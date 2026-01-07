@@ -1,0 +1,42 @@
+.contextMenu {
+  position: fixed;
+  z-index: 1000;
+  background-color: var(--color-bg-white);
+  border: 1px solid var(--color-border);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.contextMenu :global(.arco-menu) {
+  border: none;
+  box-shadow: none;
+}
+
+.contextMenu :global(.arco-menu-item) {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: 14px;
+}
+
+.contextMenu :global(.arco-menu-item:hover) {
+  background-color: var(--color-bg-hover);
+}
+
+.dividerItem {
+  padding: 4px 0 !important;
+  height: auto !important;
+  cursor: default !important;
+  pointer-events: none;
+}
+
+.dividerItem:hover {
+  background-color: transparent !important;
+}
+
+.divider {
+  height: 1px;
+  background-color: var(--color-border);
+  margin: 0;
+}
+

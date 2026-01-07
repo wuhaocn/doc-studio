@@ -1,12 +1,15 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
+import Image from '@tiptap/extension-image'
 import { Button, Input, Message, Spin } from '@arco-design/web-react'
 import { IconSave, IconArrowLeft } from '@arco-design/web-react/icon'
 import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
+import DiagramExtension from '../../extensions/DiagramExtension'
+import ContextMenu from '../../components/Editor/ContextMenu'
 import styles from './DocumentEdit.module.css'
 
 const DocumentEdit = () => {
@@ -17,16 +20,36 @@ const DocumentEdit = () => {
   const [knowledgeBase, setKnowledgeBase] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [contextMenu, setContextMenu] = useState(null)
+  const editorRef = useRef(null)
 
   const editor = useEditor({
     extensions: [
       StarterKit,
+      Image,
       Placeholder.configure({
         placeholder: '开始输入内容...',
       }),
+      DiagramExtension,
     ],
     content: '',
+    editorProps: {
+      handleDOMEvents: {
+        contextmenu: (view, event) => {
+          event.preventDefault()
+          const { clientX, clientY } = event
+          setContextMenu({ x: clientX, y: clientY })
+          return true
+        },
+      },
+    },
   })
+
+  useEffect(() => {
+    if (editor) {
+      editorRef.current = editor
+    }
+  }, [editor])
 
   useEffect(() => {
     loadData()
@@ -102,6 +125,54 @@ const DocumentEdit = () => {
     navigate(`/kb/${kbId}`)
   }
 
+  const handleInsertDiagram = (type) => {
+    if (!editor) return
+
+    const defaultContent = type === 'mermaid' 
+      ? `graph TD
+    A[开始] --> B{判断}
+    B -->|是| C[处理1]
+    B -->|否| D[处理2]
+    C --> E[结束]
+    D --> E`
+      : type === 'excalidraw'
+      ? JSON.stringify({
+          type: 'excalidraw',
+          version: 2,
+          source: 'DocStudio',
+          elements: [],
+          appState: {
+            viewBackgroundColor: '#ffffff',
+            gridSize: null,
+          },
+        })
+      : ''
+
+    editor.chain().focus().insertDiagram({
+      diagramType: type,
+      content: defaultContent,
+      width: '100%',
+      height: '400px',
+    }).run()
+  }
+
+  const handleInsertImage = () => {
+    if (!editor) return
+    const url = window.prompt('请输入图片URL:')
+    if (url) {
+      editor.chain().focus().setImage({ src: url }).run()
+    }
+  }
+
+  const handleInsertCode = () => {
+    if (!editor) return
+    editor.chain().focus().toggleCodeBlock().run()
+  }
+
+  const handleCloseContextMenu = () => {
+    setContextMenu(null)
+  }
+
   if (loading) {
     return (
       <div className={styles.loading}>
@@ -145,6 +216,16 @@ const DocumentEdit = () => {
           {editor && <EditorContent editor={editor} />}
         </div>
       </div>
+
+      {contextMenu && (
+        <ContextMenu
+          position={contextMenu}
+          onClose={handleCloseContextMenu}
+          onInsertDiagram={handleInsertDiagram}
+          onInsertImage={handleInsertImage}
+          onInsertCode={handleInsertCode}
+        />
+      )}
     </div>
   )
 }

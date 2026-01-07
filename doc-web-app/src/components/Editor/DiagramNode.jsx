@@ -1,0 +1,188 @@
+import { NodeViewWrapper } from '@tiptap/react'
+import { useState } from 'react'
+import { Button, Modal, Select, Input, Message } from '@arco-design/web-react'
+import { IconEdit, IconDelete } from '@arco-design/web-react/icon'
+import MermaidRenderer from './MermaidRenderer'
+import ExcalidrawEditor from './ExcalidrawEditor'
+import styles from './DiagramNode.module.css'
+
+const DiagramNode = ({ node, updateAttributes, deleteNode, editor }) => {
+  const { diagramType, content, width, height } = node.attrs
+  const [isEditing, setIsEditing] = useState(false)
+  const [editContent, setEditContent] = useState(content || '')
+  const [editType, setEditType] = useState(diagramType || 'mermaid')
+  const [editWidth, setEditWidth] = useState(width || '100%')
+  const [editHeight, setEditHeight] = useState(height || '400px')
+  const [showExcalidrawEditor, setShowExcalidrawEditor] = useState(false)
+
+  const handleEdit = (e) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    
+    // 如果是 Excalidraw 类型，直接打开编辑器
+    if (diagramType === 'excalidraw') {
+      setShowExcalidrawEditor(true)
+      return
+    }
+    // Mermaid 类型使用文本编辑
+    setIsEditing(true)
+    setEditContent(content || '')
+    setEditType(diagramType || 'mermaid')
+  }
+
+  const handleSave = () => {
+    if (!editContent.trim()) {
+      Message.warning('请输入图表内容')
+      return
+    }
+    updateAttributes({
+      content: editContent,
+      diagramType: editType,
+      width: editWidth,
+      height: editHeight,
+    })
+    setIsEditing(false)
+    Message.success('图表已更新')
+  }
+
+  const handleDelete = () => {
+    if (editor) {
+      const pos = editor.state.selection.$anchor.pos
+      editor.commands.deleteRange({ from: pos - node.nodeSize, to: pos })
+    } else if (deleteNode) {
+      deleteNode()
+    }
+  }
+
+  return (
+    <NodeViewWrapper className={styles.diagramWrapper} data-type="diagram">
+      <div className={styles.diagramContainer} style={{ width, height }}>
+        <div className={styles.diagramToolbar}>
+          <span className={styles.diagramLabel}>
+            {diagramType === 'mermaid' ? 'Mermaid 图表' : 'Excalidraw 图表'}
+          </span>
+          <div className={styles.diagramActions}>
+            <Button
+              type="text"
+              size="small"
+              icon={<IconEdit />}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleEdit(e)
+              }}
+            >
+              编辑
+            </Button>
+            <Button
+              type="text"
+              size="small"
+              icon={<IconDelete />}
+              onClick={handleDelete}
+            >
+              删除
+            </Button>
+          </div>
+        </div>
+        <div className={styles.diagramContent}>
+          {diagramType === 'mermaid' ? (
+            <MermaidRenderer content={content} />
+          ) : (
+            <ExcalidrawEditor 
+              content={content} 
+              showEditor={showExcalidrawEditor}
+              onEditorClose={() => setShowExcalidrawEditor(false)}
+              onUpdate={(newContent) => {
+                updateAttributes({ content: newContent })
+                setShowExcalidrawEditor(false)
+              }} 
+            />
+          )}
+        </div>
+      </div>
+
+      <Modal
+        title="编辑图表"
+        visible={isEditing}
+        onOk={handleSave}
+        onCancel={() => setIsEditing(false)}
+        style={{ width: '90%', maxWidth: '1200px' }}
+        okText="保存"
+        cancelText="取消"
+      >
+        <div className={styles.editForm}>
+          <div className={styles.formItem}>
+            <label>图表类型</label>
+            <Select
+              value={editType}
+              onChange={setEditType}
+              style={{ width: '100%' }}
+            >
+              <Select.Option value="mermaid">Mermaid (流程图/架构图)</Select.Option>
+              <Select.Option value="excalidraw">Excalidraw (手绘图表)</Select.Option>
+            </Select>
+          </div>
+
+          {editType === 'mermaid' ? (
+            <div className={styles.formItem}>
+              <label>Mermaid 代码</label>
+              <Input.TextArea
+                value={editContent}
+                onChange={setEditContent}
+                placeholder="输入 Mermaid 代码，例如：&#10;graph TD&#10;  A[开始] --> B[处理]&#10;  B --> C[结束]"
+                rows={10}
+                style={{ fontFamily: 'monospace' }}
+              />
+              <div className={styles.helpText}>
+                <a
+                  href="https://mermaid.js.org/intro/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  查看 Mermaid 语法文档
+                </a>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.formItem}>
+              <label>Excalidraw JSON</label>
+              <Input.TextArea
+                value={editContent}
+                onChange={setEditContent}
+                placeholder="Excalidraw 图表 JSON 数据"
+                rows={10}
+                style={{ fontFamily: 'monospace' }}
+              />
+              <div className={styles.helpText}>
+                使用 Excalidraw 编辑器创建图表，数据会自动保存为 JSON 格式
+              </div>
+            </div>
+          )}
+
+          <div className={styles.formRow}>
+            <div className={styles.formItem}>
+              <label>宽度</label>
+              <Input
+                value={editWidth}
+                onChange={setEditWidth}
+                placeholder="例如: 100% 或 800px"
+              />
+            </div>
+            <div className={styles.formItem}>
+              <label>高度</label>
+              <Input
+                value={editHeight}
+                onChange={setEditHeight}
+                placeholder="例如: 400px"
+              />
+            </div>
+          </div>
+        </div>
+      </Modal>
+    </NodeViewWrapper>
+  )
+}
+
+export default DiagramNode
+

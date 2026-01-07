@@ -1,0 +1,89 @@
+.diagramWrapper {
+  margin: var(--spacing-lg) 0;
+  position: relative;
+}
+
+.diagramContainer {
+  border: 2px solid var(--color-border);
+  border-radius: var(--border-radius-lg);
+  background-color: var(--color-bg-white);
+  overflow: hidden;
+  transition: all var(--transition-base);
+}
+
+.diagramContainer:hover {
+  border-color: var(--color-primary-light);
+  box-shadow: var(--shadow-md);
+}
+
+.diagramToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background-color: var(--color-bg);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.diagramLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.diagramActions {
+  display: flex;
+  gap: var(--spacing-xs);
+  position: relative;
+  z-index: 10;
+}
+
+.diagramContent {
+  padding: var(--spacing-md);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+  background-color: var(--color-bg-white);
+  overflow: auto;
+}
+
+.editForm {
+  padding: var(--spacing-md) 0;
+}
+
+.formItem {
+  margin-bottom: var(--spacing-lg);
+}
+
+.formItem label {
+  display: block;
+  margin-bottom: var(--spacing-sm);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.formRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-md);
+}
+
+.helpText {
+  margin-top: var(--spacing-xs);
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.helpText a {
+  color: var(--color-primary);
+  text-decoration: none;
+}
+
+.helpText a:hover {
+  text-decoration: underline;
+}
+

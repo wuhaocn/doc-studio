@@ -10,15 +10,18 @@
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0"
   },
   "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "react-router-dom": "^6.20.0",
     "@arco-design/web-react": "^2.54.0",
+    "@excalidraw/excalidraw": "^0.17.6",
+    "@tiptap/extension-image": "^2.1.13",
+    "@tiptap/extension-placeholder": "^2.1.13",
     "@tiptap/react": "^2.1.13",
     "@tiptap/starter-kit": "^2.1.13",
-    "@tiptap/extension-placeholder": "^2.1.13",
     "axios": "^1.6.2",
-    "dayjs": "^1.11.10"
+    "dayjs": "^1.11.10",
+    "mermaid": "^10.9.5",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0"
   },
   "devDependencies": {
     "@types/react": "^18.2.43",
@@ -31,4 +34,3 @@
     "vite": "^5.0.8"
   }
 }
-
