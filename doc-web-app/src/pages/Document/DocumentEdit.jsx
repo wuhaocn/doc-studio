@@ -5,11 +5,12 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 import { Button, Input, Message, Spin } from '@arco-design/web-react'
-import { IconSave, IconArrowLeft } from '@arco-design/web-react/icon'
+import { IconSave, IconArrowLeft, IconRobot } from '@arco-design/web-react/icon'
 import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import DiagramExtension from '../../extensions/DiagramExtension'
 import ContextMenu from '../../components/Editor/ContextMenu'
+import AIChatPanel from '../../components/AIChat/AIChatPanel'
 import styles from './DocumentEdit.module.css'
 
 const DocumentEdit = () => {
@@ -21,6 +22,7 @@ const DocumentEdit = () => {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [contextMenu, setContextMenu] = useState(null)
+  const [aiChatVisible, setAiChatVisible] = useState(false)
   const editorRef = useRef(null)
 
   const editor = useEditor({
@@ -173,6 +175,18 @@ const DocumentEdit = () => {
     setContextMenu(null)
   }
 
+  const handleToggleAIChat = () => {
+    setAiChatVisible(!aiChatVisible)
+  }
+
+  const handleInsertAIText = (text) => {
+    if (!editor) return
+    
+    // 在光标位置插入文本
+    const currentPos = editor.state.selection.anchor
+    editor.chain().focus().insertContentAt(currentPos, text).run()
+  }
+
   if (loading) {
     return (
       <div className={styles.loading}>
@@ -193,6 +207,14 @@ const DocumentEdit = () => {
           )}
         </div>
         <div className={styles.toolbarRight}>
+          <Button
+            type="outline"
+            icon={<IconRobot />}
+            onClick={handleToggleAIChat}
+            className={styles.aiButton}
+          >
+            AI 助手
+          </Button>
           <Button
             type="primary"
             icon={<IconSave />}
@@ -226,6 +248,13 @@ const DocumentEdit = () => {
           onInsertCode={handleInsertCode}
         />
       )}
+
+      <AIChatPanel
+        visible={aiChatVisible}
+        onClose={() => setAiChatVisible(false)}
+        onInsertText={handleInsertAIText}
+        documentContent={editor ? editor.getText() : ''}
+      />
     </div>
   )
 }
