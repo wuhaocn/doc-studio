@@ -5,11 +5,15 @@
 }
 
 :root {
-  /* 主色调 - 更现代的蓝色 */
+  /* 主色调 - 飞书风格蓝色 */
   --color-primary: #165dff;
   --color-primary-hover: #4080ff;
   --color-primary-light: #e8f3ff;
   --color-primary-dark: #0e42d2;
+  
+  /* 危险色 */
+  --color-danger: #f53f3f;
+  --color-danger-light: #ffece8;
   
   /* 文本颜色 */
   --color-text: #1d2129;

@@ -16,12 +16,24 @@ const Sidebar = ({ collapsed }) => {
   const loadKnowledgeBases = async () => {
     try {
       setLoading(true)
-      const response = await knowledgeBaseApi.getKnowledgeBases()
+      // 使用不分页的接口获取用户的知识库列表
+      const response = await knowledgeBaseApi.getKnowledgeBasesByUserId(1)
       if (response.code === 200) {
         setKnowledgeBases(response.data || [])
       }
     } catch (error) {
       console.error('加载知识库列表失败:', error)
+      // 如果出错，尝试使用分页接口
+      try {
+        const response = await knowledgeBaseApi.getKnowledgeBases({ page: 1, size: 100 })
+        if (response.code === 200) {
+          // 处理分页数据
+          const data = response.data?.records || response.data || []
+          setKnowledgeBases(data)
+        }
+      } catch (err) {
+        console.error('加载知识库列表失败:', err)
+      }
     } finally {
       setLoading(false)
     }
