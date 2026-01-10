@@ -14,9 +14,9 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_user_id ON knowledge_base(user_id);
-CREATE INDEX idx_status ON knowledge_base(status);
-CREATE INDEX idx_created_at ON knowledge_base(created_at);
+CREATE INDEX IF NOT EXISTS idx_kb_user_id ON knowledge_base(user_id);
+CREATE INDEX IF NOT EXISTS idx_kb_status ON knowledge_base(status);
+CREATE INDEX IF NOT EXISTS idx_kb_created_at ON knowledge_base(created_at);
 
 -- 文档表
 CREATE TABLE IF NOT EXISTS document (
@@ -36,8 +36,8 @@ CREATE TABLE IF NOT EXISTS document (
   FOREIGN KEY (knowledge_base_id) REFERENCES knowledge_base(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_knowledge_base_id ON document(knowledge_base_id);
-CREATE INDEX idx_user_id ON document(user_id);
-CREATE INDEX idx_parent_id ON document(parent_id);
-CREATE INDEX idx_created_at ON document(created_at);
+CREATE INDEX IF NOT EXISTS idx_doc_kb_id ON document(knowledge_base_id);
+CREATE INDEX IF NOT EXISTS idx_doc_user_id ON document(user_id);
+CREATE INDEX IF NOT EXISTS idx_doc_parent_id ON document(parent_id);
+CREATE INDEX IF NOT EXISTS idx_doc_created_at ON document(created_at);
 

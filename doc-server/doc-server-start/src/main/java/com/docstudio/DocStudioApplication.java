@@ -8,7 +8,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * 应用启动类
  */
 @SpringBootApplication
-@MapperScan("com.docstudio.manager.mapper")
+@MapperScan(basePackages = "com.docstudio.manager.mapper")
 public class DocStudioApplication {
     
     public static void main(String[] args) {

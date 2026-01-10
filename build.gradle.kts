@@ -11,6 +11,9 @@ allprojects {
     repositories {
         mavenCentral()
     }
+    
+    // 统一管理依赖版本
+    extra["mybatis-plus.version"] = "3.5.8"
 }
 
 subprojects {

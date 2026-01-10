@@ -6,7 +6,7 @@ import MermaidRenderer from './MermaidRenderer'
 import ExcalidrawEditor from './ExcalidrawEditor'
 import styles from './DiagramNode.module.css'
 
-const DiagramNode = ({ node, updateAttributes, deleteNode, editor }) => {
+const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => {
   const { diagramType, content, width, height } = node.attrs
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState(content || '')
@@ -47,12 +47,47 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor }) => {
     Message.success('图表已更新')
   }
 
-  const handleDelete = () => {
-    if (editor) {
-      const pos = editor.state.selection.$anchor.pos
-      editor.commands.deleteRange({ from: pos - node.nodeSize, to: pos })
-    } else if (deleteNode) {
-      deleteNode()
+  const handleDelete = (e) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
+    
+    if (!editor) {
+      if (deleteNode) {
+        deleteNode()
+      }
+      return
+    }
+
+    // 使用 getPos 获取节点在文档中的位置并删除
+    if (typeof getPos === 'function') {
+      try {
+        const pos = getPos()
+        if (pos !== undefined && pos !== null && pos >= 0) {
+          // 计算节点的起始和结束位置
+          const from = pos
+          const to = pos + node.nodeSize
+          
+          // 使用 deleteRange 删除节点
+          editor.chain()
+            .focus()
+            .deleteRange({ from, to })
+            .run()
+          return
+        }
+      } catch (error) {
+        console.error('删除节点时出错:', error)
+      }
+    }
+
+    // 备用方案：如果 getPos 不可用，尝试使用 deleteNode 命令
+    // 但这需要节点已经被选中
+    try {
+      editor.chain().focus().deleteNode('diagram').run()
+    } catch (error) {
+      console.error('删除节点失败:', error)
+      Message.error('删除图表失败，请尝试选中后删除')
     }
   }
 
@@ -79,7 +114,11 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor }) => {
               type="text"
               size="small"
               icon={<IconDelete />}
-              onClick={handleDelete}
+              onClick={(e) => {
+                e.stopPropagation()
+                e.preventDefault()
+                handleDelete(e)
+              }}
             >
               删除
             </Button>
@@ -87,10 +126,10 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor }) => {
         </div>
         <div className={styles.diagramContent}>
           {diagramType === 'mermaid' ? (
-            <MermaidRenderer content={content} />
+            <MermaidRenderer content={content || ''} />
           ) : (
             <ExcalidrawEditor 
-              content={content} 
+              content={content || ''} 
               showEditor={showExcalidrawEditor}
               onEditorClose={() => setShowExcalidrawEditor(false)}
               onUpdate={(newContent) => {

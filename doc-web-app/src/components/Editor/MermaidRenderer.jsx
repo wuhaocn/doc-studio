@@ -6,42 +6,57 @@ const MermaidRenderer = ({ content }) => {
   const containerRef = useRef(null)
   const [error, setError] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
+  const diagramIdRef = useRef(null)
 
   useEffect(() => {
-    if (!content || !containerRef.current) return
+    // 初始化 Mermaid（只初始化一次）
+    mermaid.initialize({
+      startOnLoad: false,
+      theme: 'default',
+      securityLevel: 'loose',
+      flowchart: {
+        useMaxWidth: true,
+        htmlLabels: true,
+        curve: 'basis',
+      },
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!content || content.trim() === '' || !containerRef.current) {
+      setIsLoading(false)
+      if (containerRef.current) {
+        containerRef.current.innerHTML = ''
+      }
+      return
+    }
 
     const renderDiagram = async () => {
       try {
         setIsLoading(true)
         setError(null)
 
-        // 初始化 Mermaid
-        mermaid.initialize({
-          startOnLoad: false,
-          theme: 'default',
-          securityLevel: 'loose',
-          flowchart: {
-            useMaxWidth: true,
-            htmlLabels: true,
-            curve: 'basis',
-          },
-        })
-
         // 清空容器
         containerRef.current.innerHTML = ''
 
         // 生成唯一ID
         const id = `mermaid-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+        diagramIdRef.current = id
 
         // 渲染图表
-        const { svg } = await mermaid.render(id, content)
-        containerRef.current.innerHTML = svg
+        const { svg } = await mermaid.render(id, content.trim())
+        if (containerRef.current) {
+          containerRef.current.innerHTML = svg
+        }
 
         setIsLoading(false)
       } catch (err) {
         console.error('Mermaid 渲染错误:', err)
         setError(err.message || '图表渲染失败')
         setIsLoading(false)
+        if (containerRef.current) {
+          containerRef.current.innerHTML = ''
+        }
       }
     }
 

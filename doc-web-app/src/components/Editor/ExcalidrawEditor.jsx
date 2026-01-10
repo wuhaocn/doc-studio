@@ -10,6 +10,8 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
   const elementsRef = useRef(null)
   const appStateRef = useRef(null)
   const [initialData, setInitialData] = useState(null)
+  const [previewSvg, setPreviewSvg] = useState(null)
+  const previewContainerRef = useRef(null)
 
   // 同步外部 showEditor 状态
   useEffect(() => {
@@ -19,17 +21,36 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
   }, [externalShowEditor, showEditor])
 
   useEffect(() => {
-    // 如果有内容，尝试解析
+    // 如果有内容，尝试解析并生成预览
     if (content) {
       try {
         const data = JSON.parse(content)
         setInitialData(data)
+        
+        // 生成 SVG 预览
+        if (data.elements && data.elements.length > 0) {
+          exportToSvg({
+            elements: data.elements,
+            appState: data.appState || {},
+            files: null,
+            getDimensions: (width, height) => ({ width, height }),
+          }).then((svg) => {
+            setPreviewSvg(svg.outerHTML)
+          }).catch((err) => {
+            console.error('生成预览失败:', err)
+            setPreviewSvg(null)
+          })
+        } else {
+          setPreviewSvg(null)
+        }
       } catch (error) {
         console.error('解析 Excalidraw 数据失败:', error)
         setInitialData(null)
+        setPreviewSvg(null)
       }
     } else {
       setInitialData(null)
+      setPreviewSvg(null)
     }
   }, [content])
 
@@ -69,9 +90,20 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
         } : {},
       }
 
+      const dataString = JSON.stringify(data)
       if (onUpdate) {
-        onUpdate(JSON.stringify(data))
+        onUpdate(dataString)
       }
+      
+      // 更新预览
+      const svg = await exportToSvg({
+        elements: elementsRef.current,
+        appState: appStateRef.current || {},
+        files: null,
+        getDimensions: (width, height) => ({ width, height }),
+      })
+      setPreviewSvg(svg.outerHTML)
+      
       setShowEditor(false)
       if (onEditorClose) {
         onEditorClose()
@@ -140,7 +172,51 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
   return (
     <>
       <div className={styles.container}>
-        {content && initialData ? (
+        {content && initialData && previewSvg ? (
+          <div className={styles.preview}>
+            <div className={styles.previewHeader}>
+              <div className={styles.previewText}>Excalidraw 图表</div>
+              <div className={styles.previewInfo}>
+                {initialData.elements?.length || 0} 个元素
+              </div>
+            </div>
+            <div 
+              className={styles.previewSvg}
+              ref={previewContainerRef}
+              dangerouslySetInnerHTML={{ __html: previewSvg }}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleOpenEditor()
+              }}
+            />
+            <div className={styles.previewActions}>
+              <Button
+                type="primary"
+                size="small"
+                icon={<IconEdit />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  handleOpenEditor()
+                }}
+              >
+                编辑图表
+              </Button>
+              <Button
+                type="outline"
+                size="small"
+                icon={<IconDownload />}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  e.preventDefault()
+                  handleExportSVG()
+                }}
+              >
+                导出 SVG
+              </Button>
+            </div>
+          </div>
+        ) : content && initialData ? (
           <div className={styles.preview}>
             <div className={styles.previewIcon}>✏️</div>
             <div className={styles.previewText}>Excalidraw 图表</div>
@@ -155,22 +231,10 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
                 onClick={(e) => {
                   e.stopPropagation()
                   e.preventDefault()
-                  console.log('预览区域的编辑按钮被点击')
                   handleOpenEditor()
                 }}
               >
                 编辑图表
-              </Button>
-              <Button
-                type="outline"
-                size="small"
-                icon={<IconDownload />}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  handleExportSVG()
-                }}
-              >
-                导出 SVG
               </Button>
             </div>
           </div>
@@ -186,7 +250,7 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
               icon={<IconEdit />}
               onClick={(e) => {
                 e.stopPropagation()
-                console.log('空状态的创建按钮被点击')
+                e.preventDefault()
                 handleOpenEditor()
               }}
             >
