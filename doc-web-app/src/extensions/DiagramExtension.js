@@ -103,6 +103,7 @@ export default Node.create({
   addNodeView() {
     return ReactNodeViewRenderer(DiagramNode, {
       contentDOMElementTag: 'div',
+      // 确保传递 getPos 给组件
     })
   },
 
@@ -120,6 +121,26 @@ export default Node.create({
               height: options?.height || '400px',
             },
           })
+        },
+      deleteDiagram:
+        () =>
+        ({ tr, state, dispatch }) => {
+          const { selection } = state
+          const { $from, $to } = selection
+          
+          // 查找当前选中的 diagram 节点
+          let found = false
+          state.doc.nodesBetween($from.pos, $to.pos, (node, pos) => {
+            if (node.type.name === this.name && !found) {
+              if (dispatch) {
+                tr.delete(pos, pos + node.nodeSize)
+                dispatch(tr)
+              }
+              found = true
+            }
+          })
+          
+          return found
         },
     }
   },
