@@ -164,7 +164,9 @@ const Home = () => {
                     <Menu.Item key="settings">
                       <IconSettings /> 设置
                     </Menu.Item>
-                    <Menu.Divider />
+                    <Menu.Item key="divider" disabled style={{ height: '1px', padding: 0, margin: '4px 0', background: 'var(--color-border-light)' }}>
+                      <div style={{ height: '1px', background: 'var(--color-border-light)' }} />
+                    </Menu.Item>
                     <Menu.Item key="delete" style={{ color: 'var(--color-danger)' }}>
                       <IconDelete /> 删除
                     </Menu.Item>

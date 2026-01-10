@@ -93,6 +93,17 @@ const AIChatPanel = ({ visible, onClose, onInsertText, documentContent }) => {
     }
   }
 
+  const handleInsertMermaidDiagram = (content) => {
+    // 提取 Mermaid 代码
+    const mermaidMatch = content.match(/```mermaid\n([\s\S]*?)\n```/)
+    if (mermaidMatch && onInsertText) {
+      onInsertText(content)
+      Message.success('流程图已插入到文档')
+    } else {
+      handleInsertToDocument(content)
+    }
+  }
+
   const formatMessage = (content) => {
     // 简单的markdown格式化
     return content
@@ -145,14 +156,26 @@ const AIChatPanel = ({ visible, onClose, onInsertText, documentContent }) => {
             <div className={styles.messageContent}>
               <div className={styles.messageText}>{formatMessage(message.content)}</div>
               {message.role === 'assistant' && (
-                <Button
-                  type="text"
-                  size="mini"
-                  className={styles.insertButton}
-                  onClick={() => handleInsertToDocument(message.content)}
-                >
-                  插入到文档
-                </Button>
+                <div className={styles.messageActions}>
+                  <Button
+                    type="text"
+                    size="mini"
+                    className={styles.insertButton}
+                    onClick={() => handleInsertToDocument(message.content)}
+                  >
+                    插入到文档
+                  </Button>
+                  {(message.content.includes('mermaid') || message.content.includes('graph') || message.content.includes('flowchart')) && (
+                    <Button
+                      type="text"
+                      size="mini"
+                      className={styles.insertButton}
+                      onClick={() => handleInsertMermaidDiagram(message.content)}
+                    >
+                      插入为流程图
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </div>

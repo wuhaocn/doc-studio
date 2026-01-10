@@ -6,25 +6,69 @@ import { exportToSvg, exportToPng } from '@excalidraw/excalidraw'
 import styles from './ExcalidrawEditor.module.css'
 
 const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalShowEditor, onEditorClose }, ref) => {
-  const [showEditor, setShowEditor] = useState(externalShowEditor || false)
+  const [showEditor, setShowEditor] = useState(false)
   const elementsRef = useRef(null)
   const appStateRef = useRef(null)
-  const [initialData, setInitialData] = useState(null)
+  // 初始化默认数据，确保编辑器始终有数据
+  const defaultInitialData = {
+    type: 'excalidraw',
+    version: 2,
+    source: 'DocStudio',
+    elements: [],
+    appState: {
+      viewBackgroundColor: '#ffffff',
+      gridSize: null,
+    },
+  }
+  const [initialData, setInitialData] = useState(defaultInitialData)
   const [previewSvg, setPreviewSvg] = useState(null)
   const previewContainerRef = useRef(null)
 
   // 同步外部 showEditor 状态
   useEffect(() => {
-    if (externalShowEditor !== undefined && externalShowEditor !== showEditor) {
+    if (externalShowEditor !== undefined) {
+      console.log('ExcalidrawEditor: 外部 showEditor 变化:', externalShowEditor)
       setShowEditor(externalShowEditor)
     }
-  }, [externalShowEditor, showEditor])
+  }, [externalShowEditor])
 
+  // 调试：监听 showEditor 和 initialData 的变化
   useEffect(() => {
+    console.log('ExcalidrawEditor 状态:', {
+      showEditor,
+      hasInitialData: !!initialData,
+      initialDataElements: initialData?.elements?.length || 0,
+    })
+  }, [showEditor, initialData])
+
+  // 初始化默认数据
+  useEffect(() => {
+    const defaultData = {
+      type: 'excalidraw',
+      version: 2,
+      source: 'DocStudio',
+      elements: [],
+      appState: {
+        viewBackgroundColor: '#ffffff',
+        gridSize: null,
+      },
+    }
+    
     // 如果有内容，尝试解析并生成预览
-    if (content) {
+    if (content && content.trim()) {
       try {
-        const data = JSON.parse(content)
+        const parsedData = JSON.parse(content)
+        // 确保数据格式正确
+        const data = {
+          type: parsedData.type || 'excalidraw',
+          version: parsedData.version || 2,
+          source: parsedData.source || 'DocStudio',
+          elements: parsedData.elements || [],
+          appState: parsedData.appState || {
+            viewBackgroundColor: '#ffffff',
+            gridSize: null,
+          },
+        }
         setInitialData(data)
         
         // 生成 SVG 预览
@@ -45,11 +89,13 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
         }
       } catch (error) {
         console.error('解析 Excalidraw 数据失败:', error)
-        setInitialData(null)
+        // 解析失败时使用默认数据
+        setInitialData(defaultData)
         setPreviewSvg(null)
       }
     } else {
-      setInitialData(null)
+      // 如果没有内容，设置默认的初始数据
+      setInitialData(defaultData)
       setPreviewSvg(null)
     }
   }, [content])
@@ -73,21 +119,22 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
   }
 
   const handleSave = async () => {
-    if (!elementsRef.current || elementsRef.current.length === 0) {
-      Message.warning('请先创建一些内容')
-      return
-    }
-
+    // 允许保存空图表（用户可以删除所有内容）
+    const elements = elementsRef.current || []
+    
     try {
       const data = {
         type: 'excalidraw',
         version: 2,
         source: 'DocStudio',
-        elements: elementsRef.current,
+        elements: elements,
         appState: appStateRef.current ? {
-          viewBackgroundColor: appStateRef.current.viewBackgroundColor,
-          gridSize: appStateRef.current.gridSize,
-        } : {},
+          viewBackgroundColor: appStateRef.current.viewBackgroundColor || '#ffffff',
+          gridSize: appStateRef.current.gridSize || null,
+        } : {
+          viewBackgroundColor: '#ffffff',
+          gridSize: null,
+        },
       }
 
       const dataString = JSON.stringify(data)
@@ -95,14 +142,23 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
         onUpdate(dataString)
       }
       
-      // 更新预览
-      const svg = await exportToSvg({
-        elements: elementsRef.current,
-        appState: appStateRef.current || {},
-        files: null,
-        getDimensions: (width, height) => ({ width, height }),
-      })
-      setPreviewSvg(svg.outerHTML)
+      // 更新预览（如果有元素）
+      if (elements.length > 0) {
+        try {
+          const svg = await exportToSvg({
+            elements: elements,
+            appState: appStateRef.current || data.appState,
+            files: null,
+            getDimensions: (width, height) => ({ width, height }),
+          })
+          setPreviewSvg(svg.outerHTML)
+        } catch (svgError) {
+          console.error('生成预览失败:', svgError)
+          setPreviewSvg(null)
+        }
+      } else {
+        setPreviewSvg(null)
+      }
       
       setShowEditor(false)
       if (onEditorClose) {
@@ -111,7 +167,7 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
       Message.success('图表已保存')
     } catch (error) {
       console.error('保存 Excalidraw 图表失败:', error)
-      Message.error('保存图表失败')
+      Message.error('保存图表失败: ' + (error.message || '未知错误'))
     }
   }
 
@@ -288,24 +344,48 @@ const ExcalidrawEditor = forwardRef(({ content, onUpdate, showEditor: externalSh
           </div>
         }
       >
-        <div className={styles.modalBody}>
-          {showEditor && (
-            <Excalidraw
-              initialData={initialData}
-              onChange={(elements, appState, files) => {
-                // 使用 ref 存储，避免频繁的状态更新导致无限循环
-                elementsRef.current = elements
-                appStateRef.current = appState
+        <div className={styles.modalBody} style={{ width: '100%', height: '100%' }}>
+          {showEditor && initialData ? (
+            <div 
+              id="excalidraw-container"
+              style={{ 
+                width: '100%', 
+                height: '100%', 
+                display: 'flex', 
+                flexDirection: 'column', 
+                position: 'relative',
+                minHeight: '600px'
               }}
-              UIOptions={{
-                canvasActions: {
-                  saveToActiveFile: false,
-                  loadScene: false,
-                  export: false,
-                },
-              }}
-              theme="light"
-            />
+            >
+              <Excalidraw
+                initialData={initialData}
+                onChange={(elements, appState, files) => {
+                  // 使用 ref 存储，避免频繁的状态更新导致无限循环
+                  elementsRef.current = elements
+                  appStateRef.current = appState
+                }}
+                UIOptions={{
+                  canvasActions: {
+                    saveToActiveFile: false,
+                    loadScene: false,
+                    export: false,
+                  },
+                }}
+                theme="light"
+                langCode="zh-CN"
+              />
+            </div>
+          ) : (
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center', 
+              height: '100%',
+              width: '100%',
+              color: 'var(--color-text-secondary)'
+            }}>
+              正在初始化编辑器...
+            </div>
           )}
         </div>
       </Modal>

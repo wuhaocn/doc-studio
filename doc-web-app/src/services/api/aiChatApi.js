@@ -26,12 +26,62 @@ const mockAIResponse = (message, documentContent) => {
       } else if (lowerMessage.includes('翻译') || lowerMessage.includes('translate')) {
         response = '我可以帮你翻译文本。请告诉我：\n• 需要翻译的内容\n• 目标语言（如：英文、日文等）\n\n例如："请将这段文字翻译成英文：..."'
       } else if (lowerMessage.includes('生成') || lowerMessage.includes('写')) {
-        if (lowerMessage.includes('标题')) {
+        if (lowerMessage.includes('流程图') || lowerMessage.includes('flowchart') || lowerMessage.includes('mermaid')) {
+          // 生成 Mermaid 流程图
+          let mermaidCode = ''
+          if (lowerMessage.includes('登录') || lowerMessage.includes('登录流程')) {
+            mermaidCode = `graph TD
+    A[用户访问] --> B{是否已登录?}
+    B -->|否| C[显示登录页面]
+    B -->|是| D[进入主页]
+    C --> E[输入用户名密码]
+    E --> F{验证成功?}
+    F -->|是| G[保存登录状态]
+    F -->|否| H[显示错误信息]
+    G --> D
+    H --> C`
+          } else if (lowerMessage.includes('注册') || lowerMessage.includes('注册流程')) {
+            mermaidCode = `graph TD
+    A[用户点击注册] --> B[填写注册信息]
+    B --> C{信息是否完整?}
+    C -->|否| D[提示补充信息]
+    C -->|是| E[验证邮箱]
+    D --> B
+    E --> F{邮箱验证成功?}
+    F -->|是| G[创建账户]
+    F -->|否| H[提示验证失败]
+    G --> I[注册成功]
+    H --> E`
+          } else if (lowerMessage.includes('订单') || lowerMessage.includes('下单')) {
+            mermaidCode = `graph TD
+    A[用户选择商品] --> B[加入购物车]
+    B --> C[进入结算页面]
+    C --> D[填写收货信息]
+    D --> E[选择支付方式]
+    E --> F[提交订单]
+    F --> G{支付成功?}
+    G -->|是| H[订单确认]
+    G -->|否| I[支付失败]
+    H --> J[开始发货]
+    I --> E`
+          } else {
+            // 默认流程图
+            mermaidCode = `graph TD
+    A[开始] --> B{判断条件}
+    B -->|条件1| C[处理A]
+    B -->|条件2| D[处理B]
+    C --> E[结果A]
+    D --> F[结果B]
+    E --> G[结束]
+    F --> G`
+          }
+          response = `我为你生成了一个流程图，请使用以下 Mermaid 代码：\n\n\`\`\`mermaid\n${mermaidCode}\n\`\`\`\n\n你可以点击"插入流程图"按钮将这段代码插入到文档中。`
+        } else if (lowerMessage.includes('标题')) {
           response = '以下是一些标题建议：\n\n• 如何开始使用文档系统\n• 文档编辑最佳实践\n• 团队协作指南\n• 常见问题解答\n\n需要我根据你的主题生成更具体的标题吗？'
         } else if (lowerMessage.includes('大纲') || lowerMessage.includes('目录')) {
           response = '以下是一个文档大纲示例：\n\n1. 引言\n   1.1 背景\n   1.2 目标\n2. 主要内容\n   2.1 核心概念\n   2.2 实施步骤\n3. 总结\n   3.1 要点回顾\n   3.2 下一步行动\n\n需要我根据你的主题生成更具体的大纲吗？'
         } else {
-          response = '我可以帮你生成内容。请告诉我：\n• 需要生成的内容类型（如：段落、列表、代码示例等）\n• 主题或关键词\n\n例如："请生成一段关于React的介绍"'
+          response = '我可以帮你生成内容。请告诉我：\n• 需要生成的内容类型（如：段落、列表、代码示例、流程图等）\n• 主题或关键词\n\n例如："请生成一个登录流程的流程图"或"请生成一段关于React的介绍"'
         }
       } else if (lowerMessage.includes('代码') || lowerMessage.includes('code')) {
         response = '我可以帮你生成代码示例。请告诉我：\n• 编程语言\n• 功能需求\n\n例如："请生成一个React组件的示例代码"'

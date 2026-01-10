@@ -182,7 +182,55 @@ const DocumentEdit = () => {
   const handleInsertAIText = (text) => {
     if (!editor) return
     
-    // 在光标位置插入文本
+    // 检查是否是 Mermaid 代码块
+    const mermaidMatch = text.match(/```mermaid\n([\s\S]*?)\n```/)
+    if (mermaidMatch) {
+      const mermaidCode = mermaidMatch[1].trim()
+      // 插入 Mermaid 图表
+      editor.chain().focus().insertDiagram({
+        diagramType: 'mermaid',
+        content: mermaidCode,
+        width: '100%',
+        height: '400px',
+      }).run()
+      Message.success('流程图已插入')
+      return
+    }
+    
+    // 检查是否包含 Mermaid 代码（没有代码块标记）
+    const mermaidPattern = /graph\s+(TD|LR|TB|BT|RL)|flowchart\s+(TD|LR|TB|BT|RL)|sequenceDiagram|classDiagram|stateDiagram|erDiagram|gantt|pie|gitgraph/
+    if (mermaidPattern.test(text)) {
+      // 尝试提取 Mermaid 代码
+      const lines = text.split('\n')
+      let mermaidCode = ''
+      let inMermaidBlock = false
+      
+      for (const line of lines) {
+        if (line.trim().startsWith('```mermaid') || mermaidPattern.test(line)) {
+          inMermaidBlock = true
+          if (!line.trim().startsWith('```')) {
+            mermaidCode += line + '\n'
+          }
+        } else if (inMermaidBlock && line.trim().startsWith('```')) {
+          break
+        } else if (inMermaidBlock) {
+          mermaidCode += line + '\n'
+        }
+      }
+      
+      if (mermaidCode.trim()) {
+        editor.chain().focus().insertDiagram({
+          diagramType: 'mermaid',
+          content: mermaidCode.trim(),
+          width: '100%',
+          height: '400px',
+        }).run()
+        Message.success('流程图已插入')
+        return
+      }
+    }
+    
+    // 普通文本插入
     const currentPos = editor.state.selection.anchor
     editor.chain().focus().insertContentAt(currentPos, text).run()
   }

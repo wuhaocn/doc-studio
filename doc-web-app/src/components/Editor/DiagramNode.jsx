@@ -10,6 +10,7 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => 
   const { diagramType, content, width, height } = node.attrs
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState(content || '')
+  const [previewContent, setPreviewContent] = useState(content || '') // 预览内容
   const [editType, setEditType] = useState(diagramType || 'mermaid')
   const [editWidth, setEditWidth] = useState(width || '100%')
   const [editHeight, setEditHeight] = useState(height || '400px')
@@ -29,7 +30,18 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => 
     // Mermaid 类型使用文本编辑
     setIsEditing(true)
     setEditContent(content || '')
+    setPreviewContent(content || '') // 初始化预览内容
     setEditType(diagramType || 'mermaid')
+  }
+
+  // 实时更新预览内容
+  const handleContentChange = (newContent) => {
+    setEditContent(newContent)
+    // 使用防抖更新预览
+    clearTimeout(handleContentChange.timer)
+    handleContentChange.timer = setTimeout(() => {
+      setPreviewContent(newContent)
+    }, 500) // 500ms 延迟更新预览
   }
 
   const handleSave = () => {
@@ -145,17 +157,24 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => 
         title="编辑图表"
         visible={isEditing}
         onOk={handleSave}
-        onCancel={() => setIsEditing(false)}
-        style={{ width: '90%', maxWidth: '1200px' }}
+        onCancel={() => {
+          setIsEditing(false)
+          setPreviewContent(content || '') // 重置预览内容
+        }}
+        style={{ width: '95%', maxWidth: '1400px' }}
         okText="保存"
         cancelText="取消"
+        className={styles.editModal}
       >
         <div className={styles.editForm}>
           <div className={styles.formItem}>
             <label>图表类型</label>
             <Select
               value={editType}
-              onChange={setEditType}
+              onChange={(value) => {
+                setEditType(value)
+                setPreviewContent(editContent) // 切换类型时更新预览
+              }}
               style={{ width: '100%' }}
             >
               <Select.Option value="mermaid">Mermaid (流程图/架构图)</Select.Option>
@@ -164,23 +183,35 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => 
           </div>
 
           {editType === 'mermaid' ? (
-            <div className={styles.formItem}>
-              <label>Mermaid 代码</label>
-              <Input.TextArea
-                value={editContent}
-                onChange={setEditContent}
-                placeholder="输入 Mermaid 代码，例如：&#10;graph TD&#10;  A[开始] --> B[处理]&#10;  B --> C[结束]"
-                rows={10}
-                style={{ fontFamily: 'monospace' }}
-              />
-              <div className={styles.helpText}>
-                <a
-                  href="https://mermaid.js.org/intro/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  查看 Mermaid 语法文档
-                </a>
+            <div className={styles.editContainer}>
+              <div className={styles.editPanel}>
+                <div className={styles.panelHeader}>
+                  <label>Mermaid 代码</label>
+                  <a
+                    href="https://mermaid.js.org/intro/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className={styles.helpLink}
+                  >
+                    查看语法文档
+                  </a>
+                </div>
+                <Input.TextArea
+                  value={editContent}
+                  onChange={handleContentChange}
+                  placeholder="输入 Mermaid 代码，例如：&#10;graph TD&#10;  A[开始] --> B[处理]&#10;  B --> C[结束]"
+                  rows={20}
+                  style={{ fontFamily: 'monospace', fontSize: '14px' }}
+                  className={styles.codeEditor}
+                />
+              </div>
+              <div className={styles.previewPanel}>
+                <div className={styles.panelHeader}>
+                  <label>实时预览</label>
+                </div>
+                <div className={styles.previewContent}>
+                  <MermaidRenderer content={previewContent || editContent} />
+                </div>
               </div>
             </div>
           ) : (
