@@ -1,9 +1,20 @@
 import { Link } from 'react-router-dom'
 import { IconMenuFold, IconSearch } from '@arco-design/web-react/icon'
-import { Input } from '@arco-design/web-react'
+import { Input, Avatar, Dropdown, Menu } from '@arco-design/web-react'
+import { getCurrentUser } from '../../utils/user'
 import styles from './Header.module.css'
 
 const Header = ({ onToggleSidebar }) => {
+  const user = getCurrentUser()
+
+  const userMenu = (
+    <Menu>
+      <Menu.Item key="profile">个人资料</Menu.Item>
+      <Menu.Item key="settings">设置</Menu.Item>
+      <Menu.Item key="logout">退出登录</Menu.Item>
+    </Menu>
+  )
+
   return (
     <header className={styles.header}>
       <div className={styles.left}>
@@ -22,7 +33,14 @@ const Header = ({ onToggleSidebar }) => {
         />
       </div>
       <div className={styles.right}>
-        {/* 用户信息区域，暂时留空 */}
+        <Dropdown trigger="click" droplist={userMenu}>
+          <div className={styles.userInfo}>
+            <Avatar size={32} className={styles.avatar}>
+              {user.nickname.charAt(0)}
+            </Avatar>
+            <span className={styles.username}>{user.nickname}</span>
+          </div>
+        </Dropdown>
       </div>
     </header>
   )

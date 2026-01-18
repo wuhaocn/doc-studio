@@ -97,3 +97,28 @@
   gap: var(--spacing-sm);
 }
 
+.userInfo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-lg);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.userInfo:hover {
+  background-color: var(--color-bg-hover);
+}
+
+.avatar {
+  cursor: pointer;
+}
+
+.username {
+  font-size: var(--font-size-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
