@@ -1,12 +1,12 @@
 import { NodeViewWrapper } from '@tiptap/react'
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { Button, Modal, Select, Input, Message } from '@arco-design/web-react'
 import { IconEdit, IconDelete } from '@arco-design/web-react/icon'
 import MermaidRenderer from './MermaidRenderer'
 import ExcalidrawEditor from './ExcalidrawEditor'
 import styles from './DiagramNode.module.css'
 
-const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => {
+const DiagramNode = memo(({ node, updateAttributes, deleteNode, editor, getPos }) => {
   const { diagramType, content, width, height } = node.attrs
   const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState(content || '')
@@ -252,7 +252,7 @@ const DiagramNode = ({ node, updateAttributes, deleteNode, editor, getPos }) => 
       </Modal>
     </NodeViewWrapper>
   )
-}
+})
 
 export default DiagramNode
 

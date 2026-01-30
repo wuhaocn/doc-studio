@@ -41,3 +41,20 @@ CREATE INDEX IF NOT EXISTS idx_doc_user_id ON document(user_id);
 CREATE INDEX IF NOT EXISTS idx_doc_parent_id ON document(parent_id);
 CREATE INDEX IF NOT EXISTS idx_doc_created_at ON document(created_at);
 
+-- 文档版本表
+CREATE TABLE IF NOT EXISTS document_version (
+  id BIGINT AUTO_INCREMENT PRIMARY KEY,
+  document_id BIGINT NOT NULL,
+  version INT NOT NULL,
+  title VARCHAR(200) NOT NULL,
+  content CLOB,
+  content_text CLOB,
+  user_id BIGINT NOT NULL,
+  remark VARCHAR(255),
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (document_id) REFERENCES document(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_version_doc_id ON document_version(document_id);
+CREATE INDEX IF NOT EXISTS idx_version_version ON document_version(version);
+

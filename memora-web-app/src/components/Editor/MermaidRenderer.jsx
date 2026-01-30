@@ -43,6 +43,8 @@ const MermaidRenderer = ({ content }) => {
   const renderKeyRef = useRef(0)
   const isRenderingRef = useRef(false)
   const initPromiseRef = useRef(null)
+  const isMountedRef = useRef(true) // 跟踪组件是否已挂载
+  const cleanupRef = useRef([]) // 存储需要清理的定时器
 
   // 初始化 Mermaid
   useEffect(() => {
@@ -51,16 +53,40 @@ const MermaidRenderer = ({ content }) => {
     }
   }, [])
 
+  // 组件卸载时的清理
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+      // 清理所有定时器
+      cleanupRef.current.forEach(timerId => {
+        try {
+          clearInterval(timerId)
+          clearTimeout(timerId)
+        } catch (e) {
+          // 忽略清理错误
+        }
+      })
+      cleanupRef.current = []
+    }
+  }, [])
+
   useEffect(() => {
     const renderDiagram = async () => {
+      // 检查组件是否已卸载
+      if (!isMountedRef.current) {
+        return
+      }
+
       // 等待初始化完成
       if (initPromiseRef.current) {
         try {
           await initPromiseRef.current
         } catch (err) {
           console.error('等待 Mermaid 初始化失败:', err)
-          setError('Mermaid 初始化失败')
-          setIsLoading(false)
+          if (isMountedRef.current) {
+            setError('Mermaid 初始化失败')
+            setIsLoading(false)
+          }
           return
         }
       }
@@ -70,8 +96,10 @@ const MermaidRenderer = ({ content }) => {
         console.log('正在渲染中，跳过本次')
         // 如果已经在渲染，等待完成后重试
         const checkInterval = setInterval(() => {
-          if (!isRenderingRef.current && containerRef.current) {
+          if (!isRenderingRef.current && containerRef.current && isMountedRef.current) {
             clearInterval(checkInterval)
+            // 从清理列表中移除
+            cleanupRef.current = cleanupRef.current.filter(id => id !== checkInterval)
             // 重新触发渲染
             const trimmedContent = content.trim()
             if (trimmedContent !== renderedContentRef.current) {
@@ -79,16 +107,27 @@ const MermaidRenderer = ({ content }) => {
             }
           }
         }, 200)
+        
+        // 添加到清理列表
+        cleanupRef.current.push(checkInterval)
+        
         // 5秒后清除检查
-        setTimeout(() => clearInterval(checkInterval), 5000)
+        const timeoutId = setTimeout(() => {
+          clearInterval(checkInterval)
+          cleanupRef.current = cleanupRef.current.filter(id => id !== checkInterval)
+        }, 5000)
+        
+        cleanupRef.current.push(timeoutId)
         return
       }
 
       // 检查内容是否有效
       if (!content || typeof content !== 'string' || content.trim() === '') {
         console.log('内容为空，跳过渲染')
-        setIsLoading(false)
-        setError(null)
+        if (isMountedRef.current) {
+          setIsLoading(false)
+          setError(null)
+        }
         renderedContentRef.current = ''
         if (containerRef.current) {
           containerRef.current.innerHTML = ''
@@ -98,7 +137,9 @@ const MermaidRenderer = ({ content }) => {
 
       if (!containerRef.current) {
         console.warn('容器不存在')
-        setIsLoading(false)
+        if (isMountedRef.current) {
+          setIsLoading(false)
+        }
         isRenderingRef.current = false
         return
       }
@@ -108,7 +149,9 @@ const MermaidRenderer = ({ content }) => {
       // 如果内容没有变化，跳过重新渲染
       if (trimmedContent === renderedContentRef.current) {
         console.log('内容未变化，跳过渲染')
-        setIsLoading(false)
+        if (isMountedRef.current) {
+          setIsLoading(false)
+        }
         isRenderingRef.current = false
         return
       }
@@ -116,8 +159,10 @@ const MermaidRenderer = ({ content }) => {
       isRenderingRef.current = true
 
       try {
-        setIsLoading(true)
-        setError(null)
+        if (isMountedRef.current) {
+          setIsLoading(true)
+          setError(null)
+        }
 
         // 清空容器
         if (containerRef.current) {
@@ -136,6 +181,13 @@ const MermaidRenderer = ({ content }) => {
 
         // 使用 Mermaid 10.x API - render 方法
         const result = await mermaid.render(id, trimmedContent)
+        
+        // 检查组件是否已卸载
+        if (!isMountedRef.current) {
+          isRenderingRef.current = false
+          return
+        }
+        
         const svg = result?.svg || result
         
         if (!svg || typeof svg !== 'string') {
@@ -145,7 +197,9 @@ const MermaidRenderer = ({ content }) => {
         // 检查容器是否还存在
         if (!containerRef.current) {
           console.warn('渲染过程中容器被移除')
-          setIsLoading(false)
+          if (isMountedRef.current) {
+            setIsLoading(false)
+          }
           isRenderingRef.current = false
           return
         }
@@ -154,7 +208,9 @@ const MermaidRenderer = ({ content }) => {
         containerRef.current.innerHTML = svg
         renderedContentRef.current = trimmedContent
         console.log('Mermaid 图表渲染成功，SVG 长度:', svg.length)
-        setIsLoading(false)
+        if (isMountedRef.current) {
+          setIsLoading(false)
+        }
       } catch (err) {
         console.error('Mermaid 渲染错误:', err)
         console.error('错误详情:', {
@@ -164,8 +220,10 @@ const MermaidRenderer = ({ content }) => {
           content: trimmedContent.substring(0, 200),
         })
         const errorMessage = err.message || err.toString() || '图表渲染失败'
-        setError(errorMessage)
-        setIsLoading(false)
+        if (isMountedRef.current) {
+          setError(errorMessage)
+          setIsLoading(false)
+        }
         renderedContentRef.current = ''
         if (containerRef.current) {
           containerRef.current.innerHTML = ''
