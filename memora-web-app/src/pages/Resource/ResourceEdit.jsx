@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react'
 import { Card, Typography, Message } from '@arco-design/web-react'
 import { useNavigate, useParams } from 'react-router-dom'
 import ResourceForm from '../../components/Resource/ResourceForm'
-import { resourceApi, tagApi } from '../../services/api'
+import { resourceApi } from '../../services/api/resourceApi'
+import { tagApi } from '../../services/api/tagApi'
 import styles from './ResourceEdit.module.css'
 
 /**

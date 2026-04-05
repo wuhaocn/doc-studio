@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { Button, Input, Select, Space, Card, Typography, Switch, Message, Empty } from '@arco-design/web-react'
-import { IconSearch, IconViewList, IconViewModule, IconPlus, IconRefresh } from '@arco-design/web-react/icon'
+import { IconSearch, IconList, IconLayout, IconPlus, IconRefresh } from '@arco-design/web-react/icon'
 import { useNavigate } from 'react-router-dom'
 import ResourceList from '../../components/Resource/ResourceList'
-import { resourceApi, tagApi } from '../../services/api'
+import { resourceApi } from '../../services/api/resourceApi'
+import { tagApi } from '../../services/api/tagApi'
 import styles from './ResourceHome.module.css'
 
 /**
@@ -181,7 +182,7 @@ const ResourceHome = () => {
           <div className={styles.viewMode}>
             <Space size="mini">
               <Button
-                icon={<IconViewModule />}
+                icon={<IconLayout />}
                 type={viewMode === 'card' ? 'primary' : 'default'}
                 size="small"
                 onClick={() => setViewMode('card')}
@@ -189,7 +190,7 @@ const ResourceHome = () => {
                 卡片
               </Button>
               <Button
-                icon={<IconViewList />}
+                icon={<IconList />}
                 type={viewMode === 'list' ? 'primary' : 'default'}
                 size="small"
                 onClick={() => setViewMode('list')}

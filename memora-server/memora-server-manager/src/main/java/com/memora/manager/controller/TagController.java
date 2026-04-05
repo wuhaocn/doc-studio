@@ -71,7 +71,7 @@ public class TagController {
         if (keyword != null && !keyword.isEmpty()) {
             result = tagService.search(keyword);
         } else {
-            result = tagService.list();
+            result = tagService.getList();
         }
         return Result.success(result);
     }

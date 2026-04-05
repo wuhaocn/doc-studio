@@ -24,6 +24,7 @@ subprojects {
     
     tasks.withType<JavaCompile> {
         options.encoding = "UTF-8"
+        options.compilerArgs.add("-parameters")
     }
     
     // 只在启动模块中应用Spring Boot插件

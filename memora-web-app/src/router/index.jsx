@@ -29,6 +29,10 @@ const router = createBrowserRouter([
         element: <DocumentEdit />,
       },
       {
+        path: 'kb/:id',
+        element: <KnowledgeBaseDetail />,
+      },
+      {
         path: 'knowledge-base/:id',
         element: <KnowledgeBaseDetail />,
       },
@@ -71,6 +75,11 @@ const router = createBrowserRouter([
       },
     ],
   },
-])
+], {
+  future: {
+    v7_startTransition: true,
+    v7_relativeSplatPath: true,
+  },
+})
 
 export default router

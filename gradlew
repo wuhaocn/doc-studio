@@ -159,10 +159,11 @@ function splitJvmOpts() {
 
 splitJvmOpts "$DEFAULT_JVM_OPTS $JAVA_OPTS $GRADLE_OPTS"
 
-# By default we should be in the correct project dir, but when run from Finder on Mac, the cwd is wrong
-if [ "$(uname)" = "Darwin" ] && [ "$(ps -o comm= -p $PPID)" = "Finder" ]; then
-    cd "$APP_HOME"
-fi
+# By default we should be in the correct project dir
+# Removed ps command check due to sandbox restrictions
+# if [ "$(uname)" = "Darwin" ] && [ "$(ps -o comm= -p $PPID)" = "Finder" ]; then
+#     cd "$APP_HOME"
+# fi
 
 # Execute Gradle
-exec "$JAVACMD" $JVM_OPTS -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar:$APP_HOME/gradle/wrapper/gradle-wrapper-shared-8.5.jar" org.gradle.wrapper.GradleWrapperMain "$@"
+exec "$JAVACMD" $JVM_OPTS -classpath "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain "$@"

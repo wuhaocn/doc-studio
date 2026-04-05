@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Form, Input, Select, TextArea, Switch, Button, Space, Message, Card, Tabs, Typography } from '@arco-design/web-react'
+import { Form, Input, Select, Switch, Button, Space, Message, Card, Tabs, Typography } from '@arco-design/web-react'
 import TagManager from './TagManager'
 import styles from './ResourceForm.module.css'
 
@@ -87,7 +87,7 @@ const ResourceForm = ({
               label="资源描述"
               field="description"
             >
-              <TextArea
+              <Input.TextArea
                 placeholder="请输入资源描述"
                 rows={3}
                 maxLength={500}
@@ -127,7 +127,7 @@ const ResourceForm = ({
               label="资源内容"
               field="content"
             >
-              <TextArea
+              <Input.TextArea
                 placeholder="请输入资源内容"
                 rows={6}
               />

@@ -32,18 +32,27 @@ const KnowledgeBaseDetail = () => {
   const loadData = async () => {
     try {
       setLoading(true)
-      const [kbResponse, docResponse] = await Promise.all([
-        knowledgeBaseApi.getKnowledgeBaseById(id),
-        documentApi.getDocumentsByKnowledgeBaseId(id),
-      ])
-
+      console.log('开始加载数据，知识库ID:', id)
+      const kbResponse = await knowledgeBaseApi.getKnowledgeBaseById(id)
+      console.log('知识库API响应:', kbResponse)
+      
       if (kbResponse.code === 200) {
+        console.log('知识库数据:', kbResponse.data)
         setKnowledgeBase(kbResponse.data)
+      } else {
+        console.error('知识库API返回错误:', kbResponse)
       }
+      
+      const docResponse = await knowledgeBaseApi.getDocumentsByKnowledgeBaseId(id)
+      console.log('文档API响应:', docResponse)
+      
       if (docResponse.code === 200) {
         // 处理分页数据或列表数据
         const docData = docResponse.data?.records || docResponse.data || []
+        console.log('文档数据:', docData)
         setDocuments(Array.isArray(docData) ? docData : [])
+      } else {
+        console.error('文档API返回错误:', docResponse)
       }
     } catch (error) {
       console.error('加载数据失败:', error)

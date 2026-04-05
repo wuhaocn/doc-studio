@@ -149,6 +149,54 @@
 - 官方网站: [https://skillforge.ai](https://skillforge.ai)
 - GitHub: [https://github.com/skillforge/skillforge](https://github.com/skillforge/skillforge)
 
+## 11. Doc Studio 项目技能
+
+**项目简介**: Doc Studio 项目配置了专属的 AI 技能，用于辅助项目开发、文档生成和架构设计。
+
+**主要技能**:
+
+### 11.1 code-reflection
+
+**技能名称**: code-reflection
+**描述**: 分析代码质量，识别架构问题，提出改进建议，支持高内聚、低耦合的设计原则
+**版本**: 1.0.0
+**作者**: DocStudio Team
+
+**主要功能**:
+- 代码质量分析
+- 架构评估
+- 重构建议
+- 高内聚、低耦合设计支持
+
+### 11.2 self-assessment
+
+**技能名称**: self-assessment
+**描述**: 评估系统整体状态和性能，生成全面的评估报告
+**版本**: 1.0.0
+**作者**: DocStudio Team
+
+**主要功能**:
+- 系统评估
+- 性能监控
+- 业务指标分析
+- 质量报告生成
+
+### 11.3 iteration-optimization
+
+**技能名称**: iteration-optimization
+**描述**: 支持迭代优化流程，基于自我评估结果生成具体的优化建议
+**版本**: 1.0.0
+**作者**: DocStudio Team
+
+**主要功能**:
+- 迭代规划
+- 优化建议
+- 持续改进
+- 流程支持
+
+**项目地址**:
+- 项目目录: `/Users/wuhao/data/ai/memora-agent-studio/.claude/skills/`
+
 ## 总结
 
 以上是业界优秀的 Skills 资源，涵盖了从开发框架到平台工具的各个方面。这些资源可以帮助开发者更高效地构建和部署技能，提升开发效率和质量。

@@ -35,7 +35,7 @@ public interface TagService extends IService<Tag> {
     /**
      * 获取标签列表
      */
-    List<TagVO> list();
+    List<TagVO> getList();
     
     /**
      * 搜索标签

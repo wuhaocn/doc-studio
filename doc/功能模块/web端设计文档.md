@@ -1,12 +1,12 @@
-# DocStudio Web端设计文档
+# Memora Web端设计文档
 
 ## 1. 项目概述
 
 ### 1.1 项目名称
-DocStudio Web端 - 在线文档管理系统前端
+Memora Web端 - 在线文档管理系统前端
 
 ### 1.2 项目简介
-DocStudio Web端是 DocStudio 在线文档管理系统的Web前端应用，提供用户友好的界面用于文档管理、编辑和协作。Web端与服务端无缝集成，支持实时协作编辑和多端数据同步。
+Memora Web端是 Memora 在线文档管理系统的Web前端应用，提供用户友好的界面用于文档管理、编辑和协作。Web端与服务端无缝集成，支持实时协作编辑和多端数据同步。路径：/Users/wuhao/data/ai/memora-agent-studio/memora-web-app
 
 **核心功能**:
 - **文档管理**: 浏览、创建、编辑、删除文档

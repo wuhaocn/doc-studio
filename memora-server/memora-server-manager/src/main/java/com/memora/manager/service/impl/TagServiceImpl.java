@@ -123,7 +123,7 @@ public class TagServiceImpl extends ServiceImpl<TagMapper, Tag> implements TagSe
      * 获取标签列表
      */
     @Override
-    public List<TagVO> list() {
+    public List<TagVO> getList() {
         LambdaQueryWrapper<Tag> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Tag::getStatus, 1)
             .orderByDesc(Tag::getResourceCount)

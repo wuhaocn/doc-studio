@@ -5,7 +5,7 @@ export const resourceApi = {
   // 获取资源列表（分页）
   getResources: async (params = {}) => {
     const { page = 1, size = 20, keyword, type, tagId } = params
-    const response = await httpClient.get('/resources', {
+    const response = await httpClient.get('/api/v1/resources', {
       params: { page, size, keyword, type, tagId },
     })
     return response
@@ -13,7 +13,7 @@ export const resourceApi = {
 
   // 获取资源详情
   getResourceById: async (id) => {
-    const response = await httpClient.get(`/resources/${id}`)
+    const response = await httpClient.get(`/api/v1/resources/${id}`)
     return response
   },
 
@@ -24,32 +24,32 @@ export const resourceApi = {
       ...data,
       userId: data.userId || 1,
     }
-    const response = await httpClient.post('/resources', requestData)
+    const response = await httpClient.post('/api/v1/resources', requestData)
     return response
   },
 
   // 更新资源
   updateResource: async (id, data) => {
-    const response = await httpClient.put(`/resources/${id}`, data)
+    const response = await httpClient.put(`/api/v1/resources/${id}`, data)
     return response
   },
 
   // 删除资源
   deleteResource: async (id) => {
-    const response = await httpClient.delete(`/resources/${id}`)
+    const response = await httpClient.delete(`/api/v1/resources/${id}`)
     return response
   },
 
   // 按类型获取资源
   getResourcesByType: async (type) => {
-    const response = await httpClient.get(`/resources/type/${type}`)
+    const response = await httpClient.get(`/api/v1/resources/type/${type}`)
     return response
   },
 
   // 搜索资源
   searchResources: async (params = {}) => {
     const { page = 1, size = 20, keyword, type, tagId } = params
-    const response = await httpClient.get('/resources/search', {
+    const response = await httpClient.get('/api/v1/resources/search', {
       params: { page, size, keyword, type, tagId },
     })
     return response
@@ -57,13 +57,13 @@ export const resourceApi = {
 
   // 获取资源标签
   getResourceTags: async (resourceId) => {
-    const response = await httpClient.get(`/resources/${resourceId}/tags`)
+    const response = await httpClient.get(`/api/v1/tags/resource/${resourceId}`)
     return response
   },
 
   // 关联资源到文档
   associateWithDocument: async (resourceId, documentId) => {
-    const response = await httpClient.post(`/resources/${resourceId}/associate/${documentId}`)
+    const response = await httpClient.post(`/api/v1/resources/${resourceId}/associate/${documentId}`)
     return response
   },
 }

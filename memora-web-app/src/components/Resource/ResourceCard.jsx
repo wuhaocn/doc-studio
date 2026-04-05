@@ -1,6 +1,6 @@
 import React from 'react'
 import { Card, Tag, Space, Button, Tooltip, Avatar } from '@arco-design/web-react'
-import { IconEdit, IconDelete, IconView, IconDownload } from '@arco-design/web-react/icon'
+import { IconEdit, IconDelete, IconEye, IconDownload } from '@arco-design/web-react/icon'
 import styles from './ResourceCard.module.css'
 
 /**
@@ -135,7 +135,7 @@ const ResourceCard = ({
         <Space size="mini">
           <Tooltip content="查看次数">
             <Space size="mini">
-              <IconView />
+              <IconEye />
               <span>{resource.viewCount || 0}</span>
             </Space>
           </Tooltip>
@@ -199,7 +199,7 @@ const ResourceCard = ({
             </Tag>
             <Space size="mini" direction="vertical">
               <Space size="mini">
-                <IconView />
+                <IconEye />
                 <span>{resource.viewCount || 0}</span>
               </Space>
               <Space size="mini">

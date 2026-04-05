@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { Card, Typography, Tag, Space, Button, Avatar, Message, Empty, Divider } from '@arco-design/web-react'
-import { IconEdit, IconDelete, IconView, IconDownload, IconReturn } from '@arco-design/web-react/icon'
+import { IconEdit, IconDelete, IconEye, IconDownload, IconArrowLeft } from '@arco-design/web-react/icon'
 import { useNavigate, useParams } from 'react-router-dom'
-import { resourceApi } from '../../services/api'
+import { resourceApi } from '../../services/api/resourceApi'
 import styles from './ResourceDetailPage.module.css'
 
 /**
@@ -117,7 +117,7 @@ const ResourceDetailPage = () => {
     <div className={styles.container}>
       {/* 返回按钮 */}
       <Button
-        icon={<IconReturn />}
+        icon={<IconArrowLeft />}
         onClick={handleReturn}
         className={styles.returnButton}
       >
@@ -149,7 +149,7 @@ const ResourceDetailPage = () => {
                   {resource.isPublic ? '公开' : '私有'}
                 </Tag>
                 <Space size="mini">
-                  <IconView />
+                  <IconEye />
                   <span>{resource.viewCount || 0} 次查看</span>
                 </Space>
                 <Space size="mini">

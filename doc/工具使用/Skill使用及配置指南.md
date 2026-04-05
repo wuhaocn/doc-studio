@@ -642,11 +642,82 @@ module.exports = {
 - **GitHub Skills Topics**：https://github.com/topics/claude-skills
 - **Community Skills**：https://community.anthropic.com/
 
+### 8.3 Doc Studio 项目技能
+
+Doc Studio 项目配置了专属的 AI 技能，用于辅助项目开发、文档生成和架构设计。以下是项目中可用的技能：
+
+#### 8.3.1 code-reflection
+
+**技能名称**：code-reflection
+**描述**：分析代码质量，识别架构问题，提出改进建议，支持高内聚、低耦合的设计原则
+**版本**：1.0.0
+**作者**：DocStudio Team
+
+**使用方法**：
+```
+调用 code-reflection 技能，分析这段代码的质量并提出改进建议
+```
+
+**参数**：
+- `code_path`：代码文件路径或目录路径
+- `analysis_type`：分析类型（architecture, performance, security, readability）
+- `focus_areas`：重点关注领域（cohesion, coupling, naming, structure）
+
+**使用示例**：
+```
+调用 code-reflection 技能，分析 ./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/KnowledgeBaseController.java 文件，分析类型为 architecture，重点关注 cohesion 和 coupling
+```
+
+#### 8.3.2 self-assessment
+
+**技能名称**：self-assessment
+**描述**：评估系统整体状态和性能，生成全面的评估报告
+**版本**：1.0.0
+**作者**：DocStudio Team
+
+**使用方法**：
+```
+调用 self-assessment 技能，生成系统评估报告
+```
+
+**参数**：
+- `assessment_type`：评估类型（code_quality, performance, business, comprehensive）
+- `target_areas`：评估目标领域（backend, frontend, database, api）
+- `time_range`：评估时间范围（day, week, month, quarter）
+
+**使用示例**：
+```
+调用 self-assessment 技能，生成 comprehensive 类型的评估报告，评估目标领域包括 backend 和 frontend，时间范围为 week
+```
+
+#### 8.3.3 iteration-optimization
+
+**技能名称**：iteration-optimization
+**描述**：支持迭代优化流程，基于自我评估结果生成具体的优化建议
+**版本**：1.0.0
+**作者**：DocStudio Team
+
+**使用方法**：
+```
+调用 iteration-optimization 技能，基于评估结果生成优化建议
+```
+
+**参数**：
+- `assessment_result`：自我评估结果（可从self-assessment技能获取）
+- `iteration_goals`：迭代目标
+- `priority_levels`：优先级设置（high, medium, low）
+- `timebox`：时间限制（天）
+
+**使用示例**：
+```
+调用 iteration-optimization 技能，基于之前的评估结果，设置迭代目标为提高代码质量和性能，优先级为high和medium，时间限制为14天
+```
+
 ## 9. 总结
 
 业界 Skills 是 AI 编程工具的强大扩展能力，可以大幅提升开发效率和代码质量。通过遵循官方最佳实践配置和使用 Skills，可以标准化开发流程，加快开发速度，提高代码质量。
 
-本文档详细介绍了在 TRAE、Cursor、Claude、QCode 和 Anthropics 等主流 AI 编程工具中配置和使用 Skills 的方法，以及符合官方最佳实践的技能开发规范。希望能帮助开发者更好地利用 Skills 提升开发效率，创建高质量的自定义技能。
+本文档详细介绍了在 TRAE、Cursor、Claude、QCode 和 Anthropics 等主流 AI 编程工具中配置和使用 Skills 的方法，以及符合官方最佳实践的技能开发规范。同时，也介绍了 Doc Studio 项目专属的 AI 技能，希望能帮助开发者更好地利用 Skills 提升开发效率，创建高质量的自定义技能。
 
 ## 10. 参考文档
 
@@ -655,3 +726,4 @@ module.exports = {
 - [Anthropic Skills 开发指南](https://docs.anthropic.com/claude/docs/developing-skills)
 - [TRAE Skills 使用指南](https://aicoding.csdn.net/697047d37c1d88441d8e6db3.html)
 - [Claude Skills 最佳实践](https://docs.anthropic.com/claude/docs/skill-best-practices)
+- [Doc Studio 项目技能配置](https://github.com/doc-studio/doc-studio/blob/main/AGENTS.md)

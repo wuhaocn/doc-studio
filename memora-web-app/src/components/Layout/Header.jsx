@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom'
-import { IconMenuFold, IconSearch, IconHome, IconDatabase, IconRobot } from '@arco-design/web-react/icon'
+import { IconMenuFold, IconSearch, IconHome, IconFolder, IconRobot } from '@arco-design/web-react/icon'
 import { Input, Avatar, Dropdown, Menu, Space } from '@arco-design/web-react'
 import { getCurrentUser } from '../../utils/user'
 import styles from './Header.module.css'
@@ -39,7 +39,7 @@ const Header = ({ onToggleSidebar }) => {
             </Link>
             <Link to="/resource" className={`${styles.navLink} ${isActive('/resource') ? styles.active : ''}`}>
               <Space size="mini">
-                <IconDatabase />
+                <IconFolder />
                 <span>资源库</span>
               </Space>
             </Link>
