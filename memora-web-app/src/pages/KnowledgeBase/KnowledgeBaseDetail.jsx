@@ -1346,15 +1346,17 @@ const KnowledgeBaseDetail = () => {
             <section className={`${styles.documentCard} ${focusMode ? styles.documentCardFocus : ''}`}>
               <div className={styles.documentHeader}>
                 <div className={styles.documentHeading}>
-                  <div className={styles.documentPath}>{selectedDocument.path}</div>
+                  {selectedDocument.path ? <div className={styles.documentPath}>{selectedDocument.path}</div> : null}
                   <h2 className={styles.documentTitle}>{selectedDocument.title}</h2>
+                  <div className={styles.documentSubline}>
+                    <span>v{selectedDocument.versionNo}</span>
+                    {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
+                    {selectedDocument.syncStatus && selectedDocument.syncStatus !== 'SYNCED' && (
+                      <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
+                    )}
+                  </div>
                 </div>
                 <span className={styles.documentTypeBadge}>{TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}</span>
-              </div>
-              <div className={styles.documentMeta}>
-                <span>版本：v{selectedDocument.versionNo}</span>
-                <span>{selectedDocument.format}</span>
-                <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
               </div>
               <div className={styles.documentToolbar}>
                 {selectedDocument.docType === 'DOC' && (
@@ -1365,15 +1367,6 @@ const KnowledgeBaseDetail = () => {
                     onClick={handleOpenEditorPage}
                   >
                     继续编辑
-                  </button>
-                )}
-                {selectedDocument.docType === 'DOC' && (
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => navigate(`/docs/${selectedDocument.id}`)}
-                  >
-                    阅读文档
                   </button>
                 )}
                 {selectedDocument.docType === 'DOC' && (
@@ -1425,6 +1418,15 @@ const KnowledgeBaseDetail = () => {
                     >
                       重命名 / 移动
                     </button>
+                    {selectedDocument.docType === 'DOC' && (
+                      <button
+                        type="button"
+                        className={styles.toolButton}
+                        onClick={() => navigate(`/docs/${selectedDocument.id}`)}
+                      >
+                        阅读文档
+                      </button>
+                    )}
                     {selectedDocument.docType === 'DOC' && (
                       <button type="button" className={styles.toolButton} onClick={handleToggleFocusMode}>
                         {focusMode ? '退出专注' : '专注模式'}

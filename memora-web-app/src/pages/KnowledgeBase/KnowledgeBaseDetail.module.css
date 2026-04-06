@@ -573,6 +573,15 @@
   line-height: 1.08;
 }
 
+.documentSubline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: #8d7b68;
+  font-size: 12px;
+}
+
 .documentTypeBadge {
   padding: 8px 12px;
   border-radius: 999px;
@@ -583,7 +592,6 @@
   white-space: nowrap;
 }
 
-.documentMeta,
 .syncMeta {
   display: flex;
   flex-wrap: wrap;
