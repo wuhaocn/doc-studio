@@ -34,7 +34,7 @@ const Header = ({ onToggleSidebar }) => {
 
   const navItems = [
     { to: '/', label: '工作台', icon: <IconHome /> },
-    { to: currentKnowledgeBaseRoute, label: '在线文档', icon: <IconFolder /> },
+    { to: currentKnowledgeBaseRoute, label: '知识库', icon: <IconFolder /> },
   ]
 
   return (
@@ -45,10 +45,7 @@ const Header = ({ onToggleSidebar }) => {
         </button>
         <Link to="/" className={styles.brand}>
           <span className={styles.brandMark}>M</span>
-          <div>
-            <div className={styles.brandName}>Memora Studio</div>
-            <div className={styles.brandMeta}>{currentUser.tenantName}</div>
-          </div>
+          <div className={styles.brandName}>Memora</div>
         </Link>
       </div>
 
@@ -65,20 +62,11 @@ const Header = ({ onToggleSidebar }) => {
       </nav>
 
       <div className={styles.right}>
-        <div className={styles.workspaceBadge}>
-          <span className={styles.workspaceLabel}>Plan</span>
-          <span className={styles.workspaceValue}>{currentUser.planName || 'Enterprise'}</span>
-        </div>
         <div className={styles.userCard}>
           <Avatar size={34} className={styles.avatar}>
             {currentUser.nickname.charAt(0)}
           </Avatar>
-          <div>
-            <div className={styles.userName}>{currentUser.nickname}</div>
-            <div className={styles.userMeta}>
-              {currentUser.username} / {currentUser.role}
-            </div>
-          </div>
+          <div className={styles.userName}>{currentUser.nickname}</div>
         </div>
         <button type="button" className={styles.logoutButton} onClick={logout}>
           退出

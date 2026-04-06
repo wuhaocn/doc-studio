@@ -10,7 +10,7 @@
 
 .hero {
   display: grid;
-  grid-template-columns: 1.5fr 1fr;
+  grid-template-columns: 1.5fr 0.8fr;
   gap: 24px;
   padding: 32px;
   border-radius: 32px;
@@ -39,7 +39,7 @@
 
 .description {
   margin-top: 16px;
-  max-width: 720px;
+  max-width: 640px;
   font-size: 16px;
   line-height: 1.8;
   color: #6b7280;
@@ -50,6 +50,51 @@
   flex-direction: column;
   justify-content: center;
   gap: 14px;
+}
+
+.resumeCard,
+.resumeEmpty {
+  margin-top: 22px;
+  padding: 22px;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.resumeLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a3412;
+}
+
+.resumeTitle {
+  margin-top: 10px;
+  font-size: 26px;
+  font-weight: 700;
+}
+
+.resumeMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 10px;
+  color: #8d7b68;
+  font-size: 13px;
+}
+
+.resumeActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.resumeEmpty p {
+  margin-top: 8px;
+  color: #6b7280;
+  line-height: 1.7;
 }
 
 .search {
@@ -79,7 +124,7 @@
 
 .metrics {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 18px;
   margin-top: 24px;
 }
@@ -133,7 +178,6 @@
   margin-top: 26px;
 }
 
-.mainColumn,
 .panel {
   border-radius: 28px;
   background: rgba(255, 255, 255, 0.78);
@@ -141,7 +185,9 @@
 }
 
 .mainColumn {
-  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
 .sectionHeader,
@@ -253,8 +299,59 @@
   padding: 22px;
 }
 
+.knowledgeToolbar {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.foldPanel {
+  padding: 22px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 20px 40px rgba(15, 23, 42, 0.05);
+}
+
+.foldSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.foldSummary::-webkit-details-marker {
+  display: none;
+}
+
+.foldSummary h2 {
+  font-size: 20px;
+}
+
+.foldSummary span {
+  display: block;
+  margin-top: 4px;
+  color: #8d7b68;
+  font-size: 13px;
+}
+
+.foldHint {
+  margin-top: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(23, 50, 77, 0.08);
+  color: #17324d;
+}
+
+.foldPanel[open] .foldHint {
+  background: rgba(180, 83, 9, 0.12);
+  color: #9a3412;
+}
+
 .timeline,
-.memberList {
+.memberList,
+.recentDocumentList {
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -262,12 +359,58 @@
 }
 
 .timelineItem,
-.memberItem {
+.memberItem,
+.recentDocumentItem {
   display: flex;
   gap: 14px;
   padding: 16px;
   border-radius: 20px;
   background: rgba(248, 250, 252, 0.9);
+}
+
+.recentDocumentItem {
+  align-items: center;
+  justify-content: space-between;
+}
+
+.recentDocumentItemPrimary {
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.94), rgba(240, 249, 255, 0.9));
+}
+
+.recentDocumentBody {
+  min-width: 0;
+}
+
+.recentDocumentTitle {
+  font-weight: 700;
+}
+
+.recentDocumentMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 8px;
+  color: #8d7b68;
+  font-size: 12px;
+}
+
+.recentDocumentActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.emptyRecentDocuments {
+  padding: 16px;
+  border-radius: 20px;
+  background: rgba(248, 250, 252, 0.9);
+}
+
+.emptyRecentDocuments p {
+  margin-top: 8px;
+  color: #6b7280;
+  line-height: 1.7;
 }
 
 .timelineStatus {
@@ -318,5 +461,14 @@
   .contentGrid,
   .metrics {
     grid-template-columns: 1fr;
+  }
+
+  .knowledgeToolbar {
+    flex-direction: column;
+  }
+
+  .recentDocumentItem,
+  .foldSummary {
+    align-items: flex-start;
   }
 }

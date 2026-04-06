@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import { documentApi } from '../../services/api/documentApi'
 import { buildLineDiff } from '../../utils/documentDiff'
 import { summarizePlainText } from '../../utils/documentContent'
@@ -25,6 +26,7 @@ const DocumentEditorPage = () => {
   const [versions, setVersions] = useState([])
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [versionsOpen, setVersionsOpen] = useState(false)
+  const [shareOpen, setShareOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [rollingBackVersionId, setRollingBackVersionId] = useState(null)
@@ -205,10 +207,12 @@ const DocumentEditorPage = () => {
             返回文档列表
           </button>
           <div className={styles.documentIdentity}>
+            <div className={styles.eyebrow}>文档编辑</div>
             <h1 className={styles.title}>{document.title}</h1>
             <div className={styles.meta}>
               <span className={styles.metaPill}>v{document.versionNo}</span>
               <span className={styles.metaPill}>{saving ? '保存中…' : '已进入编辑'}</span>
+              <span className={styles.metaPill}>更新于 {dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
             </div>
           </div>
         </div>
@@ -216,9 +220,23 @@ const DocumentEditorPage = () => {
           <button
             type="button"
             className={styles.secondaryButton}
+            onClick={() => navigate(`/docs/${document.id}`)}
+          >
+            阅读文档
+          </button>
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            onClick={() => setShareOpen(true)}
+          >
+            分享文档
+          </button>
+          <button
+            type="button"
+            className={styles.primaryButton}
             onClick={() => setVersionsOpen((current) => !current)}
           >
-            {versionsOpen ? '收起版本' : '版本记录'}
+            {versionsOpen ? '收起版本' : '查看版本'}
           </button>
         </div>
       </header>
@@ -327,6 +345,13 @@ const DocumentEditorPage = () => {
           </aside>
         )}
       </section>
+
+      <DocumentShareDrawer
+        open={shareOpen}
+        documentId={document.id}
+        title={document.title}
+        onClose={() => setShareOpen(false)}
+      />
     </div>
   )
 }

@@ -1,5 +1,6 @@
+import { useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { IconFolder, IconSync } from '@arco-design/web-react/icon'
+import { IconFolder } from '@arco-design/web-react/icon'
 import { useAuth } from '../../contexts/AuthContext'
 import { useKnowledgeBaseNavigation } from '../../hooks/useKnowledgeBaseNavigation'
 import styles from './Sidebar.module.css'
@@ -10,18 +11,29 @@ const Sidebar = ({ collapsed }) => {
   const { knowledgeBases } = useKnowledgeBaseNavigation(currentUser.tenantId, {
     errorMessage: '加载知识库失败',
   })
+  const [listExpanded, setListExpanded] = useState(false)
+  const previewCount = 6
+  const activeKnowledgeBase = knowledgeBases.find((kb) => location.pathname === `/kb/${kb.id}`)
+  let visibleKnowledgeBases = knowledgeBases
+
+  if (!collapsed && !listExpanded && knowledgeBases.length > previewCount) {
+    visibleKnowledgeBases = knowledgeBases.slice(0, previewCount)
+    if (activeKnowledgeBase && !visibleKnowledgeBases.some((item) => item.id === activeKnowledgeBase.id)) {
+      visibleKnowledgeBases = [...visibleKnowledgeBases.slice(0, previewCount - 1), activeKnowledgeBase]
+    }
+  }
+
+  const hiddenCount = Math.max(knowledgeBases.length - visibleKnowledgeBases.length, 0)
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
       <div className={styles.panel}>
-        <div className={styles.panelLabel}>当前租户</div>
         <div className={styles.panelTitle}>{currentUser.tenantName}</div>
-        {!collapsed && <div className={styles.panelMeta}>多租户在线文档与知识管理</div>}
       </div>
 
       <div className={styles.sectionTitle}>知识库</div>
       <div className={styles.list}>
-        {knowledgeBases.map((kb) => (
+        {visibleKnowledgeBases.map((kb) => (
           <Link
             key={kb.id}
             to={`/kb/${kb.id}`}
@@ -33,27 +45,20 @@ const Sidebar = ({ collapsed }) => {
             {!collapsed && (
               <div className={styles.itemContent}>
                 <div className={styles.itemTitle}>{kb.name}</div>
-                <div className={styles.itemMeta}>
-                  <span>{kb.documentCount} 篇文档</span>
-                  <span className={`${styles.syncDot} ${styles[`sync${kb.syncStatus || 'IDLE'}`]}`} />
-                  <span>{kb.syncStatus || 'IDLE'}</span>
-                </div>
               </div>
             )}
           </Link>
         ))}
       </div>
 
-      {!collapsed && (
-        <div className={styles.footer}>
-          <div className={styles.footerTitle}>
-            <IconSync />
-            <span>同步原则</span>
-          </div>
-          <p className={styles.footerText}>
-            本地目录用于批量导入与增量更新，线上知识库仍然是统一发布面，避免多副本失控。
-          </p>
-        </div>
+      {!collapsed && knowledgeBases.length > previewCount && (
+        <button
+          type="button"
+          className={styles.listToggle}
+          onClick={() => setListExpanded((current) => !current)}
+        >
+          {listExpanded ? '收起知识库列表' : `展开更多知识库${hiddenCount > 0 ? `（+${hiddenCount}）` : ''}`}
+        </button>
       )}
     </aside>
   )

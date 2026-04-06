@@ -4,6 +4,7 @@ import dayjs from 'dayjs'
 import { useAuth } from '../../contexts/AuthContext'
 import DocumentActionModal from '../../components/Document/DocumentActionModal'
 import DocumentBatchMoveModal from '../../components/Document/DocumentBatchMoveModal'
+import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import KnowledgeBaseFormModal from '../../components/KnowledgeBase/KnowledgeBaseFormModal'
 import KnowledgeBasePermissionModal from '../../components/KnowledgeBase/KnowledgeBasePermissionModal'
 import { documentApi } from '../../services/api/documentApi'
@@ -203,6 +204,52 @@ const validateBatchDeleteSelection = (documents, selectedIds) => {
   return ''
 }
 
+const buildInitialExpandedFolderIds = (documents, targetDocumentId = null) => {
+  const expandedIds = new Set(
+    documents
+      .filter((item) => item.docType === 'FOLDER' && (item.parentId ?? 0) === 0)
+      .map((item) => item.id)
+  )
+
+  if (!targetDocumentId) {
+    return Array.from(expandedIds)
+  }
+
+  const documentMap = getDocumentByIdMap(documents)
+  let currentDocument = documentMap.get(targetDocumentId) || null
+
+  if (currentDocument?.docType === 'FOLDER') {
+    expandedIds.add(currentDocument.id)
+  }
+
+  while (currentDocument?.parentId) {
+    const parentDocument = documentMap.get(currentDocument.parentId) || null
+    if (!parentDocument) {
+      break
+    }
+    if (parentDocument.docType === 'FOLDER') {
+      expandedIds.add(parentDocument.id)
+    }
+    currentDocument = parentDocument
+  }
+
+  return Array.from(expandedIds)
+}
+
+const isTreeItemVisible = (item, documentMap, expandedFolderIdSet) => {
+  let parentId = item.parentId ?? 0
+
+  while (parentId) {
+    if (!expandedFolderIdSet.has(parentId)) {
+      return false
+    }
+    const parentDocument = documentMap.get(parentId)
+    parentId = parentDocument?.parentId ?? 0
+  }
+
+  return true
+}
+
 const KnowledgeBaseDetail = () => {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -236,6 +283,8 @@ const KnowledgeBaseDetail = () => {
   const [dragOverDocumentId, setDragOverDocumentId] = useState(null)
   const [dragOverPosition, setDragOverPosition] = useState('before')
   const [dragSorting, setDragSorting] = useState(false)
+  const [expandedFolderIds, setExpandedFolderIds] = useState([])
+  const [treePanelCollapsed, setTreePanelCollapsed] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [knowledgeBaseInfoVisible, setKnowledgeBaseInfoVisible] = useState(false)
   const [contextPanelCollapsed, setContextPanelCollapsed] = useState(true)
@@ -243,6 +292,7 @@ const KnowledgeBaseDetail = () => {
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [rollingBackVersionId, setRollingBackVersionId] = useState(null)
   const [comparingVersionId, setComparingVersionId] = useState(null)
+  const [shareOpen, setShareOpen] = useState(false)
   const [permissionModalOpen, setPermissionModalOpen] = useState(false)
   const [permissionMembers, setPermissionMembers] = useState([])
   const [permissionAssignments, setPermissionAssignments] = useState([])
@@ -336,9 +386,26 @@ const KnowledgeBaseDetail = () => {
     }
   }, [documents, location.state, selectedDocumentId])
 
+  useEffect(() => {
+    const folderIds = new Set(documents.filter((item) => item.docType === 'FOLDER').map((item) => item.id))
+    const initialExpandedIds = buildInitialExpandedFolderIds(documents, selectedDocumentId)
+
+    setExpandedFolderIds((current) => {
+      const nextIds = new Set(initialExpandedIds)
+      current.forEach((id) => {
+        if (folderIds.has(id)) {
+          nextIds.add(id)
+        }
+      })
+      return Array.from(nextIds)
+    })
+  }, [documents, selectedDocumentId])
+
+  const documentMap = getDocumentByIdMap(documents)
+  const expandedFolderIdSet = new Set(expandedFolderIds)
   const visibleDocuments = documents.filter((item) => {
     if (!deferredSearch.trim()) {
-      return true
+      return isTreeItemVisible(item, documentMap, expandedFolderIdSet)
     }
     const searchValue = deferredSearch.toLowerCase()
     return item.title.toLowerCase().includes(searchValue) || (item.summary || '').toLowerCase().includes(searchValue)
@@ -369,6 +436,7 @@ const KnowledgeBaseDetail = () => {
       setFocusMode(false)
       setVersions([])
       setComparingVersionId(null)
+      setShareOpen(false)
       return
     }
 
@@ -389,6 +457,12 @@ const KnowledgeBaseDetail = () => {
 
     loadVersions()
   }, [selectedDocumentVersionTargetId])
+
+  useEffect(() => {
+    if (selectedDocument?.docType !== 'DOC') {
+      setShareOpen(false)
+    }
+  }, [selectedDocument?.docType])
 
   useEffect(() => {
     if (selectedDocumentIds.length === 0) {
@@ -518,6 +592,28 @@ const KnowledgeBaseDetail = () => {
     setDragOverPosition('before')
   }
 
+  const toggleFolderExpanded = (folderId, event) => {
+    event.stopPropagation()
+    setExpandedFolderIds((current) =>
+      current.includes(folderId) ? current.filter((itemId) => itemId !== folderId) : [...current, folderId]
+    )
+  }
+
+  const expandAllFolders = () => {
+    setExpandedFolderIds(documents.filter((item) => item.docType === 'FOLDER').map((item) => item.id))
+  }
+
+  const collapseToTopLevelFolders = () => {
+    setExpandedFolderIds(buildInitialExpandedFolderIds(documents, selectedDocumentId))
+  }
+
+  const handleTreeItemKeyDown = (itemId, event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      setSelectedDocumentId(itemId)
+    }
+  }
+
   const navigateToEditor = (documentId = selectedDocument?.id) => {
     if (!documentId) {
       return
@@ -539,6 +635,17 @@ const KnowledgeBaseDetail = () => {
     }
 
     setFocusMode((current) => !current)
+  }
+
+  const handleOpenVersionPanel = () => {
+    if (!selectedDocument || selectedDocument.docType !== 'DOC') {
+      return
+    }
+
+    if (focusMode) {
+      setFocusMode(false)
+    }
+    setContextPanelCollapsed(false)
   }
 
   const openCreateDocumentModal = (docType) => {
@@ -989,12 +1096,22 @@ const KnowledgeBaseDetail = () => {
         className={[
           styles.contentGrid,
           focusMode ? styles.contentGridFocus : '',
+          !focusMode && treePanelCollapsed && contextPanelCollapsed ? styles.contentGridDocumentOnly : '',
+          !focusMode && treePanelCollapsed && !contextPanelCollapsed ? styles.contentGridNoLeft : '',
           !focusMode && contextPanelCollapsed ? styles.contentGridWide : '',
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        <aside className={`${styles.treePanel} ${focusMode ? styles.focusHidden : ''}`}>
+        <aside
+          className={[
+            styles.treePanel,
+            focusMode ? styles.focusHidden : '',
+            !focusMode && treePanelCollapsed ? styles.treePanelCollapsed : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           {feedback && (
             <div className={`${styles.feedback} ${feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess}`}>
               {feedback.message}
@@ -1003,42 +1120,23 @@ const KnowledgeBaseDetail = () => {
           <div className={styles.panelHeader}>
             <div>
               <h2>文档树</h2>
-              <span className={styles.panelHint}>
-                {selectedDocument
-                  ? `当前焦点：${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType} / ${selectedDocument.title}`
-                  : '当前没有可操作节点'}
-              </span>
-              <span className={styles.panelHint}>
-                {dragSortEnabled ? '当前支持同级节点拖拽排序' : '筛选或批量模式下暂停拖拽排序'}
-              </span>
+              <span className={styles.panelHint}>{documents.length} 个</span>
             </div>
             <div className={styles.panelActions}>
               <button
                 type="button"
                 className={styles.smallButton}
-                onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
+                onClick={() => setTreePanelCollapsed(true)}
               >
-                {knowledgeBaseInfoVisible ? '隐藏知识库信息' : '知识库设置'}
+                隐藏文档树
               </button>
-              <input
-                className={styles.search}
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="筛选目录或文档"
-              />
               <button
                 type="button"
-                className={styles.smallButton}
+                className={styles.primaryCompactButton}
                 disabled={!canWriteKnowledgeBase}
-                onClick={() => {
-                  if (batchMode) {
-                    clearBatchSelection()
-                  } else {
-                    setBatchMode(true)
-                  }
-                }}
+                onClick={() => openCreateDocumentModal('DOC')}
               >
-                {batchMode ? '退出批量' : '批量模式'}
+                新建文档
               </button>
               <button
                 type="button"
@@ -1048,15 +1146,47 @@ const KnowledgeBaseDetail = () => {
               >
                 新建目录
               </button>
-              <button
-                type="button"
-                className={styles.smallButton}
-                disabled={!canWriteKnowledgeBase}
-                onClick={() => openCreateDocumentModal('DOC')}
-              >
-                新建文档
-              </button>
+              <details className={styles.inlineMoreActions}>
+                <summary className={styles.smallButton}>更多</summary>
+                <div className={styles.inlineMoreActionsMenu}>
+                  <button
+                    type="button"
+                    className={styles.toolButton}
+                    disabled={!canWriteKnowledgeBase}
+                    onClick={() => {
+                      if (batchMode) {
+                        clearBatchSelection()
+                      } else {
+                        setBatchMode(true)
+                      }
+                    }}
+                  >
+                    {batchMode ? '退出批量' : '批量模式'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.toolButton}
+                    onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
+                  >
+                    {knowledgeBaseInfoVisible ? '隐藏知识库信息' : '知识库设置'}
+                  </button>
+                  <button type="button" className={styles.toolButton} onClick={expandAllFolders}>
+                    展开目录
+                  </button>
+                  <button type="button" className={styles.toolButton} onClick={collapseToTopLevelFolders}>
+                    收起目录
+                  </button>
+                </div>
+              </details>
             </div>
+          </div>
+          <div className={styles.treeToolbar}>
+            <input
+              className={styles.search}
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="搜索文档标题或摘要"
+            />
           </div>
           {batchMode && (
             <div className={styles.batchToolbar}>
@@ -1092,7 +1222,7 @@ const KnowledgeBaseDetail = () => {
               {documents.length === 0 ? (
                 <div className={styles.emptyTreeCta}>
                   <strong>这个知识库还是空的</strong>
-                  <p>先创建第一篇文档，后续再慢慢补目录和结构。</p>
+                  <p>先写第一篇文档，目录后面再补。</p>
                   <div className={styles.emptyTreeActions}>
                     <button
                       type="button"
@@ -1108,15 +1238,16 @@ const KnowledgeBaseDetail = () => {
                       disabled={!canWriteKnowledgeBase}
                       onClick={() => openCreateDocumentModal('FOLDER')}
                     >
-                      先建目录
+                      新建目录
                     </button>
                   </div>
                 </div>
               ) : visibleDocuments.length > 0 ? (
                 visibleDocuments.map((item) => (
-                  <button
+                  <div
                     key={item.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     className={[
                       styles.treeItem,
                       selectedDocument?.id === item.id ? styles.active : '',
@@ -1132,12 +1263,24 @@ const KnowledgeBaseDetail = () => {
                     style={{ paddingLeft: `${16 + item.depth * 18}px` }}
                     draggable={dragSortEnabled}
                     onClick={() => setSelectedDocumentId(item.id)}
+                    onKeyDown={(event) => handleTreeItemKeyDown(item.id, event)}
                     onDragStart={(event) => handleDragStart(event, item)}
                     onDragOver={(event) => handleDragOver(event, item)}
                     onDrop={(event) => handleDrop(event, item)}
                     onDragEnd={clearDragState}
                   >
                     <div className={styles.treeMain}>
+                      {item.docType === 'FOLDER' ? (
+                        <button
+                          type="button"
+                          className={styles.folderToggle}
+                          onClick={(event) => toggleFolderExpanded(item.id, event)}
+                        >
+                          {expandedFolderIdSet.has(item.id) ? '▾' : '▸'}
+                        </button>
+                      ) : (
+                        <span className={styles.folderTogglePlaceholder} />
+                      )}
                       {batchMode && (
                         <input
                           type="checkbox"
@@ -1150,14 +1293,12 @@ const KnowledgeBaseDetail = () => {
                           onClick={(event) => event.stopPropagation()}
                         />
                       )}
-                      <span className={styles.treeType}>{TYPE_LABELS[item.docType] || item.docType}</span>
+                      <span
+                        className={`${styles.treeNodeMark} ${item.docType === 'FOLDER' ? styles.treeNodeFolder : styles.treeNodeDoc}`}
+                      />
                       <span className={styles.treeTitle}>{item.title}</span>
                     </div>
-                    <div className={styles.treeMeta}>
-                      <span>{item.format}</span>
-                      <span>{STATUS_LABELS[item.syncStatus] || item.syncStatus}</span>
-                    </div>
-                  </button>
+                  </div>
                 ))
               ) : (
                 <div className={styles.emptyTree}>当前筛选条件下没有匹配节点。</div>
@@ -1167,10 +1308,21 @@ const KnowledgeBaseDetail = () => {
         </aside>
 
         <div className={`${styles.documentColumn} ${focusMode ? styles.documentColumnFocus : ''}`}>
+          {!focusMode && treePanelCollapsed && (
+            <div className={styles.dockBar}>
+              <button
+                type="button"
+                className={styles.smallButton}
+                onClick={() => setTreePanelCollapsed(false)}
+              >
+                显示文档树
+              </button>
+            </div>
+          )}
           {documents.length === 0 ? (
             <div className={`${styles.emptyPanel} ${styles.emptyDocumentPanel}`}>
               <h2>从第一篇文档开始</h2>
-              <p>标题创建后就会直接进入编辑页，不需要先配置一堆属性。</p>
+              <p>输入标题后会直接进入编辑。</p>
               <div className={styles.emptyDocumentActions}>
                 <button
                   type="button"
@@ -1185,61 +1337,108 @@ const KnowledgeBaseDetail = () => {
                   className={styles.secondaryButton}
                   disabled={!canWriteKnowledgeBase}
                   onClick={() => openCreateDocumentModal('FOLDER')}
-                >
-                  创建目录
-                </button>
+                    >
+                      新建目录
+                    </button>
               </div>
             </div>
           ) : selectedDocument ? (
             <section className={`${styles.documentCard} ${focusMode ? styles.documentCardFocus : ''}`}>
               <div className={styles.documentHeader}>
                 <div className={styles.documentHeading}>
-                  <div className={styles.documentPath}>路径：{selectedDocument.path}</div>
+                  <div className={styles.documentPath}>{selectedDocument.path}</div>
                   <h2 className={styles.documentTitle}>{selectedDocument.title}</h2>
                 </div>
                 <span className={styles.documentTypeBadge}>{TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}</span>
               </div>
               <div className={styles.documentMeta}>
-                <span>格式：{selectedDocument.format}</span>
                 <span>版本：v{selectedDocument.versionNo}</span>
-                <span>同步：{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
+                <span>{selectedDocument.format}</span>
+                <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
               </div>
               <div className={styles.documentToolbar}>
-                <button
-                  type="button"
-                  className={styles.toolButton}
-                  disabled={!canWriteKnowledgeBase}
-                  onClick={openEditDocumentModal}
-                >
-                  重命名 / 移动
-                </button>
                 {selectedDocument.docType === 'DOC' && (
                   <button
                     type="button"
-                    className={styles.toolButton}
+                    className={styles.primaryButton}
                     disabled={!canWriteKnowledgeBase}
                     onClick={handleOpenEditorPage}
                   >
-                    进入编辑页
+                    继续编辑
                   </button>
                 )}
                 {selectedDocument.docType === 'DOC' && (
-                  <button type="button" className={styles.toolButton} onClick={handleToggleFocusMode}>
-                    {focusMode ? '退出专注' : '专注模式'}
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => navigate(`/docs/${selectedDocument.id}`)}
+                  >
+                    阅读文档
                   </button>
                 )}
-                {!focusMode && (
+                {selectedDocument.docType === 'DOC' && (
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setShareOpen(true)}
+                  >
+                    分享文档
+                  </button>
+                )}
+                {selectedDocument.docType === 'DOC' && (
                   <button
                     type="button"
                     className={styles.toolButton}
-                    onClick={() => setContextPanelCollapsed((current) => !current)}
+                    onClick={handleOpenVersionPanel}
                   >
-                    {contextPanelCollapsed ? '展开侧栏' : '收起侧栏'}
+                    查看版本
+                  </button>
+                )}
+                {selectedDocument.docType === 'FOLDER' && (
+                  <button
+                    type="button"
+                    className={styles.primaryButton}
+                    disabled={!canWriteKnowledgeBase}
+                    onClick={() => openCreateDocumentModal('DOC')}
+                  >
+                    在当前目录新建文档
+                  </button>
+                )}
+                {selectedDocument.docType === 'FOLDER' && (
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={!canWriteKnowledgeBase}
+                    onClick={() => openCreateDocumentModal('FOLDER')}
+                  >
+                    新建子目录
                   </button>
                 )}
                 <details className={styles.inlineMoreActions}>
                   <summary className={styles.toolButton}>更多操作</summary>
                   <div className={styles.inlineMoreActionsMenu}>
+                    <button
+                      type="button"
+                      className={styles.toolButton}
+                      disabled={!canWriteKnowledgeBase}
+                      onClick={openEditDocumentModal}
+                    >
+                      重命名 / 移动
+                    </button>
+                    {selectedDocument.docType === 'DOC' && (
+                      <button type="button" className={styles.toolButton} onClick={handleToggleFocusMode}>
+                        {focusMode ? '退出专注' : '专注模式'}
+                      </button>
+                    )}
+                    {!focusMode && (
+                      <button
+                        type="button"
+                        className={styles.toolButton}
+                        onClick={() => setContextPanelCollapsed((current) => !current)}
+                      >
+                        {contextPanelCollapsed ? '展开侧栏' : '收起侧栏'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className={styles.toolButton}
@@ -1274,7 +1473,33 @@ const KnowledgeBaseDetail = () => {
                 </div>
               )}
               <div className={styles.documentStage}>
-                {shouldRenderRichPreview ? (
+                {selectedDocument.docType === 'FOLDER' ? (
+                  <section className={styles.folderStage}>
+                    <div className={styles.folderStageLabel}>当前选中目录</div>
+                    <h3 className={styles.folderStageTitle}>{selectedDocument.title}</h3>
+                    <p className={styles.folderStageText}>
+                      目录本身不编辑正文，直接在这里继续新建内容。
+                    </p>
+                    <div className={styles.folderStageActions}>
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={() => openCreateDocumentModal('DOC')}
+                      >
+                        在当前目录新建文档
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={() => openCreateDocumentModal('FOLDER')}
+                      >
+                        新建子目录
+                      </button>
+                    </div>
+                  </section>
+                ) : shouldRenderRichPreview ? (
                   <article className={`${styles.richPreview} ${focusMode ? styles.stageFocus : ''}`}>
                     <div
                       className={`${styles.richPreviewBody} ${focusMode ? styles.richPreviewBodyFocus : ''}`}
@@ -1455,6 +1680,12 @@ const KnowledgeBaseDetail = () => {
           setBatchMoveOpen(false)
         }}
         onSubmit={handleBatchMove}
+      />
+      <DocumentShareDrawer
+        open={shareOpen}
+        documentId={selectedDocument?.docType === 'DOC' ? selectedDocument.id : null}
+        title={selectedDocument?.title || ''}
+        onClose={() => setShareOpen(false)}
       />
       <KnowledgeBasePermissionModal
         open={permissionModalOpen}

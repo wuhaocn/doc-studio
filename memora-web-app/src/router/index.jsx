@@ -6,6 +6,7 @@ const Layout = lazy(() => import('../components/Layout/Layout'))
 const LoginPage = lazy(() => import('../pages/Auth/LoginPage'))
 const Home = lazy(() => import('../pages/Home/Home'))
 const DocumentEditorPage = lazy(() => import('../pages/Document/DocumentEditorPage'))
+const DocumentReaderPage = lazy(() => import('../pages/Document/DocumentReaderPage'))
 const KnowledgeBaseDetail = lazy(() => import('../pages/KnowledgeBase/KnowledgeBaseDetail'))
 const NotFound = lazy(() => import('../pages/NotFound/NotFound'))
 
@@ -23,6 +24,10 @@ const router = createBrowserRouter([
   {
     element: renderLazyPage(RequireAuth),
     children: [
+      {
+        path: '/docs/:documentId',
+        element: renderLazyPage(DocumentReaderPage),
+      },
       {
         path: '/docs/:documentId/edit',
         element: renderLazyPage(DocumentEditorPage),

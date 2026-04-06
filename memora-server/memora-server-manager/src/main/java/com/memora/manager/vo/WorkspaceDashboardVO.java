@@ -20,6 +20,8 @@ public class WorkspaceDashboardVO {
 
     private List<KnowledgeBaseVO> knowledgeBases;
 
+    private List<DocumentVO> recentDocuments;
+
     private List<SyncJobVO> recentSyncJobs;
 
     private List<TenantMemberVO> members;

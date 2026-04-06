@@ -231,6 +231,14 @@
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
 }
 
+.contentGridDocumentOnly {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.contentGridNoLeft {
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+}
+
 .treePanel,
 .contextPanel,
 .documentCard,
@@ -251,6 +259,10 @@
   max-height: calc(100vh - 112px);
 }
 
+.treePanelCollapsed {
+  display: none;
+}
+
 .treeViewport {
   margin-top: 18px;
   overflow: auto;
@@ -263,6 +275,12 @@
 
 .documentColumnFocus {
   max-width: 100%;
+}
+
+.dockBar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 14px;
 }
 
 .contextPanel {
@@ -316,7 +334,7 @@
 
 .panelHint {
   display: block;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 .panelActions {
@@ -337,7 +355,8 @@
 
 .smallButton,
 .toolButton,
-.toolButtonDanger {
+.toolButtonDanger,
+.primaryCompactButton {
   padding: 11px 14px;
   border-radius: 14px;
   font-weight: 700;
@@ -349,6 +368,12 @@
   color: #17324d;
 }
 
+.primaryCompactButton {
+  color: #fffdf4;
+  background: linear-gradient(135deg, #17324d, #b45309);
+  box-shadow: 0 10px 24px rgba(180, 83, 9, 0.18);
+}
+
 .toolButtonDanger {
   background: rgba(239, 68, 68, 0.1);
   color: #b91c1c;
@@ -356,9 +381,14 @@
 
 .toolButton:disabled,
 .toolButtonDanger:disabled,
-.smallButton:disabled {
+.smallButton:disabled,
+.primaryCompactButton:disabled {
   opacity: 0.45;
   cursor: not-allowed;
+}
+
+.treeToolbar {
+  margin-top: 14px;
 }
 
 .treeList {
@@ -414,11 +444,12 @@
 }
 
 .treeItem {
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
   border-radius: 18px;
   background: rgba(248, 250, 252, 0.9);
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  cursor: pointer;
 }
 
 .active {
@@ -444,29 +475,51 @@
   gap: 10px;
 }
 
+.folderToggle,
+.folderTogglePlaceholder {
+  width: 20px;
+  min-width: 20px;
+}
+
+.folderToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  border-radius: 8px;
+  color: #92400e;
+  background: rgba(180, 83, 9, 0.12);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.folderTogglePlaceholder {
+  display: inline-block;
+}
+
 .treeCheckbox {
   width: 16px;
   height: 16px;
   accent-color: #17324d;
 }
 
-.treeType {
-  min-width: 36px;
-  font-size: 11px;
-  text-transform: uppercase;
-  color: #92400e;
+.treeNodeMark {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: 999px;
+}
+
+.treeNodeFolder {
+  background: #b45309;
+}
+
+.treeNodeDoc {
+  background: #17324d;
 }
 
 .treeTitle {
   font-weight: 700;
-}
-
-.treeMeta {
-  display: flex;
-  gap: 10px;
-  margin-top: 8px;
-  color: #8d7b68;
-  font-size: 12px;
 }
 
 .documentCard,
@@ -579,6 +632,42 @@
 
 .preview {
   white-space: pre-wrap;
+}
+
+.folderStage {
+  min-height: 420px;
+  padding: 32px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 251, 235, 0.92), rgba(240, 249, 255, 0.9));
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.folderStageLabel {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9a3412;
+}
+
+.folderStageTitle {
+  margin-top: 10px;
+  font-size: clamp(26px, 2.6vw, 34px);
+  line-height: 1.1;
+}
+
+.folderStageText {
+  margin-top: 14px;
+  max-width: 620px;
+  color: #6b7280;
+  line-height: 1.8;
+}
+
+.folderStageActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 22px;
 }
 
 .stageFocus {

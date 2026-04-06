@@ -34,7 +34,7 @@ const DocumentActionModal = ({
       parentId: initialValues?.parentId ?? 0,
     })
     setAdvancedOpen(mode === 'edit')
-  }, [initialValues, open])
+  }, [initialValues, mode, open])
 
   if (!open) {
     return null

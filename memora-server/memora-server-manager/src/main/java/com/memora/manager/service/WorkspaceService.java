@@ -15,6 +15,7 @@ import com.memora.manager.mapper.TenantMemberMapper;
 import com.memora.manager.support.CurrentAccessContext;
 import com.memora.manager.support.TenantAccessService;
 import com.memora.manager.vo.KnowledgeBaseVO;
+import com.memora.manager.vo.DocumentVO;
 import com.memora.manager.vo.SyncJobVO;
 import com.memora.manager.vo.TenantMemberVO;
 import com.memora.manager.vo.WorkspaceDashboardVO;
@@ -56,6 +57,7 @@ public class WorkspaceService {
 
         long documentCount = 0;
         long pendingSyncJobCount = 0;
+        List<DocumentVO> recentDocuments = List.of();
         List<SyncJobVO> recentSyncJobs = List.of();
         if (!accessibleKnowledgeBaseIds.isEmpty()) {
             LambdaQueryWrapper<Document> docQuery = new LambdaQueryWrapper<>();
@@ -64,6 +66,17 @@ public class WorkspaceService {
                 .eq(Document::getStatus, 1)
                 .eq(Document::getDocType, "DOC");
             documentCount = documentMapper.selectCount(docQuery);
+
+            LambdaQueryWrapper<Document> recentDocumentQuery = new LambdaQueryWrapper<>();
+            recentDocumentQuery.eq(Document::getTenantId, tenant.getId())
+                .in(Document::getKnowledgeBaseId, accessibleKnowledgeBaseIds)
+                .eq(Document::getStatus, 1)
+                .eq(Document::getDocType, "DOC")
+                .orderByDesc(Document::getUpdatedAt)
+                .last("LIMIT 6");
+            recentDocuments = documentMapper.selectList(recentDocumentQuery).stream()
+                .map(this::convertDocument)
+                .toList();
 
             LambdaQueryWrapper<SyncJob> pendingSyncQuery = new LambdaQueryWrapper<>();
             pendingSyncQuery.eq(SyncJob::getTenantId, tenant.getId())
@@ -87,6 +100,7 @@ public class WorkspaceService {
         dashboard.setSyncEnabledKnowledgeBaseCount(knowledgeBases.stream().filter(item -> item.getSyncEnabled() != null && item.getSyncEnabled() == 1).count());
         dashboard.setPendingSyncJobCount(pendingSyncJobCount);
         dashboard.setKnowledgeBases(knowledgeBaseVOs);
+        dashboard.setRecentDocuments(recentDocuments);
         dashboard.setRecentSyncJobs(recentSyncJobs);
         dashboard.setMembers(members.stream().map(this::convertMember).collect(Collectors.toList()));
         return dashboard;
@@ -117,5 +131,11 @@ public class WorkspaceService {
         KnowledgeBase knowledgeBase = new KnowledgeBase();
         BeanUtils.copyProperties(knowledgeBaseVO, knowledgeBase);
         return knowledgeBase;
+    }
+
+    private DocumentVO convertDocument(Document document) {
+        DocumentVO vo = new DocumentVO();
+        BeanUtils.copyProperties(document, vo);
+        return vo;
     }
 }
