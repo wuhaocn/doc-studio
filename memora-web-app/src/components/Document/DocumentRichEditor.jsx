@@ -123,43 +123,56 @@ const DocumentRichEditor = ({
     <div className={`${styles.editorShell} ${focusMode ? styles.focusMode : ''}`}>
       <div className={styles.toolbar}>
         <div className={styles.toolbarMain}>
-          <div className={styles.toolGroup}>
-            {structureTools.map((tool) => (
-              <button
-                key={tool.key}
-                type="button"
-                className={`${styles.toolButton} ${tool.active ? styles.active : ''}`}
-                onClick={tool.onClick}
-              >
-                {tool.label}
-              </button>
-            ))}
+          <div className={styles.toolSection}>
+            <span className={styles.toolSectionLabel}>结构</span>
+            <div className={styles.toolGroup}>
+              {structureTools.map((tool) => (
+                <button
+                  key={tool.key}
+                  type="button"
+                  className={`${styles.toolButton} ${tool.active ? styles.active : ''}`}
+                  onClick={tool.onClick}
+                >
+                  {tool.label}
+                </button>
+              ))}
+            </div>
           </div>
           <div className={styles.toolDivider} />
-          <div className={styles.toolGroup}>
-            {formatTools.map((tool) => (
-              <button
-                key={tool.key}
-                type="button"
-                className={`${styles.toolButton} ${tool.active ? styles.active : ''}`}
-                onClick={tool.onClick}
-              >
-                {tool.label}
-              </button>
-            ))}
+          <div className={styles.toolSection}>
+            <span className={styles.toolSectionLabel}>格式</span>
+            <div className={styles.toolGroup}>
+              {formatTools.map((tool) => (
+                <button
+                  key={tool.key}
+                  type="button"
+                  className={`${styles.toolButton} ${tool.active ? styles.active : ''}`}
+                  onClick={tool.onClick}
+                >
+                  {tool.label}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
-        <div className={styles.toolGroup}>
-          <button type="button" className={styles.toolButton} onClick={handleInsertImage}>
-            图片
-          </button>
-          <button type="button" className={styles.toolButton} onClick={handleInsertMermaid}>
-            Mermaid
-          </button>
+        <div className={styles.toolbarAside}>
+          <span className={styles.toolSectionLabel}>插入</span>
+          <div className={styles.toolGroup}>
+            <button type="button" className={styles.toolButton} onClick={handleInsertImage}>
+              图片
+            </button>
+            <button type="button" className={styles.toolButton} onClick={handleInsertMermaid}>
+              Mermaid
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className={styles.editorBody}>{editor && <EditorContent editor={editor} />}</div>
+      <div className={styles.editorBody}>
+        <div className={styles.editorCanvas}>
+          <div className={styles.editorPaper}>{editor && <EditorContent editor={editor} />}</div>
+        </div>
+      </div>
 
       <div className={styles.footer}>
         <div className={styles.footerHint}>编辑内容会在保存后生成新版本。</div>

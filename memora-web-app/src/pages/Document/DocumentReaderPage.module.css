@@ -1,7 +1,7 @@
 .page {
   min-height: 100vh;
-  padding: var(--workspace-page-padding);
-  background: #f5f7fa;
+  padding: 12px 14px 24px;
+  background: #f5f6f8;
   color: #1f2329;
 }
 
@@ -9,18 +9,24 @@
   padding-top: 10px;
 }
 
+.pageShell {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
 .state {
-  padding: 80px 28px;
+  padding: 72px 24px;
   color: #7c6f64;
 }
 
 .stateCard {
   max-width: 760px;
-  margin: 48px auto 0;
-  padding: 36px;
-  border-radius: 28px;
+  margin: 40px auto 0;
+  padding: 34px;
+  border-radius: 22px;
   background: #ffffff;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
 }
 
 .stateCard h1 {
@@ -42,52 +48,103 @@
 }
 
 .topbar {
+  position: sticky;
+  top: calc(var(--header-height) + 10px);
+  z-index: 12;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  position: sticky;
-  top: calc(var(--header-height) + 12px);
-  z-index: 12;
-  padding: 8px 10px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  border-radius: 14px;
-  backdrop-filter: blur(18px);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: none;
-  transition: padding 160ms ease, top 160ms ease, background-color 160ms ease, box-shadow 160ms ease;
+  gap: 10px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(245, 246, 248, 0.94);
+  backdrop-filter: blur(14px);
+  transition: top 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
 }
 
 .topbarScrolled {
   top: calc(var(--header-height) + 8px);
-  padding: 8px 10px;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.06);
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.04);
+}
+
+.topbarMain {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.documentIdentity {
+  min-width: 0;
+}
+
+.eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #8b93a1;
+}
+
+.title {
+  margin-top: 3px;
+  font-size: clamp(20px, 1.9vw, 24px);
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  color: #1f2329;
+}
+
+.documentSubline {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.metaPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: #f3f5f8;
+  color: #5f6672;
+  font-size: 10px;
+  font-weight: 600;
 }
 
 .backButton,
 .primaryButton,
 .secondaryButton {
-  padding: var(--button-padding-md);
-  border-radius: var(--button-radius-lg);
-  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
   transition: background-color 120ms ease, color 120ms ease, transform 120ms ease;
 }
 
 .backButton,
 .secondaryButton {
-  background: var(--button-secondary-bg);
-  color: var(--button-secondary-text);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: #ffffff;
+  color: #4f5662;
 }
 
 .primaryButton {
-  color: var(--button-primary-text);
-  background: var(--button-primary-bg);
-  box-shadow: none;
+  background: #1f6fff;
+  color: #ffffff;
 }
 
 .backButton:hover,
 .secondaryButton:hover {
-  background: var(--button-secondary-bg-hover);
+  background: #ffffff;
+}
+
+.primaryButton:hover {
+  background: #185fdd;
 }
 
 .backButton:active,
@@ -96,177 +153,134 @@
   transform: translateY(1px);
 }
 
-.backButton:active,
-.secondaryButton:active {
-  background: var(--button-secondary-bg-active);
-}
-
-.primaryButton:hover {
-  background: var(--button-primary-bg-hover);
-}
-
-.primaryButton:active {
-  background: var(--button-primary-bg-active);
-}
-
-.title {
-  font-size: var(--type-title-document);
-  line-height: 1.08;
-  transition: font-size 160ms ease;
-}
-
-.content {
-  margin-top: 14px;
-}
-
-.readerCard {
-  padding: 6px 0 0;
-  background: transparent;
-}
-
-.documentHeader {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  max-width: 860px;
-  margin: 0 auto;
-  padding: 0 4px;
-}
-
-.documentHeading {
-  min-width: 0;
-}
-
-.eyebrow {
-  font-size: var(--type-eyebrow);
-  font-weight: 700;
-  color: #245bdb;
-}
-
-.documentSubline {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  margin-top: 10px;
-  color: #8f959e;
-  font-size: var(--type-eyebrow);
-}
-
 .documentToolbar {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
   justify-content: flex-end;
+  gap: 6px;
 }
 
-.topbarScrolled .backButton,
-.documentHeader .primaryButton,
-.documentHeader .secondaryButton {
-  transition: padding 160ms ease, border-radius 160ms ease;
+.content {
+  margin-top: 8px;
 }
 
-.topbarScrolled .backButton {
-  padding: var(--button-padding-compact);
-  border-radius: var(--button-radius-md);
-}
-
-.pageScrolled .title {
-  font-size: var(--type-title-document-compact);
-}
-
-.pageScrolled .documentToolbar .primaryButton,
-.pageScrolled .documentToolbar .secondaryButton {
-  padding: var(--button-padding-compact);
-  border-radius: var(--button-radius-md);
-}
-
-.documentSummary {
-  max-width: 860px;
-  margin: 14px auto 0;
-  padding: 0 4px;
-  color: #6b7280;
-  line-height: 1.8;
+.readerCard {
+  background: transparent;
 }
 
 .documentStage {
-  margin-top: 16px;
+  padding: 6px 0 24px;
 }
 
 .preview,
 .richPreview {
-  width: 100%;
-  max-width: 860px;
+  max-width: 920px;
   margin: 0 auto;
   min-height: 560px;
-  padding: 44px 64px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 0;
+  border-radius: 18px;
+}
+
+.preview {
+  padding: 34px 40px 42px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: #ffffff;
+  color: #1f2937;
+  line-height: 1.85;
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
+}
+
+.richPreviewBody {
+  min-height: 560px;
+  padding: 34px 40px 42px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 18px;
   background: #ffffff;
   color: #1f2937;
   line-height: 1.85;
-  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.05);
 }
 
-.preview {
+.documentPaperHeader {
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.paperTitle {
+  font-size: clamp(28px, 2.5vw, 34px);
+  line-height: 1.08;
+  letter-spacing: -0.03em;
+  color: #1f2329;
+}
+
+.documentSummary {
+  margin-top: 10px;
+  color: #5f6672;
+  line-height: 1.75;
+  font-size: 13px;
+}
+
+.previewContent,
+.richPreviewContent {
+  margin-top: 22px;
+}
+
+.previewContent {
   white-space: pre-wrap;
 }
 
-.richPreviewBody {
-  max-width: 780px;
-  margin: 0 auto;
-  color: #1f2937;
-  line-height: 1.85;
-}
-
-.richPreviewBody :global(h1) {
-  margin: 0 0 20px;
+.richPreviewContent :global(h1) {
+  margin: 0 0 18px;
   font-size: 34px;
   line-height: 1.12;
+  letter-spacing: -0.03em;
+  color: #1f2329;
 }
 
-.richPreviewBody :global(h2) {
-  margin: 26px 0 14px;
-  font-size: 26px;
-  line-height: 1.22;
+.richPreviewContent :global(h2) {
+  margin: 24px 0 14px;
+  font-size: 24px;
+  line-height: 1.24;
+  color: #1f2329;
 }
 
-.richPreviewBody :global(p) {
+.richPreviewContent :global(p) {
   margin: 0 0 14px;
 }
 
-.richPreviewBody :global(ul),
-.richPreviewBody :global(ol) {
+.richPreviewContent :global(ul),
+.richPreviewContent :global(ol) {
   margin: 0 0 14px;
   padding-left: 24px;
 }
 
-.richPreviewBody :global(blockquote) {
-  margin: 16px 0;
+.richPreviewContent :global(blockquote) {
+  margin: 14px 0;
   padding: 12px 16px;
   border-left: 4px solid #3370ff;
+  border-radius: 0 14px 14px 0;
   background: rgba(51, 112, 255, 0.08);
-  color: #6b7280;
+  color: #5f6672;
 }
 
-.richPreviewBody :global(pre) {
-  margin: 16px 0;
+.richPreviewContent :global(pre) {
+  margin: 14px 0;
   padding: 16px 18px;
-  border-radius: 14px;
-  background: #14213d;
+  border-radius: 16px;
+  background: #162033;
   color: #f8fafc;
   overflow-x: auto;
 }
 
-.richPreviewBody :global(code) {
+.richPreviewContent :global(code) {
   padding: 2px 6px;
   border-radius: 8px;
   background: rgba(51, 112, 255, 0.08);
 }
 
-.richPreviewBody :global(img) {
+.richPreviewContent :global(img) {
   max-width: 100%;
-  border-radius: 14px;
+  border-radius: 16px;
 }
 
 @media (max-width: 860px) {
@@ -274,25 +288,16 @@
     padding: 14px;
   }
 
-  .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  .readerCard {
-    padding: 0;
-  }
-
-  .documentHeader {
-    flex-direction: column;
-  }
-
+  .topbar,
+  .topbarMain,
   .documentToolbar {
-    justify-content: flex-start;
+    flex-direction: column;
+    align-items: stretch;
   }
 
   .preview,
-  .richPreview {
-    padding: 20px;
+  .richPreviewBody {
+    min-height: auto;
+    padding: 28px 20px 36px;
   }
 }

@@ -27,11 +27,15 @@ const Sidebar = ({ collapsed }) => {
 
   return (
     <aside className={`${styles.sidebar} ${collapsed ? styles.collapsed : ''}`}>
-      <div className={styles.panel}>
-        <div className={styles.panelTitle}>{currentUser.tenantName}</div>
-      </div>
+      {!collapsed && (
+        <div className={styles.workspaceHeader}>
+          <div className={styles.workspaceEyebrow}>当前工作区</div>
+          <div className={styles.workspaceTitle}>{currentUser.tenantName}</div>
+          <div className={styles.workspaceMeta}>{knowledgeBases.length} 个知识库</div>
+        </div>
+      )}
 
-      <div className={styles.sectionTitle}>知识库</div>
+      <div className={styles.sectionTitle}>知识库列表</div>
       <div className={styles.list}>
         {visibleKnowledgeBases.map((kb) => (
           <Link
@@ -45,6 +49,11 @@ const Sidebar = ({ collapsed }) => {
             {!collapsed && (
               <div className={styles.itemContent}>
                 <div className={styles.itemTitle}>{kb.name}</div>
+                <div className={styles.itemMeta}>
+                  <span>{kb.documentCount || 0} 篇文档</span>
+                  <span className={styles.itemMetaDivider} />
+                  <span>{kb.syncEnabled ? '已同步连接' : '手工维护'}</span>
+                </div>
               </div>
             )}
           </Link>
@@ -57,7 +66,7 @@ const Sidebar = ({ collapsed }) => {
           className={styles.listToggle}
           onClick={() => setListExpanded((current) => !current)}
         >
-          {listExpanded ? '收起知识库列表' : `展开更多知识库${hiddenCount > 0 ? `（+${hiddenCount}）` : ''}`}
+          {listExpanded ? '收起列表' : `展开更多${hiddenCount > 0 ? `（+${hiddenCount}）` : ''}`}
         </button>
       )}
     </aside>

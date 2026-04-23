@@ -88,7 +88,13 @@ npm install
 启动开发模式：
 
 ```bash
-npm run dev
+npm run tauri:dev
+```
+
+仅启动前端调试页：
+
+```bash
+npm run dev -- --port 1420
 ```
 
 ---

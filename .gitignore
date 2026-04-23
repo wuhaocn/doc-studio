@@ -62,6 +62,7 @@ coverage/
 # Production build
 dist/
 build/
+target/
 
 # Temporary files
 *.tmp

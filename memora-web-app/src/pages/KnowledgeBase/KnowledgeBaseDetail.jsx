@@ -5,14 +5,11 @@ import { useAuth } from '../../contexts/AuthContext'
 import DocumentActionModal from '../../components/Document/DocumentActionModal'
 import DocumentBatchMoveModal from '../../components/Document/DocumentBatchMoveModal'
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
-import DocumentVersionDiff from '../../components/Document/DocumentVersionDiff'
-import DocumentVersionList from '../../components/Document/DocumentVersionList'
 import KnowledgeBaseFormModal from '../../components/KnowledgeBase/KnowledgeBaseFormModal'
 import KnowledgeBasePermissionModal from '../../components/KnowledgeBase/KnowledgeBasePermissionModal'
 import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { workspaceApi } from '../../services/api/workspaceApi'
-import { buildLineDiff } from '../../utils/documentDiff'
 import { emitKnowledgeBasesChanged } from '../../utils/knowledgeBaseEvents'
 import { rememberKnowledgeBase } from '../../utils/knowledgeBaseRoute'
 import styles from './KnowledgeBaseDetail.module.css'
@@ -261,7 +258,6 @@ const KnowledgeBaseDetail = () => {
   const [pageErrorMessage, setPageErrorMessage] = useState('')
   const [knowledgeBase, setKnowledgeBase] = useState(null)
   const [documents, setDocuments] = useState([])
-  const [syncJobs, setSyncJobs] = useState([])
   const [selectedDocumentId, setSelectedDocumentId] = useState(null)
   const [search, setSearch] = useState('')
   const [syncing, setSyncing] = useState(false)
@@ -290,11 +286,6 @@ const KnowledgeBaseDetail = () => {
   const [focusMode, setFocusMode] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [knowledgeBaseInfoVisible, setKnowledgeBaseInfoVisible] = useState(false)
-  const [contextPanelCollapsed, setContextPanelCollapsed] = useState(true)
-  const [versions, setVersions] = useState([])
-  const [versionsLoading, setVersionsLoading] = useState(false)
-  const [rollingBackVersionId, setRollingBackVersionId] = useState(null)
-  const [comparingVersionId, setComparingVersionId] = useState(null)
   const [shareOpen, setShareOpen] = useState(false)
   const [permissionModalOpen, setPermissionModalOpen] = useState(false)
   const [permissionMembers, setPermissionMembers] = useState([])
@@ -311,9 +302,6 @@ const KnowledgeBaseDetail = () => {
         setPageStatus(PAGE_STATUS.LOADING)
         setKnowledgeBase(null)
         setDocuments([])
-        setSyncJobs([])
-        setVersions([])
-        setComparingVersionId(null)
         setSelectedDocumentId(null)
       }
 
@@ -323,17 +311,10 @@ const KnowledgeBaseDetail = () => {
         setKnowledgeBase(knowledgeBaseResponse.data)
       }
 
-      const [documentTreeResult, syncJobsResult] = await Promise.allSettled([
-        documentApi.getDocumentTreeByKnowledgeBaseId(id),
-        knowledgeBaseApi.getSyncJobs(id),
-      ])
+      const [documentTreeResult] = await Promise.allSettled([documentApi.getDocumentTreeByKnowledgeBaseId(id)])
 
       if (documentTreeResult.status === 'fulfilled' && documentTreeResult.value.code === 200) {
         setDocuments(documentTreeResult.value.data || [])
-      }
-
-      if (syncJobsResult.status === 'fulfilled' && syncJobsResult.value.code === 200) {
-        setSyncJobs(syncJobsResult.value.data || [])
       }
 
       setPageStatus(PAGE_STATUS.READY)
@@ -341,9 +322,6 @@ const KnowledgeBaseDetail = () => {
       console.error('加载知识库详情失败', error)
       setKnowledgeBase(null)
       setDocuments([])
-      setSyncJobs([])
-      setVersions([])
-      setComparingVersionId(null)
       setSelectedDocumentId(null)
 
       if (error?.code === 403) {
@@ -429,10 +407,6 @@ const KnowledgeBaseDetail = () => {
   const canMoveUp = selectedSiblingIndex > 0
   const canMoveDown = selectedSiblingIndex >= 0 && selectedSiblingIndex < siblingDocuments.length - 1
   const documentModalFolderOptions = buildFolderOptions(documents, documentModalMode === 'edit' ? selectedDocument : null)
-  const comparingVersion = versions.find((version) => version.id === comparingVersionId) || null
-  const versionDiffRows = comparingVersion
-    ? buildLineDiff(selectedDocument?.contentText || '', comparingVersion.contentText || comparingVersion.content || '')
-    : []
   const selectedDocumentIdSet = new Set(selectedDocumentIds)
   const topLevelSelectedDocuments = getTopLevelSelectedDocuments(documents, selectedDocumentIds)
   const batchFolderOptions = buildBatchFolderOptions(documents, topLevelSelectedDocuments)
@@ -440,10 +414,8 @@ const KnowledgeBaseDetail = () => {
   const canWriteKnowledgeBase = !!knowledgeBase?.canWrite
   const canManageKnowledgeBase = !!knowledgeBase?.canManage
   const dragSortEnabled = canWriteKnowledgeBase && !batchMode && !search.trim()
-  const selectedDocumentVersionTargetId = selectedDocument?.docType === 'DOC' ? selectedDocument.id : null
   const shouldRenderRichPreview = selectedDocument?.docType === 'DOC' && !!selectedDocument?.content
   const compactKnowledgeBaseDescription = knowledgeBase?.description?.trim()
-  const shouldShowContextPanel = !focusMode && !contextPanelCollapsed && selectedDocument?.docType === 'DOC'
   const hasActiveSearch = !!deferredSearch.trim()
   const treePanelStatusText = hasActiveSearch
     ? `找到 ${visibleDocuments.length} 项`
@@ -458,34 +430,8 @@ const KnowledgeBaseDetail = () => {
   const selectedFolderDirectoryCount = selectedFolderChildren.filter((item) => item.docType === 'FOLDER').length
 
   useEffect(() => {
-    if (!selectedDocumentVersionTargetId) {
-      setFocusMode(false)
-      setVersions([])
-      setComparingVersionId(null)
-      setShareOpen(false)
-      return
-    }
-
-    const loadVersions = async () => {
-      try {
-        setVersionsLoading(true)
-        const response = await documentApi.getVersions(selectedDocumentVersionTargetId)
-        if (response.code === 200) {
-          setVersions(response.data || [])
-        }
-      } catch (error) {
-        console.error('加载文档版本失败', error)
-        setVersions([])
-      } finally {
-        setVersionsLoading(false)
-      }
-    }
-
-    loadVersions()
-  }, [selectedDocumentVersionTargetId])
-
-  useEffect(() => {
     if (selectedDocument?.docType !== 'DOC') {
+      setFocusMode(false)
       setShareOpen(false)
     }
   }, [selectedDocument?.docType])
@@ -678,17 +624,6 @@ const KnowledgeBaseDetail = () => {
     setFocusMode((current) => !current)
   }
 
-  const handleOpenVersionPanel = () => {
-    if (!selectedDocument || selectedDocument.docType !== 'DOC') {
-      return
-    }
-
-    if (focusMode) {
-      setFocusMode(false)
-    }
-    setContextPanelCollapsed(false)
-  }
-
   const openCreateDocumentModal = (docType) => {
     if (!canWriteKnowledgeBase) {
       return
@@ -832,35 +767,6 @@ const KnowledgeBaseDetail = () => {
     } catch (error) {
       console.error('调整文档顺序失败', error)
       setFeedback({ type: 'error', message: error?.message || '调整文档顺序失败，请稍后重试' })
-    }
-  }
-
-  const handleRollbackVersion = async (versionId) => {
-    if (!selectedDocument || !canWriteKnowledgeBase) {
-      return
-    }
-
-    if (!window.confirm(`确认将“${selectedDocument.title}”回滚到该版本吗？`)) {
-      return
-    }
-
-    try {
-      setRollingBackVersionId(versionId)
-      await documentApi.rollbackToVersion(selectedDocument.id, versionId)
-      await loadData()
-      const versionsResponse = await documentApi.getVersions(selectedDocument.id)
-      if (versionsResponse.code === 200) {
-        setVersions(versionsResponse.data || [])
-      }
-      setFeedback({
-        type: 'success',
-        message: `文档“${selectedDocument.title}”已回滚到历史版本`,
-      })
-    } catch (error) {
-      console.error('回滚文档版本失败', error)
-      setFeedback({ type: 'error', message: error?.message || '回滚文档版本失败，请稍后重试' })
-    } finally {
-      setRollingBackVersionId(null)
     }
   }
 
@@ -1069,12 +975,36 @@ const KnowledgeBaseDetail = () => {
             <div className={styles.syncBadge}>{STATUS_LABELS[knowledgeBase.syncStatus] || knowledgeBase.syncStatus}</div>
           </div>
           <div className={styles.heroMeta}>
+            <span className={styles.metaPill}>文档工作区</span>
             <span className={styles.metaPill}>{knowledgeBase.documentCount} 个节点</span>
             <span className={styles.metaPill}>{ROLE_LABELS[knowledgeBase.currentRole] || knowledgeBase.currentRole || '未知角色'}</span>
+            <span className={styles.metaPill}>{knowledgeBase.syncEnabled ? '已启用同步' : '未启用同步'}</span>
+            {knowledgeBase.permissionRestricted && <span className={styles.metaPill}>独立权限</span>}
           </div>
+          {knowledgeBaseInfoVisible && (
+            <p className={styles.heroDescription}>
+              {compactKnowledgeBaseDescription || '当前知识库用于承载文档协作和目录整理，主流程仍以继续写作和阅读为主。'}
+            </p>
+          )}
         </div>
         <div className={styles.heroActions}>
           <div className={styles.heroActionGrid}>
+            <button
+              type="button"
+              className={styles.primaryButton}
+              disabled={!canWriteKnowledgeBase}
+              onClick={() => openCreateDocumentModal('DOC')}
+            >
+              新建文档
+            </button>
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              disabled={!canWriteKnowledgeBase}
+              onClick={() => openCreateDocumentModal('FOLDER')}
+            >
+              新建目录
+            </button>
             <details className={styles.moreActions}>
               <summary className={styles.secondaryButton}>更多</summary>
               <div className={styles.moreActionsMenu}>
@@ -1126,28 +1056,11 @@ const KnowledgeBaseDetail = () => {
         </div>
       </header>
 
-      {knowledgeBaseInfoVisible && (
-        <section className={styles.heroInfoPanel}>
-          <div className={styles.heroInfoMain}>
-            <strong className={styles.heroInfoLabel}>知识库说明</strong>
-            <p className={styles.description}>
-              {compactKnowledgeBaseDescription || '当前知识库用于承载文档协作和目录整理，主流程仍以继续写作和阅读为主。'}
-            </p>
-          </div>
-          <div className={styles.heroInfoMeta}>
-            <span className={styles.metaPill}>{knowledgeBase.syncEnabled ? '已启用同步' : '未启用同步'}</span>
-            {knowledgeBase.permissionRestricted && <span className={styles.metaPill}>独立权限</span>}
-          </div>
-        </section>
-      )}
-
       <section
         className={[
           styles.contentGrid,
           focusMode ? styles.contentGridFocus : '',
-          !focusMode && treePanelCollapsed && contextPanelCollapsed ? styles.contentGridDocumentOnly : '',
-          !focusMode && treePanelCollapsed && !contextPanelCollapsed ? styles.contentGridNoLeft : '',
-          !focusMode && contextPanelCollapsed ? styles.contentGridWide : '',
+          !focusMode && treePanelCollapsed ? styles.contentGridDocumentOnly : styles.contentGridWide,
         ]
           .filter(Boolean)
           .join(' ')}
@@ -1168,7 +1081,7 @@ const KnowledgeBaseDetail = () => {
           )}
           <div className={styles.panelHeader}>
             <div>
-              <h2>文档</h2>
+              <h2>目录</h2>
               <span className={styles.panelHint}>{treePanelStatusText}</span>
             </div>
             <div className={styles.panelActions}>
@@ -1420,69 +1333,81 @@ const KnowledgeBaseDetail = () => {
             </div>
           ) : selectedDocument ? (
             <section className={`${styles.documentCard} ${focusMode ? styles.documentCardFocus : ''}`}>
-              <div className={styles.documentHeader}>
-                <div className={styles.documentHeading}>
-                  <div className={styles.documentEyebrow}>
-                    {selectedDocument.docType === 'DOC' ? '文档' : '目录'}
-                  </div>
-                  <h2 className={styles.documentTitle}>{selectedDocument.title}</h2>
-                  <div className={styles.documentSubline}>
-                    {selectedDocument.docType === 'DOC' && <span>v{selectedDocument.versionNo}</span>}
-                    {selectedDocument.docType === 'FOLDER' && <span>继续在这里整理内容</span>}
-                    {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
-                    {selectedDocument.syncStatus && selectedDocument.syncStatus !== 'SYNCED' && (
-                      <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
-                    )}
-                  </div>
+              <div
+                className={[
+                  styles.documentHeader,
+                  selectedDocument.docType === 'DOC' ? styles.documentHeaderDoc : styles.documentHeaderFolder,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
+              >
+                <div
+                  className={[
+                    styles.documentHeading,
+                    selectedDocument.docType === 'DOC' ? styles.documentHeadingDoc : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
+                >
+                  {selectedDocument.docType === 'DOC' ? (
+                    <>
+                      <span className={styles.documentEyebrow}>当前文档</span>
+                      <div className={styles.documentSubline}>
+                        <span>v{selectedDocument.versionNo}</span>
+                        {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
+                        {selectedDocument.syncStatus && selectedDocument.syncStatus !== 'SYNCED' && (
+                          <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className={styles.documentEyebrow}>目录</div>
+                      <div className={styles.documentSubline}>
+                        <span>继续在这里整理内容</span>
+                        {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
+                      </div>
+                    </>
+                  )}
                 </div>
                 <div className={styles.documentToolbar}>
-                  {selectedDocument.docType === 'DOC' && (
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      disabled={!canWriteKnowledgeBase}
-                      onClick={handleOpenEditorPage}
-                    >
-                      继续编辑
-                    </button>
-                  )}
-                  {selectedDocument.docType === 'DOC' && (
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => setShareOpen(true)}
-                    >
-                      分享文档
-                    </button>
-                  )}
-                  {selectedDocument.docType === 'DOC' && (
-                    <button
-                      type="button"
-                      className={contextPanelCollapsed ? styles.toolButton : styles.secondaryButton}
-                      onClick={handleOpenVersionPanel}
-                    >
-                      查看版本
-                    </button>
-                  )}
-                  {selectedDocument.docType === 'FOLDER' && (
-                    <button
-                      type="button"
-                      className={styles.primaryButton}
-                      disabled={!canWriteKnowledgeBase}
-                      onClick={() => openCreateDocumentModal('DOC')}
-                    >
-                      新建文档
-                    </button>
-                  )}
-                  {selectedDocument.docType === 'FOLDER' && (
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      disabled={!canWriteKnowledgeBase}
-                      onClick={() => openCreateDocumentModal('FOLDER')}
-                    >
-                      新建目录
-                    </button>
+                  {selectedDocument.docType === 'DOC' ? (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={handleOpenEditorPage}
+                      >
+                        继续编辑
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        onClick={() => setShareOpen(true)}
+                      >
+                        分享文档
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={() => openCreateDocumentModal('DOC')}
+                      >
+                        新建文档
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={() => openCreateDocumentModal('FOLDER')}
+                      >
+                        新建目录
+                      </button>
+                    </>
                   )}
                   <details className={styles.inlineMoreActions}>
                     <summary className={styles.toolButton}>更多</summary>
@@ -1537,9 +1462,6 @@ const KnowledgeBaseDetail = () => {
                   </details>
                 </div>
               </div>
-              {selectedDocument.summary && selectedDocument.docType === 'DOC' ? (
-                <p className={styles.documentSummary}>{selectedDocument.summary}</p>
-              ) : null}
               {focusMode && (
                 <div className={styles.focusBanner}>
                   已进入专注模式，只保留当前文档正文。
@@ -1576,14 +1498,44 @@ const KnowledgeBaseDetail = () => {
                   </section>
                 ) : shouldRenderRichPreview ? (
                   <article className={`${styles.richPreview} ${focusMode ? styles.stageFocus : ''}`}>
-                    <div
-                      className={`${styles.richPreviewBody} ${focusMode ? styles.richPreviewBodyFocus : ''}`}
-                      dangerouslySetInnerHTML={{ __html: selectedDocument.content }}
-                    />
+                    <div className={`${styles.richPreviewBody} ${focusMode ? styles.richPreviewBodyFocus : ''}`}>
+                      <div className={styles.documentPaperHeader}>
+                        <h2 className={styles.documentTitle}>{selectedDocument.title}</h2>
+                        <div className={styles.documentSubline}>
+                          <span>v{selectedDocument.versionNo}</span>
+                          {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
+                          {selectedDocument.syncStatus && selectedDocument.syncStatus !== 'SYNCED' && (
+                            <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
+                          )}
+                        </div>
+                        {selectedDocument.summary ? (
+                          <p className={styles.documentSummary}>{selectedDocument.summary}</p>
+                        ) : null}
+                      </div>
+                      <div
+                        className={styles.richPreviewContent}
+                        dangerouslySetInnerHTML={{ __html: selectedDocument.content }}
+                      />
+                    </div>
                   </article>
                 ) : (
                   <div className={`${styles.preview} ${focusMode ? styles.stageFocus : ''}`}>
-                    {selectedDocument.contentText || selectedDocument.content || '当前节点是目录或尚未录入正文。'}
+                    <div className={styles.documentPaperHeader}>
+                      <h2 className={styles.documentTitle}>{selectedDocument.title}</h2>
+                      <div className={styles.documentSubline}>
+                        <span>v{selectedDocument.versionNo}</span>
+                        {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
+                        {selectedDocument.syncStatus && selectedDocument.syncStatus !== 'SYNCED' && (
+                          <span>{STATUS_LABELS[selectedDocument.syncStatus] || selectedDocument.syncStatus}</span>
+                        )}
+                      </div>
+                      {selectedDocument.summary ? (
+                        <p className={styles.documentSummary}>{selectedDocument.summary}</p>
+                      ) : null}
+                    </div>
+                    <div className={styles.previewContent}>
+                      {selectedDocument.contentText || selectedDocument.content || '当前节点是目录或尚未录入正文。'}
+                    </div>
                   </div>
                 )}
               </div>
@@ -1592,74 +1544,6 @@ const KnowledgeBaseDetail = () => {
             <div className={styles.emptyPanel}>当前没有可展示的文档。</div>
           )}
         </div>
-
-        <aside className={[styles.contextPanel, shouldShowContextPanel ? '' : styles.contextPanelCollapsed].filter(Boolean).join(' ')}>
-          <section className={styles.versionPanel}>
-            <div className={styles.panelHeader}>
-              <div>
-                <div className={styles.versionEyebrow}>右侧抽屉</div>
-                <h2>查看版本</h2>
-                <span>{selectedDocument?.docType === 'DOC' ? `${versions.length} 个版本` : '仅文档节点可用'}</span>
-              </div>
-              <button type="button" className={styles.versionCloseButton} onClick={() => setContextPanelCollapsed(true)}>
-                收起
-              </button>
-            </div>
-            {selectedDocument?.docType === 'DOC' ? (
-              <>
-                <DocumentVersionList
-                  versions={versions}
-                  loading={versionsLoading}
-                  comparingVersionId={comparingVersionId}
-                  rollingBackVersionId={rollingBackVersionId}
-                  canRollback={canWriteKnowledgeBase}
-                  onToggleCompare={(versionId) => setComparingVersionId((current) => (current === versionId ? null : versionId))}
-                  onRollback={handleRollbackVersion}
-                />
-                {comparingVersion && (
-                  <DocumentVersionDiff
-                    title="查看差异"
-                    subtitle={`当前版本 v${selectedDocument.versionNo} vs 历史版本 v${comparingVersion.version}`}
-                    rows={versionDiffRows}
-                  />
-                )}
-              </>
-            ) : null}
-          </section>
-
-          <details className={styles.syncDisclosure}>
-            <summary className={styles.syncDisclosureSummary}>
-              <div className={styles.syncSummaryMain}>
-                <div className={styles.syncSummaryEyebrow}>低频信息</div>
-                <strong className={styles.syncSummaryTitle}>同步记录</strong>
-                <span className={styles.syncSummaryMeta}>{syncJobs.length} 条记录</span>
-              </div>
-              <span className={styles.syncSummaryHint}>按需查看</span>
-            </summary>
-            <section className={styles.syncPanel}>
-              <div className={styles.syncList}>
-                {syncJobs.length > 0 ? (
-                  syncJobs.map((job) => (
-                    <article key={job.id} className={styles.syncItem}>
-                      <div className={styles.syncTop}>
-                        <strong className={styles.syncStatusBadge}>{job.status}</strong>
-                        <span>{dayjs(job.createdAt).format('MM-DD HH:mm')}</span>
-                      </div>
-                      <p className={styles.syncMessage}>{job.message}</p>
-                      <div className={styles.syncMeta}>
-                        <span className={styles.syncPath}>{job.localPath}</span>
-                        <span className="ui-chip">扫描 {job.scannedCount}</span>
-                        <span className="ui-chip">变更 {job.changedCount}</span>
-                      </div>
-                    </article>
-                  ))
-                ) : (
-                  <div className={styles.emptyVersion}>当前还没有同步记录。</div>
-                )}
-              </div>
-            </section>
-          </details>
-        </aside>
       </section>
 
       <KnowledgeBaseFormModal

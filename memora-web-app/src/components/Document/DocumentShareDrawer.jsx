@@ -58,7 +58,7 @@ const DocumentShareDrawer = ({
         <div className={styles.header}>
           <div>
             <p className={styles.eyebrow}>分享文档</p>
-            <h2 className={styles.title}>复制分享链接</h2>
+            <h2 className={styles.title}>复制只读链接</h2>
             <p className={styles.description}>{title}</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose}>
@@ -66,16 +66,21 @@ const DocumentShareDrawer = ({
           </button>
         </div>
 
-        <div className={styles.section}>
-          <div className={styles.label}>分享范围</div>
-          <div className={styles.scopeCard}>
+        <div className={styles.summaryRow}>
+          <div className={styles.summaryCard}>
+            <div className={styles.label}>访问方式</div>
             <strong>租户内只读</strong>
-            <p>已登录并具备当前知识库访问权限的成员，可直接通过链接阅读文档，不展示编辑入口。</p>
+            <p>对方打开后直接进入阅读页，不展示编辑入口。</p>
+          </div>
+          <div className={styles.summaryCard}>
+            <div className={styles.label}>目标页面</div>
+            <strong>文档阅读页</strong>
+            <p>适合发给评审、协作成员或只需查看内容的人。</p>
           </div>
         </div>
 
         <div className={styles.section}>
-          <div className={styles.label}>分享链接</div>
+          <div className={styles.label}>复制分享链接</div>
           <div className={styles.linkRow}>
             <input readOnly value={documentLink} className={styles.linkInput} />
             <button type="button" className={styles.primaryButton} onClick={handleCopyLink}>
@@ -85,7 +90,7 @@ const DocumentShareDrawer = ({
         </div>
 
         <div className={styles.note}>
-          分享后，对方会直接打开只读阅读页。公开匿名分享后续再补。
+          仅已登录且具备当前知识库访问权限的成员可以访问。公开匿名分享暂不开放。
         </div>
       </div>
     </div>

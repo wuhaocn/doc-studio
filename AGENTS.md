@@ -1,111 +1,48 @@
-# Doc Studio AI Agents 配置
+# Memora Repo Notes
 
-## 1. 项目技能概览
+## Current Product Focus
 
-Doc Studio项目配置了专属的AI技能，用于辅助项目开发、文档生成和架构设计。以下是项目中可用的技能列表：
+Memora is currently converging on one main delivery path:
 
-### 1.1 doc-studio-skill
+`tenant -> knowledge base -> document tree -> editing -> versions -> sync -> permissions`
 
-**技能名称**: doc-studio-skill
-**描述**: Doc Studio项目的专属技能，用于生成和优化项目文档、代码结构和架构设计
-**版本**: 1.0.0
-**作者**: Doc Studio Team
+This repository is no longer organized around the earlier `Doc Studio` skill system. If you find references to resource libraries, AI skills, or generic document generators, treat them as legacy unless the current README or module docs explicitly say otherwise.
 
-#### 使用示例
+## Repository Map
 
-```
-调用 doc-studio-skill，生成项目架构文档
-```
-
-```
-调用 doc-studio-skill，生成API文档，目标路径为 ./api-docs，详细需求为包含所有REST API端点的文档
-```
-
-## 2. 技能使用指南
-
-### 2.1 基本语法
-
-```
-调用 [技能名称]，[任务描述]，目标路径为 [目标路径]，详细需求为 [详细需求]
+```text
+memora-doc/
+├── memora-server/      # Spring Boot backend
+├── memora-web-app/     # React web console
+├── memora-client/      # Tauri sync agent shell
+├── doc/                # product, architecture, and dev docs
+├── build.gradle.kts
+└── settings.gradle.kts
 ```
 
-### 2.2 支持的任务类型
+## Source Of Truth
 
-- **document**: 生成项目文档
-- **code**: 生成代码文件
-- **architecture**: 生成架构设计文档
-- **test**: 生成测试用例
-- **api-docs**: 生成API文档
-- **readme**: 更新项目README文件
-- **memory**: 生成记忆库模块
-- **memory-schema**: 生成记忆库数据模式
-- **memory-api**: 生成记忆库API接口
+- Start with [README.md](./README.md) for current scope and reading order.
+- Backend details live in [memora-server/README.md](./memora-server/README.md).
+- Web details live in [memora-web-app/README.md](./memora-web-app/README.md).
+- Client details live in [memora-client/README.md](./memora-client/README.md).
+- Product and architecture decisions live under `doc/`.
 
-## 3. 技能配置文件
+## Working Rules
 
-技能配置文件位于 `.claude/skills/` 目录下，每个技能有独立的目录结构：
+- Prefer improving the online document main flow over expanding side systems.
+- Keep multi-tenant isolation, permission checks, and document/version integrity explicit.
+- Do not reintroduce old `Doc Studio` naming or `.claude/skills` assumptions.
+- When updating docs, prefer fixing canonical entry docs over adding more parallel summaries.
 
-```
-doc-studio/.claude/skills/
-└── doc-studio-skill/
-    ├── SKILL.md              # 技能元数据和使用说明
-    ├── manifest.json          # 技能清单文件
-    └── src/
-        └── index.js          # 技能入口文件
-```
+## Validation
 
-## 4. 技能更新和优化
+- Backend: `gradle test`
+- Web: `cd memora-web-app && npm install && npm run lint && npm run build`
+- Client: `cd memora-client/src-tauri && cargo check`
 
-### 4.1 自学习机制
+## Known Environment Notes
 
-项目采用自学习机制，通过以下方式不断优化技能：
-
-1. **使用反馈收集**: 记录技能的使用情况和效果
-2. **自动优化**: 根据使用反馈自动调整技能的行为和输出
-3. **定期更新**: 定期检查技能配置，更新技能版本
-
-### 4.2 手动更新
-
-可以通过修改技能目录下的文件来手动更新技能：
-
-1. 修改 `SKILL.md` 更新技能元数据和使用说明
-2. 修改 `manifest.json` 更新技能配置
-3. 修改 `src/index.js` 更新技能实现逻辑
-
-## 5. 最佳实践
-
-1. **明确任务需求**: 在调用技能时，提供清晰的任务描述和详细需求
-2. **指定目标路径**: 明确指定输出文件的目标路径
-3. **验证输出结果**: 对技能生成的结果进行验证和调整
-4. **提供反馈**: 记录技能使用过程中的问题和建议，用于技能优化
-5. **定期更新技能**: 保持技能配置和实现的更新，适应项目发展
-
-## 6. 扩展技能
-
-可以通过以下步骤扩展项目技能：
-
-1. 在 `.claude/skills/` 目录下创建新的技能目录
-2. 创建 `SKILL.md` 文件，定义技能元数据和使用说明
-3. 创建 `manifest.json` 文件，配置技能清单
-4. 实现技能逻辑，创建 `src/index.js` 文件
-5. 在 `AGENTS.md` 中添加技能说明
-
-## 7. 技能使用统计
-
-| 技能名称 | 调用次数 | 成功次数 | 失败次数 | 平均执行时间 |
-|----------|----------|----------|----------|--------------|
-| doc-studio-skill | 10 | 8 | 2 | 2.5s |
-
-## 8. 版本历史
-
-| 版本 | 日期 | 更新内容 |
-|------|------|----------|
-| 1.0.1 | 2026-01-23 | 初始版本，添加doc-studio-skill技能 |
-
-## 9. 联系信息
-
-如有问题或建议，请联系项目团队：
-
-- 项目名称: Doc Studio
-- 团队: Doc Studio Team
-- 邮箱: team@doc-studio.com
+- Backend validation works with system Gradle in this repository.
+- Web validation requires local npm dependencies.
+- Tauri validation currently depends on a sufficiently new Rust/Cargo toolchain.

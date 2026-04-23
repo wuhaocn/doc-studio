@@ -5,20 +5,20 @@
 }
 
 :root {
-  --color-primary: #3370ff;
-  --color-primary-hover: #245bdb;
-  --color-primary-light: #e8f0ff;
-  --color-accent: #1456f0;
+  --color-primary: #1f6fff;
+  --color-primary-hover: #185fdd;
+  --color-primary-light: #edf3ff;
+  --color-accent: #1752c2;
   --color-text: #1f2329;
   --color-text-secondary: #646a73;
-  --color-border: rgba(31, 35, 41, 0.08);
-  --color-bg: #f2f3f5;
+  --color-border: rgba(31, 35, 41, 0.06);
+  --color-bg: #f5f6f8;
   --color-bg-white: #ffffff;
-  --sidebar-width: 320px;
-  --header-height: 64px;
-  --workspace-page-padding: 12px 14px 24px;
-  --workspace-card-radius: 16px;
-  --workspace-panel-padding: 16px;
+  --sidebar-width: 248px;
+  --header-height: 50px;
+  --workspace-page-padding: 14px 16px 24px;
+  --workspace-card-radius: 18px;
+  --workspace-panel-padding: 18px;
   --button-padding-lg: 14px 18px;
   --button-padding-md: 10px 14px;
   --button-padding-sm: 9px 12px;
@@ -40,19 +40,19 @@
   --type-title-editor: clamp(24px, 2.4vw, 30px);
   --type-title-editor-compact: clamp(20px, 2vw, 24px);
   --type-title-folder: clamp(26px, 2.6vw, 34px);
-  --button-secondary-bg: rgba(51, 112, 255, 0.08);
-  --button-secondary-bg-hover: rgba(51, 112, 255, 0.12);
-  --button-secondary-bg-active: rgba(51, 112, 255, 0.16);
-  --button-secondary-text: #245bdb;
-  --button-primary-bg: linear-gradient(135deg, #3370ff, #1456f0);
-  --button-primary-bg-hover: linear-gradient(135deg, #2f6af2, #114fe2);
-  --button-primary-bg-active: linear-gradient(135deg, #2a60de, #0f47ca);
+  --button-secondary-bg: rgba(255, 255, 255, 0.92);
+  --button-secondary-bg-hover: rgba(255, 255, 255, 1);
+  --button-secondary-bg-active: rgba(248, 250, 252, 1);
+  --button-secondary-text: #4f5662;
+  --button-primary-bg: #1f6fff;
+  --button-primary-bg-hover: #185fdd;
+  --button-primary-bg-active: #164fb7;
   --button-primary-text: #ffffff;
   --button-danger-bg: rgba(239, 68, 68, 0.1);
   --button-danger-bg-hover: rgba(239, 68, 68, 0.14);
   --button-danger-bg-active: rgba(239, 68, 68, 0.18);
   --button-danger-text: #b91c1c;
-  --field-bg: rgba(247, 248, 250, 0.94);
+  --field-bg: rgba(248, 250, 252, 0.96);
   --field-bg-hover: rgba(244, 247, 252, 0.98);
   --field-bg-disabled: rgba(242, 244, 247, 0.9);
   --field-border: rgba(31, 35, 41, 0.1);
@@ -102,15 +102,15 @@ button, input, textarea, select {
   min-height: 24px;
   padding: 0 9px;
   border-radius: 999px;
-  background: rgba(31, 35, 41, 0.04);
+  background: rgba(15, 23, 42, 0.04);
   color: #646a73;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
 }
 
 .ui-chip-accent {
-  background: rgba(51, 112, 255, 0.1);
-  color: #245bdb;
+  background: rgba(31, 111, 255, 0.1);
+  color: #1f4dbd;
   font-weight: 700;
 }

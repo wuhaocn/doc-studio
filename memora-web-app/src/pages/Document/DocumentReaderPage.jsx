@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import Header from '../../components/Layout/Header'
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import { documentApi } from '../../services/api/documentApi'
 import styles from './DocumentReaderPage.module.css'
@@ -116,56 +117,67 @@ const DocumentReaderPage = () => {
 
   return (
     <div className={`${styles.page} ${scrolled ? styles.pageScrolled : ''}`}>
-      <header className={`${styles.topbar} ${scrolled ? styles.topbarScrolled : ''}`}>
-        <button
-          type="button"
-          className={styles.backButton}
-          onClick={isShareMode ? () => navigate('/') : backToKnowledgeBase}
-        >
-          {isShareMode ? '返回工作台' : '返回知识库'}
-        </button>
-        {isShareMode && <span className="ui-chip ui-chip-accent">分享只读</span>}
-      </header>
-
-      <main className={styles.content}>
-        <section className={styles.readerCard}>
-          <div className={styles.documentHeader}>
-            <div className={styles.documentHeading}>
-              <div className={styles.eyebrow}>{isShareMode ? '分享阅读' : '阅读文档'}</div>
+      <Header onToggleSidebar={() => {}} showMenuButton={false} />
+      <div className={styles.pageShell}>
+        <header className={`${styles.topbar} ${scrolled ? styles.topbarScrolled : ''}`}>
+          <div className={styles.topbarMain}>
+            <button
+              type="button"
+              className={styles.backButton}
+              onClick={isShareMode ? () => navigate('/') : backToKnowledgeBase}
+            >
+              {isShareMode ? '返回工作台' : '返回知识库'}
+            </button>
+            <div className={styles.documentIdentity}>
+              <div className={styles.eyebrow}>{isShareMode ? '分享阅读' : '文档阅读'}</div>
               <h1 className={styles.title}>{document.title}</h1>
               <div className={styles.documentSubline}>
-                <span>v{document.versionNo}</span>
-                <span>{dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
-                {isShareMode ? <span>只读访问</span> : null}
+                <span className={styles.metaPill}>v{document.versionNo}</span>
+                <span className={styles.metaPill}>{dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
+                <span className={styles.metaPill}>{isShareMode ? '只读访问' : '阅读模式'}</span>
               </div>
-            </div>
-            <div className={styles.documentToolbar}>
-              <button type="button" className={styles.secondaryButton} onClick={() => setShareOpen(true)}>
-                分享文档
-              </button>
-              {!isShareMode && (
-                <button type="button" className={styles.primaryButton} onClick={() => navigate(`/docs/${document.id}/edit`)}>
-                  继续编辑
-                </button>
-              )}
             </div>
           </div>
-
-          {document.summary ? <p className={styles.documentSummary}>{document.summary}</p> : null}
-
-          <div className={styles.documentStage}>
-            {shouldRenderRichPreview ? (
-              <article className={styles.richPreview}>
-                <div className={styles.richPreviewBody} dangerouslySetInnerHTML={{ __html: document.content }} />
-              </article>
-            ) : (
-              <div className={styles.preview}>
-                {document.contentText || document.content || '当前文档暂无正文。'}
-              </div>
+          <div className={styles.documentToolbar}>
+            <button type="button" className={styles.secondaryButton} onClick={() => setShareOpen(true)}>
+              分享文档
+            </button>
+            {!isShareMode && (
+              <button type="button" className={styles.primaryButton} onClick={() => navigate(`/docs/${document.id}/edit`)}>
+                继续编辑
+              </button>
             )}
           </div>
-        </section>
-      </main>
+        </header>
+
+        <main className={styles.content}>
+          <section className={styles.readerCard}>
+            <div className={styles.documentStage}>
+              {shouldRenderRichPreview ? (
+                <article className={styles.richPreview}>
+                  <div className={styles.richPreviewBody}>
+                    <div className={styles.documentPaperHeader}>
+                      <h2 className={styles.paperTitle}>{document.title}</h2>
+                      {document.summary ? <p className={styles.documentSummary}>{document.summary}</p> : null}
+                    </div>
+                    <div className={styles.richPreviewContent} dangerouslySetInnerHTML={{ __html: document.content }} />
+                  </div>
+                </article>
+              ) : (
+                <div className={styles.preview}>
+                  <div className={styles.documentPaperHeader}>
+                    <h2 className={styles.paperTitle}>{document.title}</h2>
+                    {document.summary ? <p className={styles.documentSummary}>{document.summary}</p> : null}
+                  </div>
+                  <div className={styles.previewContent}>
+                    {document.contentText || document.content || '当前文档暂无正文。'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        </main>
+      </div>
 
       <DocumentShareDrawer
         open={shareOpen}

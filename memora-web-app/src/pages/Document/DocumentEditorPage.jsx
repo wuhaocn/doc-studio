@@ -1,6 +1,7 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import Header from '../../components/Layout/Header'
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import DocumentVersionDiff from '../../components/Document/DocumentVersionDiff'
 import DocumentVersionList from '../../components/Document/DocumentVersionList'
@@ -214,6 +215,7 @@ const DocumentEditorPage = () => {
 
   return (
     <div className={`${styles.page} ${scrolled ? styles.pageScrolled : ''}`}>
+      <Header onToggleSidebar={() => {}} showMenuButton={false} />
       <div className={`${styles.pageShell} ${versionsOpen ? styles.pageShellWide : ''}`}>
         <header className={`${styles.topbar} ${scrolled ? styles.topbarScrolled : ''}`}>
           <div className={styles.topbarMain}>
@@ -226,7 +228,7 @@ const DocumentEditorPage = () => {
               <div className={styles.meta}>
                 <span className={styles.metaPill}>v{document.versionNo}</span>
                 <span className={styles.metaPill}>{saving ? '保存中…' : '已进入编辑'}</span>
-                <span className={styles.metaPill}>更新于 {dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
+                <span className={styles.metaPill}>{dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
               </div>
             </div>
           </div>
@@ -250,7 +252,7 @@ const DocumentEditorPage = () => {
               className={styles.ghostButton}
               onClick={() => setVersionsOpen(true)}
             >
-              查看版本
+              版本
             </button>
           </div>
         </header>
@@ -260,10 +262,6 @@ const DocumentEditorPage = () => {
             {feedback.message}
           </div>
         )}
-
-        <div className={styles.workspaceHint}>
-          {versionsOpen ? '右侧正在显示历史版本，写作过程不受影响。' : '先继续写作，需要时再展开版本记录。'}
-        </div>
 
         <section className={`${styles.workspace} ${versionsOpen ? styles.workspaceWithDrawer : ''}`}>
           <div className={styles.editorPanel}>
