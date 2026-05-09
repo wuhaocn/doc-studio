@@ -10,12 +10,23 @@
 
 Web 端当前提供：
 
+- Owner 注册页与登录页
+- 邀请接受页
+- 邀请生成、查看、列表与撤销
 - 当前租户工作台与最近编辑文档入口
+- 已加入工作区列表与工作区切换
+- 工作区统一搜索页与头部全局搜索入口
+- 工作区最近审计记录、汇总与 CSV 导出
 - 知识库进入、创建与基础管理
 - 知识库内文档树浏览与维护
+- 知识库与当前节点最近审计记录
+- 知识库与文档回收站 / 恢复
 - 独立文档阅读页与编辑页
-- 版本查看、回滚与阅读链接复制
+- 版本查看、回滚、阅读链接复制与受控分享
+- 公开分享只读页
+- Service Account / API key 管理弹层
 - 知识库级权限管理
+- 状态页与只读权限反馈
 
 当前不以这些目标为主：
 
@@ -32,10 +43,14 @@ Web 端当前提供：
 memora-web-app/
 ├── src/
 │   ├── components/
+│   │   ├── Audit/                   # 审计事件列表
+│   │   ├── Feedback/                # 状态页与反馈组件
 │   │   └── Layout/                  # 全局布局、头部、知识库侧栏
 │   ├── pages/
 │   │   ├── Home/                    # 工作台首页
+│   │   ├── Search/                  # 工作区统一搜索页
 │   │   ├── Document/                # 独立阅读页与编辑页
+│   │   ├── Share/                   # 公开分享只读页
 │   │   ├── KnowledgeBase/           # 知识库详情页
 │   │   └── NotFound/                # 404 页面
 │   ├── contexts/                    # 当前会话上下文
@@ -51,7 +66,11 @@ memora-web-app/
 当前主路由：
 
 - `/login`
+- `/register`
+- `/accept-invite`
+- `/share/:token`
 - `/`
+- `/search`
 - `/kb/:id`
 - `/docs/:documentId`
 - `/docs/:documentId/edit`
@@ -70,17 +89,21 @@ memora-web-app/
 ### 页面
 
 - [Home.jsx](./src/pages/Home/Home.jsx)
+- [SearchPage.jsx](./src/pages/Search/SearchPage.jsx)
 - [DocumentReaderPage.jsx](./src/pages/Document/DocumentReaderPage.jsx)
 - [DocumentEditorPage.jsx](./src/pages/Document/DocumentEditorPage.jsx)
 - [KnowledgeBaseDetail.jsx](./src/pages/KnowledgeBase/KnowledgeBaseDetail.jsx)
 - [KnowledgeBaseTreePanel.jsx](./src/components/KnowledgeBase/KnowledgeBaseTreePanel.jsx)
 - [KnowledgeBaseDocumentPanel.jsx](./src/components/KnowledgeBase/KnowledgeBaseDocumentPanel.jsx)
 - [KnowledgeBaseContextPanel.jsx](./src/components/KnowledgeBase/KnowledgeBaseContextPanel.jsx)
+- [AuditEventList.jsx](./src/components/Audit/AuditEventList.jsx)
 
 ### 页面控制与工具
 
+- [PageState.jsx](./src/components/Feedback/PageState.jsx)
 - [useKnowledgeBaseDetailController.js](./src/hooks/useKnowledgeBaseDetailController.js)
 - [knowledgeBaseTree.js](./src/utils/knowledgeBaseTree.js)
+- [workspaceSearch.js](./src/utils/workspaceSearch.js)
 - [documentContent.js](./src/utils/documentContent.js)
 
 ### API
@@ -89,6 +112,7 @@ memora-web-app/
 - [knowledgeBaseApi.js](./src/services/api/knowledgeBaseApi.js)
 - [documentApi.js](./src/services/api/documentApi.js)
 - [authApi.js](./src/services/api/authApi.js)
+- [auditApi.js](./src/services/api/auditApi.js)
 - [axios.js](./src/services/http/axios.js)
 
 ---
@@ -118,9 +142,12 @@ memora-web-app/
 
 - 上次编辑文档快捷入口
 - 最近文档
+- 顶栏工作区切换与统一搜索
 - 轻量概览条
 - 知识库入口列表
 - 默认折叠的成员信息
+- 对管理员显示最近工作区审计记录
+- 对管理员提供 API key 管理入口
 
 ### 知识库详情页重点
 
@@ -130,6 +157,8 @@ memora-web-app/
 - 文件夹节点引导下一步动作，而不是空白预览
 - 版本信息按需展开
 - 右侧上下文面板只展示知识库与当前节点信息
+- 管理角色可直接查看知识库和当前节点最近审计记录
+- 显式展示当前角色能做什么、不能做什么
 - 支持阅读专注模式
 
 ### 文档编辑页重点
@@ -138,12 +167,15 @@ memora-web-app/
 - 编辑页不再保留知识库侧栏
 - 继续沿用轻量顶部栏风格
 - 主动作包括：返回知识库、阅读文档、复制阅读链接、查看版本
+- 管理角色可从编辑页直接创建受控分享
 
 ### 文档阅读页重点
 
 - 只展示阅读所需信息
 - 提供返回知识库、复制阅读链接、继续编辑
+- 管理角色可从阅读页直接创建受控分享
 - 阅读页始终是独立路由，不强制绕回知识库
+- 当前角色只读时不再暴露误导性的编辑入口
 
 ---
 
@@ -152,6 +184,7 @@ memora-web-app/
 ### 页面角色
 
 - 工作台首页是继续工作的入口，不是管理后台首页
+- 搜索页是跨知识库的工作区入口，不是局部筛选弹层
 - 知识库详情页是文档工作区，不是后端详情页
 - 编辑页只服务编辑
 - 阅读页只服务阅读，并继续受当前认证会话控制
@@ -194,22 +227,37 @@ Axios 基础配置：
 
 - [axios.js](./src/services/http/axios.js)
 
-当前 demo 会话 token 形式：
+当前真实会话 token 形式：
 
-- `Authorization: Bearer demo:{tenantId}:{userId}`
+- `Authorization: Bearer session:{opaqueToken}`
 
-demo 账号：
+本地种子账号：
 
 - `admin / 123456`
+- `editor / 123456`
 
 说明：
 
-- 上述账号和 token 仅用于当前演示与联调，不代表正式认证方案。
+- 上述种子账号仅用于本地联调；真实进入产品应优先走 Owner 注册和邀请接受。
+- Axios 在受保护请求遇到 `401` 时会先尝试一次 `refresh`，失败后再清空本地会话。
+- Axios 默认附带 `X-Memora-Client: memora-web-app`，用于后端审计来源标记。
 
 前端启动后会调用：
 
+- `POST /api/v1/auth/register-owner`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/refresh`
 - `GET /api/v1/auth/session`
+- `GET /api/v1/workspaces/joined`
+- `POST /api/v1/workspaces/{tenantId}/switch`
+- `POST /api/v1/tenants/current/invites`
+- `GET /api/v1/tenants/current/invites`
+- `POST /api/v1/tenants/current/invites/{id}/revoke`
+- `GET /api/v1/invites/{token}`
+- `POST /api/v1/invites/accept`
+- `GET /api/v1/documents?keyword=...`
+- `GET /api/v1/audit-logs`
 
 ---
 
@@ -218,6 +266,7 @@ demo 账号：
 在当前机器上，Web 端已经通过：
 
 - `npm run lint`
+- `npm run test:unit`
 - `npm run build`
 
 如果跨 CPU 架构复用依赖，需要重新执行 `npm install`，避免 `esbuild` 平台不匹配。

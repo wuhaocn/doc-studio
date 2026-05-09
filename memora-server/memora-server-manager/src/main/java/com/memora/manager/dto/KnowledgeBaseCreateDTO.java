@@ -23,6 +23,6 @@ public class KnowledgeBaseCreateDTO {
     
     private String cover;
     
-    private Long userId; // 临时字段，后续从鉴权中获取
+    private Long userId; // 兼容旧请求体，服务端会忽略并始终使用当前会话用户
 
 }

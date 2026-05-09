@@ -11,13 +11,16 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
 public class TenantAccessService {
-    private static final Set<String> EDITOR_ROLES = Set.of("OWNER", "EDITOR");
+    private static final Set<String> TENANT_WRITE_ROLES = Set.of("OWNER", "ADMIN", "EDITOR");
+    private static final Set<String> TENANT_MANAGE_ROLES = Set.of("OWNER", "ADMIN");
     private static final Set<String> OWNER_ROLES = Set.of("OWNER");
     private static final Set<String> KNOWLEDGE_BASE_WRITE_ROLES = Set.of("OWNER", "ADMIN", "EDITOR");
     private static final Set<String> KNOWLEDGE_BASE_MANAGE_ROLES = Set.of("OWNER", "ADMIN");
@@ -42,8 +45,16 @@ public class TenantAccessService {
 
     public TenantMember requireEditor(Long tenantId) {
         TenantMember member = requireTenantMember(tenantId);
-        if (!EDITOR_ROLES.contains(member.getRole())) {
+        if (!TENANT_WRITE_ROLES.contains(member.getRole())) {
             throw new BusinessException(403, "当前角色无写权限");
+        }
+        return member;
+    }
+
+    public TenantMember requireTenantManage(Long tenantId) {
+        TenantMember member = requireTenantMember(tenantId);
+        if (!TENANT_MANAGE_ROLES.contains(member.getRole())) {
+            throw new BusinessException(403, "当前角色无管理权限");
         }
         return member;
     }
@@ -77,26 +88,15 @@ public class TenantAccessService {
     }
 
     public List<KnowledgeBase> filterReadableKnowledgeBases(List<KnowledgeBase> knowledgeBases) {
-        if (knowledgeBases.isEmpty()) {
-            return knowledgeBases;
-        }
+        return filterKnowledgeBasesByResolvedRole(knowledgeBases, role -> role != null);
+    }
 
-        Long tenantId = knowledgeBases.get(0).getTenantId();
-        requireTenantMember(tenantId);
+    public List<KnowledgeBase> filterWritableKnowledgeBases(List<KnowledgeBase> knowledgeBases) {
+        return filterKnowledgeBasesByResolvedRole(knowledgeBases, KNOWLEDGE_BASE_WRITE_ROLES::contains);
+    }
 
-        List<Long> knowledgeBaseIds = knowledgeBases.stream()
-            .map(KnowledgeBase::getId)
-            .toList();
-        Set<Long> restrictedKnowledgeBaseIds = listActiveKnowledgeBaseMembers(knowledgeBaseIds).stream()
-            .map(KnowledgeBaseMember::getKnowledgeBaseId)
-            .collect(Collectors.toSet());
-        Set<Long> readableKnowledgeBaseIds = listCurrentUserKnowledgeBaseMembers(knowledgeBaseIds).stream()
-            .map(KnowledgeBaseMember::getKnowledgeBaseId)
-            .collect(Collectors.toSet());
-
-        return knowledgeBases.stream()
-            .filter(item -> !restrictedKnowledgeBaseIds.contains(item.getId()) || readableKnowledgeBaseIds.contains(item.getId()))
-            .toList();
+    public List<KnowledgeBase> filterManageableKnowledgeBases(List<KnowledgeBase> knowledgeBases) {
+        return filterKnowledgeBasesByResolvedRole(knowledgeBases, KNOWLEDGE_BASE_MANAGE_ROLES::contains);
     }
 
     public String getKnowledgeBaseRole(KnowledgeBase knowledgeBase) {
@@ -151,5 +151,34 @@ public class TenantAccessService {
             .eq(KnowledgeBaseMember::getUserId, currentAccessContext.getCurrentUserId())
             .eq(KnowledgeBaseMember::getStatus, 1);
         return knowledgeBaseMemberMapper.selectList(queryWrapper);
+    }
+
+    private List<KnowledgeBase> filterKnowledgeBasesByResolvedRole(
+        List<KnowledgeBase> knowledgeBases,
+        Predicate<String> rolePredicate) {
+        if (knowledgeBases.isEmpty()) {
+            return knowledgeBases;
+        }
+
+        Long tenantId = knowledgeBases.get(0).getTenantId();
+        TenantMember tenantMember = requireTenantMember(tenantId);
+
+        List<Long> knowledgeBaseIds = knowledgeBases.stream()
+            .map(KnowledgeBase::getId)
+            .toList();
+        Set<Long> restrictedKnowledgeBaseIds = listActiveKnowledgeBaseMembers(knowledgeBaseIds).stream()
+            .map(KnowledgeBaseMember::getKnowledgeBaseId)
+            .collect(Collectors.toSet());
+        Map<Long, String> currentUserKnowledgeBaseRoles = listCurrentUserKnowledgeBaseMembers(knowledgeBaseIds).stream()
+            .collect(Collectors.toMap(KnowledgeBaseMember::getKnowledgeBaseId, KnowledgeBaseMember::getRole));
+
+        return knowledgeBases.stream()
+            .filter(item -> {
+                String resolvedRole = restrictedKnowledgeBaseIds.contains(item.getId())
+                    ? currentUserKnowledgeBaseRoles.get(item.getId())
+                    : tenantMember.getRole();
+                return resolvedRole != null && rolePredicate.test(resolvedRole);
+            })
+            .toList();
     }
 }

@@ -92,13 +92,21 @@
   align-items: start;
 }
 
+.mainColumn {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
 .sidebarColumn {
   position: sticky;
   top: calc(var(--header-height) + 12px);
 }
 
 .sidebarCard,
-.stagePanel {
+.stagePanel,
+.auditPanel {
   border: 1px solid rgba(15, 23, 42, 0.06);
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.97);
@@ -113,7 +121,10 @@
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.workspaceSection .primaryButton {
+.workspaceActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   margin-top: 14px;
 }
 
@@ -151,6 +162,16 @@
   padding: 14px 18px;
 }
 
+.auditPanel {
+  padding: 14px 18px;
+}
+
+.auditHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .stageHeader {
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
@@ -161,6 +182,34 @@
   font-size: 18px;
   font-weight: 700;
   letter-spacing: -0.02em;
+}
+
+.auditSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin: 14px 0 16px;
+}
+
+.auditSummaryCard {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+  border: 1px solid rgba(31, 111, 255, 0.08);
+}
+
+.auditSummaryCard span {
+  display: block;
+  color: #7b8290;
+  font-size: 11px;
+}
+
+.auditSummaryCard strong {
+  display: block;
+  margin-top: 6px;
+  color: #111827;
+  font-size: 18px;
+  line-height: 1.2;
 }
 
 .documentList,
@@ -342,5 +391,14 @@
   .knowledgeMark,
   .itemTail {
     display: none;
+  }
+
+  .auditHeaderActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .auditSummaryGrid {
+    grid-template-columns: 1fr;
   }
 }

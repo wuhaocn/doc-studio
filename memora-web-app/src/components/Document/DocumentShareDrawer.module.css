@@ -1,0 +1,279 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(15, 23, 42, 0.32);
+  backdrop-filter: blur(6px);
+}
+
+.drawer {
+  width: min(560px, 100%);
+  height: 100%;
+  overflow-y: auto;
+  background: #ffffff;
+  box-shadow: -24px 0 60px rgba(15, 23, 42, 0.18);
+  padding: 24px 22px 28px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #8b93a1;
+  text-transform: uppercase;
+}
+
+.title {
+  margin-top: 6px;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.15;
+}
+
+.description {
+  margin-top: 8px;
+  color: #5b6472;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.closeButton,
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  border-radius: 10px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.closeButton,
+.secondaryButton {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  color: #4b5563;
+}
+
+.primaryButton {
+  background: #1f6fff;
+  color: #ffffff;
+}
+
+.summaryBlock {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.summaryItem {
+  padding: 14px;
+  border-radius: 14px;
+  background: linear-gradient(180deg, #f8fbff 0%, #eef5ff 100%);
+  border: 1px solid rgba(31, 111, 255, 0.08);
+}
+
+.summaryItem span {
+  display: block;
+  color: #7b8290;
+  font-size: 11px;
+}
+
+.summaryItem strong {
+  display: block;
+  margin-top: 8px;
+  color: #111827;
+  font-size: 13px;
+}
+
+.form {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #fbfcfe;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.field span {
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  min-height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 0 12px;
+  color: #111827;
+  background: #ffffff;
+}
+
+.message {
+  margin-top: 14px;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.messageError {
+  background: rgba(254, 242, 242, 0.98);
+  color: #b91c1c;
+}
+
+.messageSuccess {
+  background: rgba(236, 253, 245, 0.98);
+  color: #047857;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.note {
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.historySection {
+  margin-top: 22px;
+}
+
+.historyHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: #111827;
+}
+
+.historyHeader strong {
+  font-size: 14px;
+}
+
+.historyHeader span {
+  color: #7b8290;
+  font-size: 11px;
+}
+
+.shareList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.shareItem,
+.emptyState {
+  padding: 14px;
+  border-radius: 14px;
+  background: #f8fafc;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.shareTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.shareTopline strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.shareTopline span {
+  color: #7b8290;
+  font-size: 11px;
+}
+
+.shareLinkRow {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.shareInput {
+  flex: 1;
+  min-width: 0;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  color: #111827;
+  font-size: 12px;
+}
+
+.shareMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 12px;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.shareActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.emptyState {
+  margin-top: 14px;
+  color: #5f6672;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+@media (max-width: 720px) {
+  .drawer {
+    width: 100%;
+    padding: 18px 16px 22px;
+  }
+
+  .summaryBlock,
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .footer,
+  .shareLinkRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

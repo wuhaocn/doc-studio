@@ -83,14 +83,17 @@ Spring Boot Monolith
 职责：
 
 - 解析当前会话
-- 提供 demo 登录占位
+- 提供 Owner 注册、登录、登出、session 和 refresh
+- 提供工作区切换后的新 session
+- 提供工作区邀请与接受邀请
 - 解析当前用户与租户上下文
-- 为后续真实认证保留清晰替换点
+- 为后续更强认证和更完整会话治理保留清晰替换点
 
 关键文件：
 
 - [CurrentAccessContext.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/support/CurrentAccessContext.java)
 - [AuthController.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/AuthController.java)
+- [WorkspaceAccessController.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/WorkspaceAccessController.java)
 - [AuthService.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/service/AuthService.java)
 
 ### 5.2 Workspace
@@ -98,6 +101,7 @@ Spring Boot Monolith
 职责：
 
 - 聚合当前租户工作台
+- 返回当前主体加入的工作区列表
 - 返回成员、知识库、最近文档
 - 只返回当前会话可见的数据
 
@@ -114,6 +118,7 @@ Spring Boot Monolith
 - 作为当前主要权限边界
 - 提供成员权限配置
 - 提供文档树入口
+- 提供软删除与恢复基础
 
 关键文件：
 
@@ -127,8 +132,10 @@ Spring Boot Monolith
 - 管理目录与文档节点
 - 管理树结构与路径
 - 管理文档正文
+- 提供工作区统一搜索 V1 结果
 - 创建版本快照
 - 支持批量移动、批量删除、排序
+- 保留删除元数据与恢复语义
 
 关键文件：
 
@@ -148,6 +155,21 @@ Spring Boot Monolith
 
 - [DocumentVersion.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/entity/DocumentVersion.java)
 - [DocumentVersionMapper.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/mapper/DocumentVersionMapper.java)
+
+### 5.6 Audit
+
+职责：
+
+- 记录主链路关键操作成功事件
+- 记录当前主体快照、对象、动作、来源与请求路径
+- 提供租户、知识库、对象三级最小查询
+- 为后续失败审计、导出和长期留存保留扩展点
+
+关键文件：
+
+- [AuditLog.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/entity/AuditLog.java)
+- [AuditLogController.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/AuditLogController.java)
+- [AuditLogService.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/service/AuditLogService.java)
 
 ---
 
@@ -199,6 +221,8 @@ Spring Boot Monolith
 - `userId`
 - `documentCount`
 - `sortOrder`
+- `deletedAt`
+- `deletedBy`
 
 ### 6.4 KnowledgeBaseMember
 
@@ -240,12 +264,16 @@ Spring Boot Monolith
 - `depth`
 - `sortOrder`
 - `versionNo`
+- `deletedAt`
+- `deletedBy`
 
 当前规则：
 
 - `docType` 包含 `DOC` 与 `FOLDER`
 - 树结构变更必须保持 `parentId`、`path`、`depth` 一致
 - 删除、移动、排序都必须校验树一致性
+- 软删除必须保留恢复所需元数据
+- 恢复时必须校验所属知识库和父级目录状态
 
 ### 6.6 DocumentVersion
 
@@ -270,7 +298,41 @@ Spring Boot Monolith
 - 保存正文时生成快照
 - 回滚不应破坏原历史链
 
-### 6.7 当前模型边界
+### 6.7 AuditLog
+
+含义：
+
+- 主链路治理基线
+- 关键操作追踪记录
+
+关键字段：
+
+- `tenantId`
+- `knowledgeBaseId`
+- `knowledgeBaseName`
+- `actorType`
+- `actorUserId`
+- `actorDisplayName`
+- `actorRole`
+- `objectType`
+- `objectId`
+- `objectTitle`
+- `actionType`
+- `resultType`
+- `detail`
+- `sourceType`
+- `requestMethod`
+- `requestPath`
+- `createdAt`
+
+当前规则：
+
+- 当前阶段只记录成功事件
+- 工作区级查询要求租户管理权限
+- 知识库或对象级查询要求对应知识库管理权限
+- Web 端通过 `X-Memora-Client` 标记来源，未携带时记为 `DIRECT_API`
+
+### 6.8 当前模型边界
 
 当前持久化模型已经不再包含：
 
@@ -326,6 +388,8 @@ Spring Boot Monolith
 - 所有主流程接口都必须基于当前会话解析 tenant 与 user
 - 不能依赖前端隐藏按钮做权限控制
 - 阅读链接只能作为直达入口，不能等价于放宽权限
+- 跨知识库聚合查询必须继承知识库权限边界
+- 统一搜索只能返回当前会话可阅读的正文文档
 
 ### 8.2 版本约束
 
@@ -333,7 +397,21 @@ Spring Boot Monolith
 - 回滚必须可追溯
 - 历史版本不能被破坏性覆盖
 
-### 8.3 富文本约束
+### 8.3 删除与恢复约束
+
+- 删除默认采用软删除
+- 删除后的对象必须保留 `deletedAt` 与 `deletedBy`
+- 恢复不能绕过知识库权限边界
+- 恢复子文档前必须保证父级目录已可用
+
+### 8.4 审计约束
+
+- 审计写入不得绕过租户边界
+- 审计查询不得向无管理权限主体暴露工作区关键操作
+- 审计对象过滤必须显式提供 `objectType + objectId`
+- 失败审计、导出已属于当前已交付基线，但长期留存仍未上升到独立归档服务
+
+### 8.5 富文本约束
 
 - 不可信 HTML 不能直接按生产能力渲染
 - 展示能力与安全能力必须分开表述
@@ -346,12 +424,13 @@ Spring Boot Monolith
 
 优先演进顺序：
 
-1. 真实认证与完整会话上下文
-2. 更清晰的权限错误语义
-3. 搜索能力
+1. 更完整的会话治理与跨端一致性
+2. 搜索质量、排序策略与索引化
+3. 长期保留策略与归档能力
 4. 更强的版本 diff 与恢复体验
 5. 受控阅读与发布模型
-6. 更稳定的 Web 信息架构与交互分层
+6. 更细 API key 作用域与外部文档操作边界
+7. 更稳定的 Web 信息架构与交互分层
 
 ---
 

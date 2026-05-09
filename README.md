@@ -19,18 +19,26 @@ Memora 当前聚焦为一个面向企业知识管理的在线文档系统，现�
 
 - 后端已从单用户 demo 收敛为多租户基础模型。
 - 核心模型已包含租户、租户成员、知识库、文档树、文档版本。
-- 基于 bearer token 的当前会话上下文已接通最小租户隔离。
+- Owner 注册、登录、登出、刷新、当前 session 与邀请接受已接通真实 bearer token 会话。
 - 租户角色与知识库级权限覆盖已实现。
 - 知识库成员权限接口与前端基础权限感知已接通。
+- 跨知识库文档聚合查询已按知识库权限边界过滤。
+- 知识库和文档的软删除元数据、回收站列表、恢复接口与 Web 端交互已补齐。
+- 工作区邀请已支持生成、查看、列出和撤销。
+- 已加入工作区列表与当前工作区切换已接通真实 session。
+- 工作区统一搜索 V1 已接通，并按知识库权限边界过滤结果。
+- 知识库详情页、文档阅读页、文档编辑页已补状态页与更细权限反馈。
+- 审计日志模型、关键操作追踪、失败审计、汇总与 CSV 导出已接通，Web 已展示最近记录与治理汇总。
+- 受控文档分享已接通：创建、列出、撤销、外部只读访问、访问码、过期与访问审计均已落地。
+- Service Account / API key 与开放文档 API 已接通，支持知识库作用域、轮换、禁用、吊销与并发版本保护。
 - Web 端已形成工作台首页 + 知识库详情页 + 独立阅读页 + 独立编辑页主结构。
 
 未完成：
 
-- 真实认证与完整权限模型
-- 生产级权限交互
+- 更完整的会话治理与跨端一致性
+- 更细粒度的生产级权限模型
 - 更成熟的在线编辑与协作能力
-- 后端完整构建与测试环境恢复
-- 搜索、审计、发布等产品化能力
+- 更长期的归档型审计留存、批量导出治理与更细开放接口范围
 
 当前判断：
 
@@ -45,7 +53,10 @@ Memora 当前聚焦为一个面向企业知识管理的在线文档系统，现�
 
 `tenant -> knowledge base -> document tree -> editing -> versions -> permissions`
 
-只有这条链路稳定后，才考虑搜索、发布、审计、协作增强等下一阶段能力。
+当前已经补齐 `P2` 基础版能力：多工作区切换、统一搜索、状态页和更细权限反馈。
+当前也已经补齐 `P3` 到 `P5` 基线能力：失败审计、最小导出、受控分享、Service Account / API key 与开放文档操作。
+
+下一阶段重点不再是“有没有入口”，而是继续收口会话治理、权限细化、搜索质量和协作体验。
 
 ---
 
@@ -89,6 +100,7 @@ memora-doc/
 Web 端当前是主交付载体，核心页面包括：
 
 - 工作台首页
+- 工作区统一搜索页
 - 知识库详情页
 - 文档阅读页
 - 文档编辑页
@@ -176,6 +188,12 @@ node scripts/tools/sync-share-skills.js --project-only
 ./scripts/backend-test.sh
 ```
 
+Web 验证：
+
+```bash
+cd memora-web-app && npm run lint && npm run test:unit && npm run build
+```
+
 发布构建：
 
 ```bash
@@ -199,19 +217,29 @@ node scripts/tools/sync-share-skills.js --project-only
 - 多租户工作区模型
 - 工作台首页
 - 租户成员列表
-- demo 登录与会话占位接口
+- Owner 注册、登录、登出与当前 session
+- 已加入工作区列表与工作区切换
+- 工作区成员邀请与接受邀请
+- 工作区邀请列表与撤销
 - 知识库列表与详情
 - 知识库成员权限接口
 - 知识库权限管理界面
+- 工作区统一搜索 V1
 - 文档树展示与维护
 - 在线文档编辑
 - 文档快照与回滚
+- 文档回收站 / 恢复交互
+- 知识库回收站 / 恢复交互
+- 状态页与只读权限反馈
+- 关键操作审计、失败记录、汇总与导出
+- 文档受控分享与外部只读访问
+- Service Account、API key 与开放文档接口
 
 ### 当前成熟度
 
-- 基础较稳：租户边界、多知识库模型、文档树、基础编辑、版本能力
-- 可演示闭环：工作台、知识库管理、知识库级权限、阅读链接
-- 尚未生产化：真实认证、审计、搜索、发布
+- 基础较稳：租户边界、多知识库模型、文档树、基础编辑、版本能力、删除恢复语义基础
+- 可演示闭环：身份进入产品、邀请生命周期、工作台、工作区切换、统一搜索、知识库管理、知识库级权限、删除恢复、审计、受控分享、开放写入
+- 尚未生产化：更完整的会话治理、更细权限模型、搜索质量与索引化、长期归档型审计留存
 
 ### 当前明确不做
 
@@ -229,10 +257,13 @@ node scripts/tools/sync-share-skills.js --project-only
 ### 后端
 
 - [WorkspaceController.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/WorkspaceController.java)
+- [WorkspaceAccessController.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/WorkspaceAccessController.java)
 - [AuthController.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/AuthController.java)
 - [KnowledgeBaseController.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/KnowledgeBaseController.java)
 - [DocumentController.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/DocumentController.java)
+- [AuditLogController.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/AuditLogController.java)
 - [WorkspaceService.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/service/WorkspaceService.java)
 - [KnowledgeBaseService.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/service/KnowledgeBaseService.java)
 - [DocumentService.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/service/DocumentService.java)
+- [AuditLogService.java](./memora-server/memora-server-manager/src/main/java/com/memora/manager/service/AuditLogService.java)
 - [schema.sql](./memora-server/memora-server-start/src/main/resources/db/schema.sql)

@@ -38,4 +38,8 @@ public class KnowledgeBase {
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;
+
+    private LocalDateTime deletedAt;
+
+    private Long deletedBy;
 }

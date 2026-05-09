@@ -13,10 +13,16 @@
 后端当前提供：
 
 - 工作台聚合接口
-- 会话占位与访问上下文解析
+- 注册、登录、邀请与访问上下文解析
+- 已加入工作区列表与工作区切换
 - 知识库管理
 - 文档树管理
+- 工作区统一搜索 V1
 - 文档版本快照与回滚
+- 文档与知识库软删除恢复接口
+- 关键操作审计、失败审计、汇总与导出
+- 文档受控分享与外部只读访问
+- Service Account、API key 与开放文档接口
 - 初始化种子数据
 
 ---
@@ -45,6 +51,7 @@ memora-server/
 当前核心服务包括：
 
 - `WorkspaceController / WorkspaceService`
+- `WorkspaceAccessController`
 - `KnowledgeBaseController / KnowledgeBaseService`
 - `DocumentController / DocumentService`
 
@@ -66,10 +73,18 @@ memora-server/
 
 - `Tenant`
 - `TenantMember`
+- `UserAccount`
+- `UserSession`
+- `TenantInvite`
 - `KnowledgeBase`
 - `KnowledgeBaseMember`
 - `Document`
 - `DocumentVersion`
+- `AuditLog`
+- `DocumentShareLink`
+- `ServiceAccount`
+- `ApiKey`
+- `ApiKeyScope`
 
 数据库脚本：
 
@@ -83,17 +98,32 @@ memora-server/
 ### 工作台
 
 - `GET /api/v1/workspaces/current/dashboard`
+- `GET /api/v1/workspaces/joined`
+- `POST /api/v1/workspaces/{tenantId}/switch`
 
 ### 认证与会话
 
+- `POST /api/v1/auth/register-owner`
 - `POST /api/v1/auth/login`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/auth/refresh`
 - `GET /api/v1/auth/session`
+
+### 成员邀请
+
+- `POST /api/v1/tenants/current/invites`
+- `GET /api/v1/tenants/current/invites`
+- `POST /api/v1/tenants/current/invites/{id}/revoke`
+- `GET /api/v1/invites/{token}`
+- `POST /api/v1/invites/accept`
 
 ### 知识库
 
 - `POST /api/v1/knowledge-bases`
 - `PUT /api/v1/knowledge-bases/{id}`
 - `DELETE /api/v1/knowledge-bases/{id}`
+- `GET /api/v1/knowledge-bases/trash`
+- `POST /api/v1/knowledge-bases/{id}/restore`
 - `GET /api/v1/knowledge-bases`
 - `GET /api/v1/knowledge-bases/tenant/{tenantId}`
 - `GET /api/v1/knowledge-bases/user/{userId}`
@@ -108,6 +138,8 @@ memora-server/
 - `POST /api/v1/documents`
 - `PUT /api/v1/documents/{id}`
 - `DELETE /api/v1/documents/{id}`
+- `GET /api/v1/documents/trash`
+- `POST /api/v1/documents/{id}/restore`
 - `POST /api/v1/documents/batch-move`
 - `POST /api/v1/documents/batch-delete`
 - `PUT /api/v1/documents/sort`
@@ -118,6 +150,42 @@ memora-server/
 - `GET /api/v1/documents/{id}/versions`
 - `GET /api/v1/documents/versions/{versionId}`
 - `POST /api/v1/documents/{id}/rollback/{versionId}`
+
+### 审计
+
+- `GET /api/v1/audit-logs`
+- `GET /api/v1/audit-logs/summary`
+- `GET /api/v1/audit-logs/export`
+
+### 受控分享
+
+- `POST /api/v1/document-shares`
+- `GET /api/v1/documents/{documentId}/shares`
+- `POST /api/v1/document-shares/{shareId}/revoke`
+- `GET /api/v1/public-shares/{token}`
+- `POST /api/v1/public-shares/{token}/access`
+
+### Service Account / API key
+
+- `GET /api/v1/service-accounts`
+- `POST /api/v1/service-accounts`
+- `POST /api/v1/api-keys/{apiKeyId}/disable`
+- `POST /api/v1/api-keys/{apiKeyId}/revoke`
+- `POST /api/v1/api-keys/{apiKeyId}/rotate`
+
+### 开放文档接口
+
+- `GET /api/v1/open/knowledge-bases`
+- `GET /api/v1/open/knowledge-bases/{knowledgeBaseId}/documents`
+- `GET /api/v1/open/documents/{documentId}`
+- `GET /api/v1/open/documents/{documentId}/versions`
+- `POST /api/v1/open/documents`
+- `PUT /api/v1/open/documents/{documentId}`
+
+说明：
+
+- 工作区统一搜索 V1 复用 `GET /api/v1/documents?keyword=...`
+- 统一搜索结果当前只返回当前会话可阅读的正文文档
 
 ---
 
@@ -186,32 +254,41 @@ H2 控制台：
 - 多租户基础模型
 - 统一 `CurrentAccessContext`
 - 工作台聚合接口
+- 已加入工作区列表与工作区切换
 - 知识库核心模型
 - 知识库成员权限接口
 - 文档树核心模型
+- 工作区统一搜索 V1
 - 版本快照与回滚
-- demo 登录接口
-- bearer token 会话占位
+- 删除元数据与恢复接口
+- 关键操作审计与最小查询
+- Owner 注册、登录、登出、刷新与 session
+- 工作区邀请、邀请列表、撤销与接受邀请
+- bearer token 真实 session
 - 面向企业知识库场景的种子数据
 
 ### 未实现
 
-- 真实认证上下文
-- 生产级权限系统
+- 更细粒度的生产级权限系统
+- 更完整的会话治理与跨端一致性
 - 完整协作编辑模型
-- 更完整的回归覆盖
+- 更成熟的搜索质量、索引和回归覆盖
+- 更长期的归档型审计留存与批量治理
 
 ### 当前会话策略
 
 后端控制器已不再硬编码 tenant 或 user，主业务链路统一从 `CurrentAccessContext` 解析当前主体。
 
-当前 demo 登录账号：
+当前本地种子账号：
 
 - `admin / 123456`
+- `editor / 123456`
+- `reviewer / 123456`
+- `viewer / 123456`
 
-返回 token 形式：
+当前真实会话 token 形式：
 
-- `Authorization: Bearer demo:{tenantId}:{userId}`
+- `Authorization: Bearer session:{opaqueToken}`
 
 除 `POST /api/v1/auth/login` 外，主流程接口都要求有效 bearer token。
 
@@ -220,13 +297,21 @@ H2 控制台：
 仓库已具备在线文档主流程的最小集成测试基线，包括：
 
 - 工作台接口
+- 认证、邀请与工作区切换审计
 - 知识库创建
 - 文档树查询
+- 知识库 / 文档关键动作审计写入与查询
+- 失败登录审计、审计汇总与 CSV 导出
+- 文档受控分享生命周期与访问审计
+- Service Account / API key 与开放文档接口
 - 跨租户拒绝
 - 角色拒绝
 - 知识库级权限覆盖
 - 知识库成员权限接口
 - bearer token 会话场景
+- 全局文档列表权限过滤
+- 文档回收站与恢复
+- 知识库回收站与恢复
 
 测试文件：
 

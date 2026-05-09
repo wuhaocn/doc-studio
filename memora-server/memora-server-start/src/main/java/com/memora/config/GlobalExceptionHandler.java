@@ -3,6 +3,7 @@ package com.memora.config;
 import com.memora.common.exception.BusinessException;
 import com.memora.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -46,6 +47,14 @@ public class GlobalExceptionHandler {
             .orElse("参数校验失败");
         return Result.error(400, message);
     }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public Result<Void> handleDataIntegrityViolationException(DataIntegrityViolationException e) {
+        Throwable rootCause = e.getMostSpecificCause();
+        String rootMessage = rootCause == null ? "" : rootCause.getMessage();
+        log.warn("数据约束冲突: {}", rootMessage);
+        return Result.error(409, resolveConflictMessage(rootMessage));
+    }
     
     /**
      * 处理其他异常
@@ -54,5 +63,22 @@ public class GlobalExceptionHandler {
     public Result<Void> handleException(Exception e) {
         log.error("系统异常", e);
         return Result.error(500, "系统异常: " + e.getMessage());
+    }
+
+    private String resolveConflictMessage(String rootMessage) {
+        String normalized = rootMessage == null ? "" : rootMessage.toLowerCase();
+        if (normalized.contains("uk_kb_tenant_slug")) {
+            return "同一租户下已存在同名或同标识知识库";
+        }
+        if (normalized.contains("uk_doc_kb_path")) {
+            return "当前目录下已存在同名文档或目录";
+        }
+        if (normalized.contains("uk_kb_member_user")) {
+            return "知识库成员不能重复配置";
+        }
+        if (normalized.contains("uk_tenant_member")) {
+            return "租户成员不能重复配置";
+        }
+        return "数据冲突，当前操作未能保存";
     }
 }

@@ -13,6 +13,7 @@ const KnowledgeBaseTreePanel = ({
   setModalError,
   setEditing,
   openPermissionModal,
+  openDocumentTrash,
   handleDeleteKnowledgeBase,
   focusMode,
   treePanelCollapsed,
@@ -53,6 +54,13 @@ const KnowledgeBaseTreePanel = ({
   toggleFolderExpanded,
   expandedFolderIdSet,
 }) => {
+  const currentRoleLabel = roleLabels[knowledgeBase.currentRole] || knowledgeBase.currentRole || '未知角色'
+  const roleBoundaryMessage = !canWriteKnowledgeBase
+    ? `当前角色为${currentRoleLabel}，只能阅读和搜索当前知识库，不能新建、移动或删除节点。`
+    : canManageKnowledgeBase
+      ? `当前角色为${currentRoleLabel}，可编辑文档，并可继续管理知识库设置、成员权限和回收站。`
+      : `当前角色为${currentRoleLabel}，可编辑文档和整理目录，但不能修改知识库设置或成员权限。`
+
   return (
     <>
       <header className={`${styles.hero} ${scrolled ? styles.heroScrolled : ''}`}>
@@ -68,7 +76,7 @@ const KnowledgeBaseTreePanel = ({
           <div className={styles.heroMeta}>
             <span className={styles.metaPill}>文档工作区</span>
             <span className={styles.metaPill}>{knowledgeBase.documentCount} 个节点</span>
-            <span className={styles.metaPill}>{roleLabels[knowledgeBase.currentRole] || knowledgeBase.currentRole || '未知角色'}</span>
+            <span className={styles.metaPill}>{currentRoleLabel}</span>
             {knowledgeBase.permissionRestricted && <span className={styles.metaPill}>独立权限</span>}
           </div>
           {knowledgeBaseInfoVisible && (
@@ -76,6 +84,9 @@ const KnowledgeBaseTreePanel = ({
               {compactKnowledgeBaseDescription || '当前知识库用于承载文档协作和目录整理，主流程仍以继续写作和阅读为主。'}
             </p>
           )}
+          <div className={`${styles.heroNotice} ${!canWriteKnowledgeBase ? styles.heroNoticeReadonly : ''}`}>
+            {roleBoundaryMessage}
+          </div>
         </div>
         <div className={styles.heroActions}>
           <div className={styles.heroActionGrid}>
@@ -123,6 +134,14 @@ const KnowledgeBaseTreePanel = ({
                   onClick={openPermissionModal}
                 >
                   访问权限
+                </button>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={!canWriteKnowledgeBase}
+                  onClick={openDocumentTrash}
+                >
+                  文档回收站
                 </button>
                 <button
                   type="button"
@@ -190,6 +209,14 @@ const KnowledgeBaseTreePanel = ({
                   onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
                 >
                   {knowledgeBaseInfoVisible ? '收起说明' : '知识库说明'}
+                </button>
+                <button
+                  type="button"
+                  className={styles.toolButton}
+                  disabled={!canWriteKnowledgeBase}
+                  onClick={openDocumentTrash}
+                >
+                  文档回收站
                 </button>
               </div>
             </details>

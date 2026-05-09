@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { IconMenuFold, IconMenuUnfold, IconHome, IconFolder } from '@arco-design/web-react/icon'
 import { Avatar } from '@arco-design/web-react'
 import { useAuth } from '../../contexts/AuthContext'
@@ -9,8 +9,12 @@ import styles from './Header.module.css'
 
 const Header = ({ onToggleSidebar, showMenuButton = true }) => {
   const location = useLocation()
-  const { currentUser, logout } = useAuth()
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const { currentUser, joinedWorkspaces, workspaceSwitching, switchWorkspace, logout } = useAuth()
   const [scrolled, setScrolled] = useState(false)
+  const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '')
+  const [workspaceError, setWorkspaceError] = useState('')
   const { knowledgeBases } = useKnowledgeBaseNavigation(currentUser.tenantId, {
     errorMessage: '加载头部知识库导航失败',
   })
@@ -24,6 +28,10 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
     window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
+
+  useEffect(() => {
+    setSearchKeyword(searchParams.get('keyword') || '')
+  }, [location.pathname, searchParams])
 
   const currentKnowledgeBaseRoute = useMemo(() => {
     if (location.pathname.startsWith('/kb/')) {
@@ -81,6 +89,32 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
     return items
   }, [currentKnowledgeBase, currentKnowledgeBaseRoute, currentUser.tenantName, location.pathname])
 
+  const handleSearchSubmit = (event) => {
+    event.preventDefault()
+    const normalizedKeyword = searchKeyword.trim()
+    if (!normalizedKeyword) {
+      navigate('/search')
+      return
+    }
+    navigate(`/search?keyword=${encodeURIComponent(normalizedKeyword)}`)
+  }
+
+  const handleWorkspaceChange = async (event) => {
+    const nextTenantId = Number(event.target.value)
+    if (!nextTenantId || nextTenantId === currentUser.tenantId) {
+      return
+    }
+
+    try {
+      setWorkspaceError('')
+      await switchWorkspace(nextTenantId)
+      navigate('/', { replace: true })
+    } catch (error) {
+      console.error('切换工作区失败', error)
+      setWorkspaceError(error?.message || '切换工作区失败，请稍后重试')
+    }
+  }
+
   return (
     <header className={`${styles.header} ${scrolled ? styles.scrolled : ''}`}>
       <div className={styles.left}>
@@ -113,7 +147,36 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
         ))}
       </nav>
 
+      <form className={styles.searchForm} onSubmit={handleSearchSubmit}>
+        <input
+          className={styles.searchInput}
+          value={searchKeyword}
+          onChange={(event) => setSearchKeyword(event.target.value)}
+          placeholder="搜索标题或正文"
+        />
+        <button type="submit" className={styles.searchButton}>
+          搜索
+        </button>
+      </form>
+
       <div className={styles.right}>
+        {joinedWorkspaces.length > 1 ? (
+          <div className={styles.workspaceSwitcher}>
+            <select
+              className={styles.workspaceSelect}
+              value={currentUser.tenantId}
+              onChange={handleWorkspaceChange}
+              disabled={workspaceSwitching}
+            >
+              {joinedWorkspaces.map((workspace) => (
+                <option key={workspace.tenantId} value={workspace.tenantId}>
+                  {workspace.tenantName} · {workspace.role}
+                </option>
+              ))}
+            </select>
+            {workspaceError ? <span className={styles.workspaceError}>{workspaceError}</span> : null}
+          </div>
+        ) : null}
         <div className={styles.userCard}>
           <Avatar size={30} className={styles.avatar}>
             {currentUser.nickname.charAt(0)}

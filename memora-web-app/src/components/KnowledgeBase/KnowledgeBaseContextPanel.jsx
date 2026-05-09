@@ -1,3 +1,5 @@
+import AuditEventList from '../Audit/AuditEventList'
+
 const KnowledgeBaseContextPanel = ({
   styles,
   knowledgeBase,
@@ -6,6 +8,12 @@ const KnowledgeBaseContextPanel = ({
   canWriteKnowledgeBase,
   canManageKnowledgeBase,
   roleLabels,
+  knowledgeBaseAuditEvents,
+  knowledgeBaseAuditLoading,
+  knowledgeBaseAuditError,
+  documentAuditEvents,
+  documentAuditLoading,
+  documentAuditError,
 }) => {
   const folderCount = documents.filter((item) => item.docType === 'FOLDER').length
   const documentCount = documents.filter((item) => item.docType === 'DOC').length
@@ -19,6 +27,16 @@ const KnowledgeBaseContextPanel = ({
       ? '目录'
       : '文档'
     : '未选择'
+  const permissionBoundaryTitle = canManageKnowledgeBase
+    ? '当前角色可继续管理这个知识库'
+    : canWriteKnowledgeBase
+      ? '当前角色可以继续编辑，但不能管理权限'
+      : '当前角色处于只读模式'
+  const permissionBoundaryMessage = canManageKnowledgeBase
+    ? '你可以创建、移动、删除文档，也可以修改知识库设置、成员权限并查看回收站。'
+    : canWriteKnowledgeBase
+      ? '你可以创建、编辑、移动和删除文档，但不能修改知识库设置，也不能调整成员权限。'
+      : '你只能阅读和搜索当前知识库内容。新建、移动、删除、回收站和权限配置入口都会保持不可用。'
 
   return (
     <aside className={styles.contextPanel}>
@@ -68,6 +86,46 @@ const KnowledgeBaseContextPanel = ({
                 <span className={styles.metaPill}>{canManageKnowledgeBase ? '允许管理' : '不可管理'}</span>
               </div>
             </article>
+            <article className={styles.contextItem}>
+              <div className={styles.contextItemTop}>
+                <span>权限边界</span>
+                <span className={styles.contextBadge}>{canWriteKnowledgeBase ? '可写' : '只读'}</span>
+              </div>
+              <div className={styles.contextMessage}>{permissionBoundaryTitle}</div>
+              <div className={styles.contextMessage}>{permissionBoundaryMessage}</div>
+            </article>
+            {canManageKnowledgeBase ? (
+              <article className={styles.contextItem}>
+                <div className={styles.contextItemTop}>
+                  <span>知识库最近变更</span>
+                  <span className={styles.contextBadge}>审计</span>
+                </div>
+                <AuditEventList
+                  events={knowledgeBaseAuditEvents}
+                  loading={knowledgeBaseAuditLoading}
+                  errorMessage={knowledgeBaseAuditError}
+                  emptyTitle="当前知识库还没有治理记录"
+                  emptyDescription="权限变更、删除恢复、节点写操作会显示在这里。"
+                  compact
+                />
+              </article>
+            ) : null}
+            {canManageKnowledgeBase && selectedDocument ? (
+              <article className={styles.contextItem}>
+                <div className={styles.contextItemTop}>
+                  <span>当前节点最近变更</span>
+                  <span className={styles.contextBadge}>{selectedDocumentTypeLabel}</span>
+                </div>
+                <AuditEventList
+                  events={documentAuditEvents}
+                  loading={documentAuditLoading}
+                  errorMessage={documentAuditError}
+                  emptyTitle="当前节点还没有关键操作记录"
+                  emptyDescription="删除、恢复、移动、回滚和正文更新会显示在这里。"
+                  compact
+                />
+              </article>
+            ) : null}
           </div>
         </div>
       </details>

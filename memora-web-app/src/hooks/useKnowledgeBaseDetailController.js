@@ -67,6 +67,11 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
   const [permissionLoading, setPermissionLoading] = useState(false)
   const [permissionSubmitting, setPermissionSubmitting] = useState(false)
   const [permissionError, setPermissionError] = useState('')
+  const [documentTrashOpen, setDocumentTrashOpen] = useState(false)
+  const [deletedDocuments, setDeletedDocuments] = useState([])
+  const [documentTrashLoading, setDocumentTrashLoading] = useState(false)
+  const [documentTrashError, setDocumentTrashError] = useState('')
+  const [restoringDocumentId, setRestoringDocumentId] = useState(null)
   const deferredSearch = useDeferredValue(search)
 
   const loadData = useCallback(async ({ resetState = false } = {}) => {
@@ -208,6 +213,8 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       : `${documents.length} 个节点`
   const treeHintText = batchMode
     ? '选择文档或目录后，再移动或删除。'
+    : !canWriteKnowledgeBase
+      ? '当前角色只能阅读和搜索，不能新建、移动或删除节点。'
     : dragSortEnabled
       ? '可直接拖拽排序。'
       : hasActiveSearch
@@ -278,6 +285,55 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setPermissionError(error?.message || '加载知识库权限配置失败，请稍后重试')
     } finally {
       setPermissionLoading(false)
+    }
+  }
+
+  const loadDeletedDocuments = useCallback(async () => {
+    try {
+      setDocumentTrashLoading(true)
+      setDocumentTrashError('')
+      const response = await documentApi.getDeletedDocuments({
+        knowledgeBaseId: Number(id),
+      })
+      if (response.code === 200) {
+        setDeletedDocuments(response.data || [])
+      }
+    } catch (error) {
+      console.error('加载文档回收站失败', error)
+      setDocumentTrashError(error?.message || '加载文档回收站失败，请稍后重试')
+    } finally {
+      setDocumentTrashLoading(false)
+    }
+  }, [id])
+
+  const openDocumentTrash = async () => {
+    if (!canWriteKnowledgeBase) {
+      return
+    }
+
+    setDocumentTrashOpen(true)
+    await loadDeletedDocuments()
+  }
+
+  const handleRestoreDocument = async (documentId) => {
+    try {
+      setRestoringDocumentId(documentId)
+      setDocumentTrashError('')
+      await documentApi.restoreDocument(documentId)
+      await Promise.all([
+        loadData(),
+        loadDeletedDocuments(),
+      ])
+      setSelectedDocumentId(documentId)
+      setFeedback({
+        type: 'success',
+        message: '文档已从回收站恢复',
+      })
+    } catch (error) {
+      console.error('恢复文档失败', error)
+      setDocumentTrashError(error?.message || '恢复文档失败，请稍后重试')
+    } finally {
+      setRestoringDocumentId(null)
     }
   }
 
@@ -490,7 +546,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       await loadData()
       setFeedback({
         type: 'success',
-        message: `${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}“${selectedDocument.title}”已删除`,
+        message: `${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}“${selectedDocument.title}”已删除，可在文档回收站恢复`,
       })
     } catch (error) {
       console.error('删除文档节点失败', error)
@@ -666,7 +722,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       clearBatchSelection()
       setFeedback({
         type: 'success',
-        message: `已批量删除 ${selectedDocumentIds.length} 个节点`,
+        message: `已批量删除 ${selectedDocumentIds.length} 个节点，可在文档回收站恢复`,
       })
     } catch (error) {
       console.error('批量删除文档节点失败', error)
@@ -688,7 +744,15 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     try {
       await knowledgeBaseApi.deleteKnowledgeBase(id)
       emitKnowledgeBasesChanged()
-      navigate('/')
+      navigate('/', {
+        state: {
+          feedback: {
+            type: 'success',
+            message: `知识库“${knowledgeBase.name}”已删除，可在知识库回收站恢复`,
+          },
+          openKnowledgeBaseTrash: true,
+        },
+      })
     } catch (error) {
       console.error('删除知识库失败', error)
       setFeedback({ type: 'error', message: error?.message || '删除知识库失败，请稍后重试' })
@@ -746,6 +810,13 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     permissionSubmitting,
     permissionError,
     setPermissionError,
+    documentTrashOpen,
+    setDocumentTrashOpen,
+    deletedDocuments,
+    documentTrashLoading,
+    documentTrashError,
+    setDocumentTrashError,
+    restoringDocumentId,
     visibleDocuments,
     safeSelectedDocumentContent,
     canMoveUp,
@@ -770,6 +841,8 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     handleSaveKnowledgeBase,
     openPermissionModal,
     handleSubmitPermissions,
+    openDocumentTrash,
+    handleRestoreDocument,
     clearBatchSelection,
     handleToggleBatchMode,
     clearDragState,

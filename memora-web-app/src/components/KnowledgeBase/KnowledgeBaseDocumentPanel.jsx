@@ -8,8 +8,10 @@ const KnowledgeBaseDocumentPanel = ({
   documents,
   selectedDocument,
   canWriteKnowledgeBase,
+  canManageKnowledgeBase,
   handleOpenEditorPage,
   setReadLinkOpen,
+  setShareDrawerOpen,
   openCreateDocumentModal,
   openEditDocumentModal,
   navigate,
@@ -114,6 +116,15 @@ const KnowledgeBaseDocumentPanel = ({
                   >
                     复制阅读链接
                   </button>
+                  {canManageKnowledgeBase ? (
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => setShareDrawerOpen(true)}
+                    >
+                      受控分享
+                    </button>
+                  ) : null}
                 </>
               ) : (
                 <>

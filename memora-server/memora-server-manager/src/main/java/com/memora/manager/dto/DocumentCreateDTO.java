@@ -35,7 +35,7 @@ public class DocumentCreateDTO {
     
     private Long parentId; // 默认为0，表示根目录
     
-    private Long userId; // 临时字段，后续从鉴权中获取
+    private Long userId; // 兼容旧请求体，服务端会忽略并始终使用当前会话用户
 
     private Integer sortOrder;
 }

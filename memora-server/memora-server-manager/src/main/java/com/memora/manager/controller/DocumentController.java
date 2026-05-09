@@ -39,6 +39,11 @@ public class DocumentController {
         return Result.success();
     }
 
+    @PostMapping("/{id}/restore")
+    public Result<DocumentVO> restore(@PathVariable Long id) {
+        return Result.success(documentService.restore(id));
+    }
+
     @PostMapping("/batch-move")
     public Result<Void> batchMove(@Valid @RequestBody DocumentBatchMoveDTO dto) {
         documentService.batchMove(dto);
@@ -65,6 +70,11 @@ public class DocumentController {
         @RequestParam(required = false) Long parentId,
         @RequestParam(required = false) Long userId) {
         return Result.success(documentService.list(page, size, keyword, knowledgeBaseId, parentId, userId));
+    }
+
+    @GetMapping("/trash")
+    public Result<List<DocumentVO>> listDeleted(@RequestParam(required = false) Long knowledgeBaseId) {
+        return Result.success(documentService.listDeleted(knowledgeBaseId));
     }
 
     @GetMapping("/knowledge-base/{knowledgeBaseId}")

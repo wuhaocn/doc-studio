@@ -10,6 +10,8 @@ import com.memora.manager.entity.TenantMember;
 import com.memora.manager.mapper.KnowledgeBaseMapper;
 import com.memora.manager.mapper.KnowledgeBaseMemberMapper;
 import com.memora.manager.mapper.TenantMemberMapper;
+import com.memora.manager.support.AuditLogCommand;
+import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
 import com.memora.manager.support.TenantAccessService;
 import com.memora.manager.vo.KnowledgeBaseMemberVO;
@@ -37,6 +39,7 @@ public class KnowledgeBaseMemberService {
     private final TenantMemberMapper tenantMemberMapper;
     private final CurrentAccessContext currentAccessContext;
     private final TenantAccessService tenantAccessService;
+    private final AuditLogService auditLogService;
 
     public List<KnowledgeBaseMemberVO> listMembers(Long knowledgeBaseId) {
         KnowledgeBase knowledgeBase = getAccessibleKnowledgeBase(knowledgeBaseId);
@@ -47,12 +50,18 @@ public class KnowledgeBaseMemberService {
     @Transactional(rollbackFor = Exception.class)
     public List<KnowledgeBaseMemberVO> replaceMembers(Long knowledgeBaseId, KnowledgeBaseMemberBatchUpdateDTO dto) {
         KnowledgeBase knowledgeBase = getAccessibleKnowledgeBase(knowledgeBaseId);
-        tenantAccessService.requireKnowledgeBaseManageAccess(knowledgeBase);
+        String actorRole = tenantAccessService.requireKnowledgeBaseManageAccess(knowledgeBase);
 
         List<KnowledgeBaseMemberItemDTO> members = dto == null || dto.getMembers() == null
             ? List.of()
             : dto.getMembers();
         validateMembers(knowledgeBase, members);
+
+        LambdaQueryWrapper<KnowledgeBaseMember> beforeQuery = new LambdaQueryWrapper<>();
+        beforeQuery.eq(KnowledgeBaseMember::getKnowledgeBaseId, knowledgeBaseId)
+            .eq(KnowledgeBaseMember::getTenantId, knowledgeBase.getTenantId())
+            .eq(KnowledgeBaseMember::getStatus, 1);
+        int previousCount = knowledgeBaseMemberMapper.selectList(beforeQuery).size();
 
         LambdaQueryWrapper<KnowledgeBaseMember> deleteQuery = new LambdaQueryWrapper<>();
         deleteQuery.eq(KnowledgeBaseMember::getKnowledgeBaseId, knowledgeBaseId)
@@ -71,6 +80,22 @@ public class KnowledgeBaseMemberService {
             member.setUpdatedAt(now);
             knowledgeBaseMemberMapper.insert(member);
         }
+
+        long manageRoleCount = members.stream()
+            .filter(item -> MANAGE_ROLES.contains(item.getRole()))
+            .count();
+        auditLogService.recordSuccess(AuditLogCommand.builder()
+            .tenantId(knowledgeBase.getTenantId())
+            .knowledgeBaseId(knowledgeBase.getId())
+            .knowledgeBaseName(knowledgeBase.getName())
+            .actorUserId(currentAccessContext.getCurrentUserId())
+            .actorRole(actorRole)
+            .objectType(AuditLogConstants.OBJECT_KNOWLEDGE_BASE)
+            .objectId(knowledgeBase.getId())
+            .objectTitle(knowledgeBase.getName())
+            .actionType(AuditLogConstants.ACTION_UPDATE_KNOWLEDGE_BASE_MEMBERS)
+            .detail("知识库成员权限从 " + previousCount + " 条调整为 " + members.size() + " 条，管理角色 " + manageRoleCount + " 人")
+            .build());
 
         return buildMemberVOs(knowledgeBaseId, knowledgeBase.getTenantId());
     }

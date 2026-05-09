@@ -16,35 +16,6 @@
   color: #7c6f64;
 }
 
-.stateCard {
-  max-width: 760px;
-  margin: 48px auto 0;
-  padding: 36px;
-  border-radius: 24px;
-  background: #ffffff;
-  border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.06);
-}
-
-.stateCard h1 {
-  font-size: var(--type-title-state);
-  line-height: 1.15;
-  color: #1f2329;
-}
-
-.stateCard p {
-  margin-top: 14px;
-  color: #6b7280;
-  line-height: 1.8;
-}
-
-.stateActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-top: 22px;
-}
-
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -102,6 +73,21 @@
   color: #5f6672;
   font-size: 13px;
   line-height: 1.65;
+}
+
+.heroNotice {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(31, 111, 255, 0.08);
+  color: #1f4dbd;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.heroNoticeReadonly {
+  background: rgba(148, 163, 184, 0.14);
+  color: #475569;
 }
 
 .heroMeta {

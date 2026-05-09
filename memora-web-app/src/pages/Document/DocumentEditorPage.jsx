@@ -1,11 +1,14 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import PageState from '../../components/Feedback/PageState'
 import Header from '../../components/Layout/Header'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
+import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import DocumentVersionDiff from '../../components/Document/DocumentVersionDiff'
 import DocumentVersionList from '../../components/Document/DocumentVersionList'
 import { documentApi } from '../../services/api/documentApi'
+import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { buildLineDiff } from '../../utils/documentDiff'
 import { summarizePlainText } from '../../utils/documentContent'
 import styles from './DocumentEditorPage.module.css'
@@ -15,6 +18,7 @@ const DocumentRichEditor = lazy(() => import('../../components/Document/Document
 const PAGE_STATUS = {
   LOADING: 'loading',
   READY: 'ready',
+  READ_ONLY: 'read_only',
   FORBIDDEN: 'forbidden',
   NOT_FOUND: 'not_found',
   ERROR: 'error',
@@ -26,10 +30,12 @@ const DocumentEditorPage = () => {
   const [pageStatus, setPageStatus] = useState(PAGE_STATUS.LOADING)
   const [pageErrorMessage, setPageErrorMessage] = useState('')
   const [document, setDocument] = useState(null)
+  const [knowledgeBaseAccess, setKnowledgeBaseAccess] = useState(null)
   const [versions, setVersions] = useState([])
   const [versionsLoading, setVersionsLoading] = useState(false)
   const [versionsOpen, setVersionsOpen] = useState(false)
   const [readLinkOpen, setReadLinkOpen] = useState(false)
+  const [shareDrawerOpen, setShareDrawerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [feedback, setFeedback] = useState(null)
   const [rollingBackVersionId, setRollingBackVersionId] = useState(null)
@@ -41,6 +47,7 @@ const DocumentEditorPage = () => {
       if (resetState) {
         setPageStatus(PAGE_STATUS.LOADING)
         setDocument(null)
+        setKnowledgeBaseAccess(null)
         setVersions([])
         setComparingVersionId(null)
       }
@@ -54,11 +61,15 @@ const DocumentEditorPage = () => {
         return
       }
 
+      const knowledgeBaseResponse = await knowledgeBaseApi.getKnowledgeBaseById(documentData.knowledgeBaseId)
+      const knowledgeBaseData = knowledgeBaseResponse?.data
       setDocument(documentData)
-      setPageStatus(PAGE_STATUS.READY)
+      setKnowledgeBaseAccess(knowledgeBaseData || null)
+      setPageStatus(knowledgeBaseData?.canWrite ? PAGE_STATUS.READY : PAGE_STATUS.READ_ONLY)
     } catch (error) {
       console.error('加载文档编辑页失败', error)
       setDocument(null)
+      setKnowledgeBaseAccess(null)
       setVersions([])
       setComparingVersionId(null)
 
@@ -180,25 +191,25 @@ const DocumentEditorPage = () => {
   }
 
   if (pageStatus !== PAGE_STATUS.READY || !document) {
-    const stateTitleMap = {
-      [PAGE_STATUS.FORBIDDEN]: '当前会话无权编辑该文档',
-      [PAGE_STATUS.NOT_FOUND]: '当前文档不存在',
-      [PAGE_STATUS.ERROR]: '文档编辑页暂时不可用',
-    }
-
     return (
-      <div className={styles.stateCard}>
-        <h1>{stateTitleMap[pageStatus] || '文档编辑页暂时不可用'}</h1>
-        <p>{pageErrorMessage || '请返回知识库继续操作。'}</p>
-        <div className={styles.stateActions}>
-          <button type="button" className={styles.primaryButton} onClick={() => navigate('/')}>
-            返回工作台
-          </button>
-          <button type="button" className={styles.secondaryButton} onClick={() => loadData({ resetState: true })}>
-            重新加载
-          </button>
-        </div>
-      </div>
+      <PageState
+        eyebrow={pageStatus === PAGE_STATUS.READ_ONLY ? '只读角色' : pageStatus === PAGE_STATUS.FORBIDDEN ? '无权访问' : pageStatus === PAGE_STATUS.NOT_FOUND ? '内容不存在' : '编辑页不可用'}
+        title={pageStatus === PAGE_STATUS.READ_ONLY ? '当前角色只能阅读，不能进入编辑页' : pageStatus === PAGE_STATUS.FORBIDDEN ? '当前会话无权编辑该文档' : pageStatus === PAGE_STATUS.NOT_FOUND ? '当前文档不存在' : '文档编辑页暂时不可用'}
+        description={pageStatus === PAGE_STATUS.READ_ONLY
+          ? `当前工作区角色为 ${knowledgeBaseAccess?.currentRole || '只读'}。请返回阅读页继续查看正文。`
+          : pageErrorMessage || '请返回知识库继续操作。'}
+        primaryAction={{
+          label: pageStatus === PAGE_STATUS.READ_ONLY ? '进入阅读页' : '返回工作台',
+          onClick: () => {
+            if (pageStatus === PAGE_STATUS.READ_ONLY) {
+              navigate(`/docs/${documentId}`)
+              return
+            }
+            navigate('/')
+          },
+        }}
+        secondaryAction={{ label: '重新加载', onClick: () => loadData({ resetState: true }) }}
+      />
     )
   }
 
@@ -225,6 +236,7 @@ const DocumentEditorPage = () => {
                   <div className={styles.meta}>
                     <span className={styles.metaPill}>v{document.versionNo}</span>
                     <span className={styles.metaPill}>{saving ? '保存中…' : '可编辑'}</span>
+                    <span className={styles.metaPill}>{knowledgeBaseAccess?.currentRole || '未知角色'}</span>
                     <span className={styles.metaPill}>最近更新 {dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
                   </div>
                 </div>
@@ -244,6 +256,15 @@ const DocumentEditorPage = () => {
                 >
                   复制阅读链接
                 </button>
+                {knowledgeBaseAccess?.canManage ? (
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setShareDrawerOpen(true)}
+                  >
+                    受控分享
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={styles.ghostButton}
@@ -304,6 +325,12 @@ const DocumentEditorPage = () => {
         documentId={document.id}
         title={document.title}
         onClose={() => setReadLinkOpen(false)}
+      />
+      <DocumentShareDrawer
+        open={shareDrawerOpen}
+        documentId={document.id}
+        title={document.title}
+        onClose={() => setShareDrawerOpen(false)}
       />
     </div>
   )

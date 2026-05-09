@@ -28,6 +28,10 @@
   gap: 8px;
 }
 
+.right {
+  flex: 0 0 auto;
+}
+
 .menuButton,
 .logoutButton,
 .navLink,
@@ -109,6 +113,67 @@
   padding: 0 2px;
 }
 
+.searchForm {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+  max-width: 320px;
+  flex: 0 1 320px;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2329;
+  font-size: 12px;
+}
+
+.searchInput:focus {
+  border-color: rgba(31, 111, 255, 0.28);
+  box-shadow: 0 0 0 3px rgba(31, 111, 255, 0.08);
+}
+
+.searchButton {
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  background: rgba(31, 111, 255, 0.08);
+  color: #1f4dbd;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.workspaceSwitcher {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.workspaceSelect {
+  min-width: 176px;
+  min-height: 34px;
+  padding: 0 11px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.9);
+  color: #1f2329;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.workspaceError {
+  max-width: 176px;
+  color: #b91c1c;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
 .navLink,
 .navLabel {
   display: inline-flex;
@@ -181,12 +246,19 @@
     display: none;
   }
 
+  .searchForm {
+    min-width: 180px;
+    max-width: 220px;
+  }
+
   .userCard {
     padding-right: 8px;
   }
 }
 
 @media (max-width: 720px) {
+  .searchForm,
+  .workspaceSwitcher,
   .brandWorkspace,
   .userRole,
   .userName {

@@ -40,6 +40,14 @@ export const knowledgeBaseApi = {
     return httpClient.delete(`/api/v1/knowledge-bases/${id}`)
   },
 
+  getDeletedKnowledgeBases: async () => {
+    return httpClient.get('/api/v1/knowledge-bases/trash')
+  },
+
+  restoreKnowledgeBase: async (id) => {
+    return httpClient.post(`/api/v1/knowledge-bases/${id}/restore`)
+  },
+
   getDocumentsByKnowledgeBaseId: async (id, params = {}) => {
     const { parentId, page, size, keyword } = params
     return httpClient.get(`/api/v1/knowledge-bases/${id}/documents`, {

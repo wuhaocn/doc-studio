@@ -156,10 +156,45 @@
   color: #1f2329;
 }
 
+.fieldWithAction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
 .field input:focus {
   border-color: rgba(51, 112, 255, 0.4);
   background: #ffffff;
   box-shadow: 0 0 0 3px rgba(51, 112, 255, 0.1);
+}
+
+.fieldActionButton {
+  padding: 0 16px;
+  border-radius: var(--button-radius-lg);
+  background: rgba(36, 91, 219, 0.08);
+  color: #245bdb;
+  font-size: var(--type-eyebrow);
+  font-weight: 700;
+  transition: background-color 120ms ease, transform 120ms ease;
+}
+
+.fieldActionButton:hover {
+  background: rgba(36, 91, 219, 0.14);
+}
+
+.fieldActionButton:active {
+  transform: translateY(1px);
+}
+
+.fieldActionButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.splitFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .error {
@@ -201,6 +236,41 @@
   line-height: 1.7;
 }
 
+.helperLinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.helperLink {
+  color: #245bdb;
+  font-size: var(--type-eyebrow);
+  font-weight: 700;
+}
+
+.infoCard {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 28px;
+  padding: 18px 20px;
+  border-radius: 20px;
+  border: 1px solid rgba(51, 112, 255, 0.12);
+  background: linear-gradient(180deg, rgba(232, 240, 255, 0.92), rgba(245, 248, 255, 0.96));
+  color: #245bdb;
+}
+
+.infoCard strong {
+  color: #1f2329;
+  font-size: 20px;
+}
+
+.infoCard span {
+  color: #646a73;
+  line-height: 1.7;
+  font-size: var(--type-body-sm);
+}
+
 @media (max-width: 900px) {
   .panel {
     grid-template-columns: 1fr;
@@ -209,5 +279,13 @@
   .hero,
   .form {
     padding: 20px;
+  }
+
+  .splitFields {
+    grid-template-columns: 1fr;
+  }
+
+  .fieldWithAction {
+    grid-template-columns: 1fr;
   }
 }

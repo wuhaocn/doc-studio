@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import PageState from '../../components/Feedback/PageState'
 import Header from '../../components/Layout/Header'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
+import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import { documentApi } from '../../services/api/documentApi'
+import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { sanitizeRichHtml } from '../../utils/documentContent'
 import styles from './DocumentReaderPage.module.css'
 
@@ -22,7 +25,9 @@ const DocumentReaderPage = () => {
   const [pageStatus, setPageStatus] = useState(PAGE_STATUS.LOADING)
   const [pageErrorMessage, setPageErrorMessage] = useState('')
   const [document, setDocument] = useState(null)
+  const [knowledgeBaseAccess, setKnowledgeBaseAccess] = useState(null)
   const [readLinkOpen, setReadLinkOpen] = useState(false)
+  const [shareDrawerOpen, setShareDrawerOpen] = useState(false)
 
   const loadDocument = useCallback(async () => {
     try {
@@ -37,11 +42,14 @@ const DocumentReaderPage = () => {
         return
       }
 
+      const knowledgeBaseResponse = await knowledgeBaseApi.getKnowledgeBaseById(documentData.knowledgeBaseId)
       setDocument(documentData)
+      setKnowledgeBaseAccess(knowledgeBaseResponse?.data || null)
       setPageStatus(PAGE_STATUS.READY)
     } catch (error) {
       console.error('加载文档阅读页失败', error)
       setDocument(null)
+      setKnowledgeBaseAccess(null)
 
       if (error?.code === 403) {
         setPageStatus(PAGE_STATUS.FORBIDDEN)
@@ -92,29 +100,20 @@ const DocumentReaderPage = () => {
   }
 
   if (pageStatus !== PAGE_STATUS.READY || !document) {
-    const stateTitleMap = {
-      [PAGE_STATUS.FORBIDDEN]: '当前会话无权访问该文档',
-      [PAGE_STATUS.NOT_FOUND]: '当前文档不存在',
-      [PAGE_STATUS.ERROR]: '文档阅读页暂时不可用',
-    }
-
     return (
-      <div className={styles.stateCard}>
-        <h1>{stateTitleMap[pageStatus] || '文档阅读页暂时不可用'}</h1>
-        <p>{pageErrorMessage || '请返回知识库继续操作。'}</p>
-        <div className={styles.stateActions}>
-          <button type="button" className={styles.primaryButton} onClick={() => navigate('/')}>
-            返回工作台
-          </button>
-          <button type="button" className={styles.secondaryButton} onClick={loadDocument}>
-            重新加载
-          </button>
-        </div>
-      </div>
+      <PageState
+        eyebrow={pageStatus === PAGE_STATUS.FORBIDDEN ? '无权访问' : pageStatus === PAGE_STATUS.NOT_FOUND ? '内容不存在' : '阅读页不可用'}
+        title={pageStatus === PAGE_STATUS.FORBIDDEN ? '当前会话无权访问该文档' : pageStatus === PAGE_STATUS.NOT_FOUND ? '当前文档不存在' : '文档阅读页暂时不可用'}
+        description={pageErrorMessage || '请返回工作台或知识库继续操作。'}
+        primaryAction={{ label: '返回工作台', onClick: () => navigate('/') }}
+        secondaryAction={{ label: '重新加载', onClick: loadDocument }}
+      />
     )
   }
 
   const shouldRenderRichPreview = document.docType === 'DOC' && !!document.content
+  const canWriteKnowledgeBase = !!knowledgeBaseAccess?.canWrite
+  const canManageKnowledgeBase = !!knowledgeBaseAccess?.canManage
 
   return (
     <div className={`${styles.page} ${scrolled ? styles.pageScrolled : ''}`}>
@@ -135,7 +134,7 @@ const DocumentReaderPage = () => {
               <div className={styles.documentSubline}>
                 <span className={styles.metaPill}>v{document.versionNo}</span>
                 <span className={styles.metaPill}>{dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
-                <span className={styles.metaPill}>阅读模式</span>
+                <span className={styles.metaPill}>{canWriteKnowledgeBase ? '可继续编辑' : '当前角色只读'}</span>
               </div>
             </div>
           </div>
@@ -143,9 +142,16 @@ const DocumentReaderPage = () => {
             <button type="button" className={styles.secondaryButton} onClick={() => setReadLinkOpen(true)}>
               复制阅读链接
             </button>
-            <button type="button" className={styles.primaryButton} onClick={() => navigate(`/docs/${document.id}/edit`)}>
-              继续编辑
-            </button>
+            {canManageKnowledgeBase ? (
+              <button type="button" className={styles.secondaryButton} onClick={() => setShareDrawerOpen(true)}>
+                受控分享
+              </button>
+            ) : null}
+            {canWriteKnowledgeBase ? (
+              <button type="button" className={styles.primaryButton} onClick={() => navigate(`/docs/${document.id}/edit`)}>
+                继续编辑
+              </button>
+            ) : null}
           </div>
         </header>
 
@@ -183,6 +189,12 @@ const DocumentReaderPage = () => {
         documentId={document.id}
         title={document.title}
         onClose={() => setReadLinkOpen(false)}
+      />
+      <DocumentShareDrawer
+        open={shareDrawerOpen}
+        documentId={document.id}
+        title={document.title}
+        onClose={() => setShareDrawerOpen(false)}
       />
     </div>
   )

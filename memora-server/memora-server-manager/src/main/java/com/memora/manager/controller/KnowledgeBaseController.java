@@ -41,6 +41,11 @@ public class KnowledgeBaseController {
         return Result.success();
     }
 
+    @PostMapping("/{id}/restore")
+    public Result<KnowledgeBaseVO> restore(@PathVariable Long id) {
+        return Result.success(knowledgeBaseService.restore(id));
+    }
+
     @GetMapping("/{id}")
     public Result<KnowledgeBaseVO> getById(@PathVariable Long id) {
         return Result.success(knowledgeBaseService.getById(id));
@@ -66,6 +71,11 @@ public class KnowledgeBaseController {
         @RequestParam(required = false) Long tenantId,
         @RequestParam(required = false) Long userId) {
         return Result.success(knowledgeBaseService.list(page, size, keyword, tenantId, userId));
+    }
+
+    @GetMapping("/trash")
+    public Result<List<KnowledgeBaseVO>> listDeleted() {
+        return Result.success(knowledgeBaseService.listDeleted());
     }
 
     @GetMapping("/tenant/{tenantId}")

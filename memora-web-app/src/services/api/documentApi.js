@@ -9,6 +9,13 @@ export const documentApi = {
     })
   },
 
+  searchDocuments: async (keyword, options = {}) => {
+    const { page = 1, size = 50 } = options
+    return httpClient.get('/api/v1/documents', {
+      params: { page, size, keyword },
+    })
+  },
+
   getDocumentsByKnowledgeBaseId: async (kbId, parentId = null) => {
     return httpClient.get(`/api/v1/documents/knowledge-base/${kbId}`, {
       params: { parentId },
@@ -36,6 +43,17 @@ export const documentApi = {
 
   deleteDocument: async (id) => {
     return httpClient.delete(`/api/v1/documents/${id}`)
+  },
+
+  getDeletedDocuments: async (params = {}) => {
+    const { knowledgeBaseId } = params
+    return httpClient.get('/api/v1/documents/trash', {
+      params: { knowledgeBaseId },
+    })
+  },
+
+  restoreDocument: async (id) => {
+    return httpClient.post(`/api/v1/documents/${id}/restore`)
   },
 
   batchMoveDocuments: async (documentIds = [], parentId = 0) => {

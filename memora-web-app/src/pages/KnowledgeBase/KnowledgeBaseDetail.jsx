@@ -1,14 +1,20 @@
+import { useCallback, useEffect, useState } from 'react'
+import dayjs from 'dayjs'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import DocumentActionModal from '../../components/Document/DocumentActionModal'
 import DocumentBatchMoveModal from '../../components/Document/DocumentBatchMoveModal'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
+import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
+import PageState from '../../components/Feedback/PageState'
 import KnowledgeBaseContextPanel from '../../components/KnowledgeBase/KnowledgeBaseContextPanel'
 import KnowledgeBaseFormModal from '../../components/KnowledgeBase/KnowledgeBaseFormModal'
 import KnowledgeBaseDocumentPanel from '../../components/KnowledgeBase/KnowledgeBaseDocumentPanel'
 import KnowledgeBasePermissionModal from '../../components/KnowledgeBase/KnowledgeBasePermissionModal'
 import KnowledgeBaseTreePanel from '../../components/KnowledgeBase/KnowledgeBaseTreePanel'
+import TrashListModal from '../../components/KnowledgeBase/TrashListModal'
 import { PAGE_STATUS, useKnowledgeBaseDetailController } from '../../hooks/useKnowledgeBaseDetailController'
+import { auditApi } from '../../services/api/auditApi'
 import styles from './KnowledgeBaseDetail.module.css'
 
 const ROLE_LABELS = {
@@ -24,6 +30,13 @@ const KnowledgeBaseDetail = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser } = useAuth()
+  const [knowledgeBaseAuditEvents, setKnowledgeBaseAuditEvents] = useState([])
+  const [knowledgeBaseAuditLoading, setKnowledgeBaseAuditLoading] = useState(false)
+  const [knowledgeBaseAuditError, setKnowledgeBaseAuditError] = useState('')
+  const [documentAuditEvents, setDocumentAuditEvents] = useState([])
+  const [documentAuditLoading, setDocumentAuditLoading] = useState(false)
+  const [documentAuditError, setDocumentAuditError] = useState('')
+  const [shareDrawerOpen, setShareDrawerOpen] = useState(false)
   const controller = useKnowledgeBaseDetailController({
     id,
     currentUser,
@@ -82,6 +95,13 @@ const KnowledgeBaseDetail = () => {
     permissionSubmitting,
     permissionError,
     setPermissionError,
+    documentTrashOpen,
+    setDocumentTrashOpen,
+    deletedDocuments,
+    documentTrashLoading,
+    documentTrashError,
+    setDocumentTrashError,
+    restoringDocumentId,
     visibleDocuments,
     safeSelectedDocumentContent,
     canMoveUp,
@@ -106,6 +126,8 @@ const KnowledgeBaseDetail = () => {
     handleSaveKnowledgeBase,
     openPermissionModal,
     handleSubmitPermissions,
+    openDocumentTrash,
+    handleRestoreDocument,
     clearBatchSelection,
     handleToggleBatchMode,
     clearDragState,
@@ -130,30 +152,76 @@ const KnowledgeBaseDetail = () => {
     setSelectedDocumentId,
   } = controller
 
+  const loadKnowledgeBaseAuditEvents = useCallback(async () => {
+    if (!knowledgeBase?.id || !canManageKnowledgeBase) {
+      setKnowledgeBaseAuditEvents([])
+      setKnowledgeBaseAuditError('')
+      return
+    }
+
+    try {
+      setKnowledgeBaseAuditLoading(true)
+      setKnowledgeBaseAuditError('')
+      const response = await auditApi.listAuditLogs({
+        knowledgeBaseId: knowledgeBase.id,
+        size: 6,
+      })
+      setKnowledgeBaseAuditEvents(response?.data?.records || [])
+    } catch (error) {
+      console.error('加载知识库审计记录失败', error)
+      setKnowledgeBaseAuditEvents([])
+      setKnowledgeBaseAuditError(error?.message || '加载知识库审计记录失败，请稍后重试')
+    } finally {
+      setKnowledgeBaseAuditLoading(false)
+    }
+  }, [canManageKnowledgeBase, knowledgeBase?.id])
+
+  const loadDocumentAuditEvents = useCallback(async () => {
+    if (!selectedDocument?.id || !canManageKnowledgeBase) {
+      setDocumentAuditEvents([])
+      setDocumentAuditError('')
+      return
+    }
+
+    try {
+      setDocumentAuditLoading(true)
+      setDocumentAuditError('')
+      const response = await auditApi.listAuditLogs({
+        objectType: 'DOCUMENT',
+        objectId: selectedDocument.id,
+        size: 6,
+      })
+      setDocumentAuditEvents(response?.data?.records || [])
+    } catch (error) {
+      console.error('加载节点审计记录失败', error)
+      setDocumentAuditEvents([])
+      setDocumentAuditError(error?.message || '加载节点审计记录失败，请稍后重试')
+    } finally {
+      setDocumentAuditLoading(false)
+    }
+  }, [canManageKnowledgeBase, selectedDocument?.id])
+
+  useEffect(() => {
+    loadKnowledgeBaseAuditEvents()
+  }, [documents, feedback?.message, knowledgeBase?.updatedAt, loadKnowledgeBaseAuditEvents])
+
+  useEffect(() => {
+    loadDocumentAuditEvents()
+  }, [feedback?.message, loadDocumentAuditEvents, selectedDocument?.id, selectedDocument?.updatedAt])
+
   if (pageStatus === PAGE_STATUS.LOADING) {
     return <div className={styles.state}>正在加载知识库...</div>
   }
 
   if (pageStatus !== PAGE_STATUS.READY || !knowledgeBase) {
-    const stateTitleMap = {
-      [PAGE_STATUS.FORBIDDEN]: '当前会话无权访问该知识库',
-      [PAGE_STATUS.NOT_FOUND]: '当前知识库不存在',
-      [PAGE_STATUS.ERROR]: '知识库详情暂时不可用',
-    }
-
     return (
-      <div className={styles.stateCard}>
-        <h1>{stateTitleMap[pageStatus] || '知识库详情暂时不可用'}</h1>
-        <p>{pageErrorMessage || '请返回工作台查看当前可访问的知识库。'}</p>
-        <div className={styles.stateActions}>
-          <button type="button" className={styles.primaryButton} onClick={() => navigate('/')}>
-            返回工作台
-          </button>
-          <button type="button" className={styles.secondaryButton} onClick={() => loadData({ resetState: true })}>
-            重新加载
-          </button>
-        </div>
-      </div>
+      <PageState
+        eyebrow={pageStatus === PAGE_STATUS.FORBIDDEN ? '无权访问' : pageStatus === PAGE_STATUS.NOT_FOUND ? '内容不存在' : '知识库不可用'}
+        title={pageStatus === PAGE_STATUS.FORBIDDEN ? '当前会话无权访问该知识库' : pageStatus === PAGE_STATUS.NOT_FOUND ? '当前知识库不存在' : '知识库详情暂时不可用'}
+        description={pageErrorMessage || '请返回工作台查看当前可访问的知识库。'}
+        primaryAction={{ label: '返回工作台', onClick: () => navigate('/') }}
+        secondaryAction={{ label: '重新加载', onClick: () => loadData({ resetState: true }) }}
+      />
     )
   }
 
@@ -172,6 +240,7 @@ const KnowledgeBaseDetail = () => {
         setModalError={setModalError}
         setEditing={setEditing}
         openPermissionModal={openPermissionModal}
+        openDocumentTrash={openDocumentTrash}
         handleDeleteKnowledgeBase={handleDeleteKnowledgeBase}
         focusMode={focusMode}
         treePanelCollapsed={treePanelCollapsed}
@@ -230,8 +299,10 @@ const KnowledgeBaseDetail = () => {
           documents={documents}
           selectedDocument={selectedDocument}
           canWriteKnowledgeBase={canWriteKnowledgeBase}
+          canManageKnowledgeBase={canManageKnowledgeBase}
           handleOpenEditorPage={handleOpenEditorPage}
           setReadLinkOpen={setReadLinkOpen}
+          setShareDrawerOpen={setShareDrawerOpen}
           openCreateDocumentModal={openCreateDocumentModal}
           openEditDocumentModal={openEditDocumentModal}
           navigate={navigate}
@@ -255,6 +326,12 @@ const KnowledgeBaseDetail = () => {
             canWriteKnowledgeBase={canWriteKnowledgeBase}
             canManageKnowledgeBase={canManageKnowledgeBase}
             roleLabels={ROLE_LABELS}
+            knowledgeBaseAuditEvents={knowledgeBaseAuditEvents}
+            knowledgeBaseAuditLoading={knowledgeBaseAuditLoading}
+            knowledgeBaseAuditError={knowledgeBaseAuditError}
+            documentAuditEvents={documentAuditEvents}
+            documentAuditLoading={documentAuditLoading}
+            documentAuditError={documentAuditError}
           />
         )}
       </section>
@@ -304,6 +381,12 @@ const KnowledgeBaseDetail = () => {
         title={selectedDocument?.title || ''}
         onClose={() => setReadLinkOpen(false)}
       />
+      <DocumentShareDrawer
+        open={shareDrawerOpen && selectedDocument?.docType === 'DOC'}
+        documentId={selectedDocument?.docType === 'DOC' ? selectedDocument.id : null}
+        title={selectedDocument?.title || ''}
+        onClose={() => setShareDrawerOpen(false)}
+      />
       <KnowledgeBasePermissionModal
         open={permissionModalOpen}
         loading={permissionLoading}
@@ -317,6 +400,31 @@ const KnowledgeBaseDetail = () => {
           setPermissionModalOpen(false)
         }}
         onSubmit={handleSubmitPermissions}
+      />
+
+      <TrashListModal
+        open={documentTrashOpen}
+        eyebrow="文档回收站"
+        title={knowledgeBase.name}
+        description="这里保留当前知识库已删除的文档和目录。恢复时仍会校验父级目录和知识库状态。"
+        items={deletedDocuments}
+        loading={documentTrashLoading}
+        errorMessage={documentTrashError}
+        restoringItemId={restoringDocumentId}
+        emptyTitle="当前知识库回收站为空"
+        emptyDescription="删除后的文档或目录会暂存到这里，便于继续恢复主链路。"
+        onClose={() => {
+          setDocumentTrashError('')
+          setDocumentTrashOpen(false)
+        }}
+        onRestore={(item) => handleRestoreDocument(item.id)}
+        getItemTitle={(item) => item.title}
+        getItemDescription={(item) => `${item.docType === 'FOLDER' ? '目录' : '文档'} · ${item.path || '未记录路径'}`}
+        getItemMeta={(item) => [
+          item.deletedAt ? `删除于 ${dayjs(item.deletedAt).format('MM-DD HH:mm')}` : '',
+          item.deletedBy ? `删除人 #${item.deletedBy}` : '',
+          item.versionNo ? `当前版本 ${item.versionNo}` : '',
+        ]}
       />
     </div>
   )
