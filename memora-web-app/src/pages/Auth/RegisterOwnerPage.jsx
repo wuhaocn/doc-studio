@@ -6,6 +6,7 @@ import styles from './LoginPage.module.css'
 const RegisterOwnerPage = () => {
   const navigate = useNavigate()
   const { isAuthenticated, registerOwner, sessionLoading } = useAuth()
+  const [showCustomSlug, setShowCustomSlug] = useState(false)
   const [form, setForm] = useState({
     tenantName: '',
     tenantSlug: '',
@@ -46,23 +47,23 @@ const RegisterOwnerPage = () => {
     <div className={styles.page}>
       <section className={styles.panel}>
         <div className={styles.hero}>
-          <p className={styles.eyebrow}>Owner Signup</p>
-          <h1 className={styles.title}>先创建工作区，再开始知识生产</h1>
+          <p className={styles.eyebrow}>创建工作区</p>
+          <h1 className={styles.title}>先开一个团队空间，再开始沉淀知识</h1>
           <p className={styles.description}>
-            当前注册只面向工作区管理员。注册完成后会立即创建用户、工作区、Owner 成员关系和可用会话。
+            注册完成后会直接进入工作台。你会成为当前工作区管理员，后续再邀请成员加入即可。
           </p>
-          <div className={styles.featureList}>
-            <div className={styles.featureItem}>
-              <strong>工作区</strong>
-              <span>生成独立 tenant，并以它作为当前主权限边界。</span>
+          <div className={styles.heroChecklist}>
+            <div className={styles.heroChecklistItem}>
+              <strong>一步进入</strong>
+              <span>创建完成后直接建立会话，不需要再单独登录一次。</span>
             </div>
-            <div className={styles.featureItem}>
-              <strong>成员</strong>
-              <span>注册者默认成为 Owner，后续通过邀请成员加入。</span>
+            <div className={styles.heroChecklistItem}>
+              <strong>管理员身份</strong>
+              <span>当前注册者会自动成为工作区管理员。</span>
             </div>
-            <div className={styles.featureItem}>
-              <strong>主链路</strong>
-              <span>注册成功后直接进入工作台继续创建知识库和文档。</span>
+            <div className={styles.heroChecklistItem}>
+              <strong>后续扩展</strong>
+              <span>成员通过邀请加入，知识库和文档在进入后继续创建。</span>
             </div>
           </div>
         </div>
@@ -71,7 +72,7 @@ const RegisterOwnerPage = () => {
           <div className={styles.formHeader}>
             <p className={styles.formEyebrow}>注册工作区</p>
             <h2 className={styles.formTitle}>创建 Owner 账号</h2>
-            <p className={styles.formDescription}>只收集进入产品闭环所需的最小信息。</p>
+            <p className={styles.formDescription}>先填写工作区名称和你的账号信息；自定义工作区地址属于可选项。</p>
           </div>
           <label className={styles.field}>
             <span>工作区名称</span>
@@ -82,17 +83,9 @@ const RegisterOwnerPage = () => {
               required
             />
           </label>
-          <label className={styles.field}>
-            <span>工作区标识</span>
-            <input
-              value={form.tenantSlug}
-              onChange={(event) => setForm((current) => ({ ...current, tenantSlug: event.target.value }))}
-              placeholder="可选，不填则按名称自动生成"
-            />
-          </label>
           <div className={styles.splitFields}>
             <label className={styles.field}>
-              <span>姓名</span>
+              <span>你的姓名</span>
               <input
                 value={form.displayName}
                 onChange={(event) => setForm((current) => ({ ...current, displayName: event.target.value }))}
@@ -100,6 +93,18 @@ const RegisterOwnerPage = () => {
                 required
               />
             </label>
+            <label className={styles.field}>
+              <span>邮箱</span>
+              <input
+                type="email"
+                value={form.email}
+                onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
+                placeholder="请输入邮箱"
+                required
+              />
+            </label>
+          </div>
+          <div className={styles.splitFields}>
             <label className={styles.field}>
               <span>用户名</span>
               <input
@@ -109,27 +114,37 @@ const RegisterOwnerPage = () => {
                 required
               />
             </label>
+            <label className={styles.field}>
+              <span>密码</span>
+              <input
+                type="password"
+                value={form.password}
+                onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
+                placeholder="至少 6 位密码"
+                required
+              />
+            </label>
           </div>
-          <label className={styles.field}>
-            <span>邮箱</span>
-            <input
-              type="email"
-              value={form.email}
-              onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="请输入邮箱"
-              required
-            />
-          </label>
-          <label className={styles.field}>
-            <span>密码</span>
-            <input
-              type="password"
-              value={form.password}
-              onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder="至少 6 位密码"
-              required
-            />
-          </label>
+          <button
+            type="button"
+            className={styles.textButton}
+            onClick={() => setShowCustomSlug((current) => !current)}
+          >
+            {showCustomSlug ? '收起自定义地址' : '自定义工作区地址（可选）'}
+          </button>
+          {showCustomSlug ? (
+            <div className={styles.advancedPanel}>
+              <label className={styles.field}>
+                <span>工作区地址</span>
+                <input
+                  value={form.tenantSlug}
+                  onChange={(event) => setForm((current) => ({ ...current, tenantSlug: event.target.value }))}
+                  placeholder="不填则按名称自动生成"
+                />
+              </label>
+              <p className={styles.fieldHint}>仅当你希望工作区使用固定访问地址时再填写，例如 north-quality-center。</p>
+            </div>
+          ) : null}
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}
           <button type="submit" className={styles.submitButton} disabled={submitting || sessionLoading}>
             {submitting ? '创建中...' : '创建工作区并进入'}

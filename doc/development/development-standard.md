@@ -132,7 +132,7 @@
 - 新增持久化字段时，同步更新：
   - `entity`
   - `schema.sql`
-  - `data.sql`
+  - `seed-data.sql`（仅 `dev/test` profile 需要的种子数据）
   - 相关测试
 
 ### 5.3 前端要求

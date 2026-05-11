@@ -203,6 +203,34 @@ CREATE INDEX IF NOT EXISTS idx_audit_log_tenant_created_at ON audit_log(tenant_i
 CREATE INDEX IF NOT EXISTS idx_audit_log_kb_created_at ON audit_log(knowledge_base_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_audit_log_object_created_at ON audit_log(object_type, object_id, created_at);
 
+CREATE TABLE IF NOT EXISTS audit_log_archive (
+  id BIGINT PRIMARY KEY,
+  tenant_id BIGINT NOT NULL,
+  knowledge_base_id BIGINT,
+  knowledge_base_name VARCHAR(120),
+  actor_type VARCHAR(30) NOT NULL,
+  actor_user_id BIGINT,
+  actor_display_name VARCHAR(120),
+  actor_role VARCHAR(40),
+  object_type VARCHAR(40) NOT NULL,
+  object_id BIGINT,
+  object_title VARCHAR(200),
+  action_type VARCHAR(60) NOT NULL,
+  result_type VARCHAR(30) NOT NULL,
+  detail VARCHAR(500),
+  source_type VARCHAR(60),
+  request_method VARCHAR(20),
+  request_path VARCHAR(255),
+  created_at TIMESTAMP NOT NULL,
+  archived_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (tenant_id) REFERENCES tenant(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_log_archive_tenant_created_at ON audit_log_archive(tenant_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_archive_kb_created_at ON audit_log_archive(knowledge_base_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_archive_object_created_at ON audit_log_archive(object_type, object_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_archive_archived_at ON audit_log_archive(archived_at);
+
 CREATE TABLE IF NOT EXISTS document_share_link (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
   tenant_id BIGINT NOT NULL,

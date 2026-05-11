@@ -1,5 +1,5 @@
 # MySQL 配置示例
-# 使用方法：在 application.yml 中设置 spring.profiles.active=mysql，
+# 使用方法：SPRING_PROFILES_ACTIVE=mysql ./start-backend.sh
 # 并通过环境变量提供数据库连接信息，不要在仓库内提交真实口令。
 
 spring:
@@ -12,4 +12,7 @@ spring:
     init:
       mode: always
       schema-locations: classpath:db/schema-mysql.sql
-      data-locations: classpath:db/data.sql
+
+memora:
+  auth:
+    allow-demo-token: false

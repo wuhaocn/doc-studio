@@ -7,10 +7,13 @@ import styles from './LoginPage.module.css'
 const AcceptInvitePage = () => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const tokenFromLink = searchParams.get('token') || ''
   const { isAuthenticated, acceptInvite, sessionLoading } = useAuth()
-  const [token, setToken] = useState(searchParams.get('token') || '')
-  const [inviteLoading, setInviteLoading] = useState(Boolean(searchParams.get('token')))
+  const [token, setToken] = useState(tokenFromLink)
+  const [inviteLoading, setInviteLoading] = useState(Boolean(tokenFromLink))
   const [inviteInfo, setInviteInfo] = useState(null)
+  const [manualTokenOpen, setManualTokenOpen] = useState(!tokenFromLink)
+  const [accountMode, setAccountMode] = useState('new')
   const [form, setForm] = useState({
     displayName: '',
     username: '',
@@ -84,14 +87,17 @@ const AcceptInvitePage = () => {
     }
   }
 
+  const isExistingAccountMode = accountMode === 'existing'
+  const inviteLoaded = Boolean(inviteInfo)
+
   return (
     <div className={styles.page}>
       <section className={styles.panel}>
         <div className={styles.hero}>
-          <p className={styles.eyebrow}>Invite Accept</p>
-          <h1 className={styles.title}>通过邀请加入现有工作区</h1>
+          <p className={styles.eyebrow}>加入工作区</p>
+          <h1 className={styles.title}>确认邀请后，直接进入团队空间</h1>
           <p className={styles.description}>
-            普通成员不开放公共注册。接受邀请时会创建账号或复用已有账号，并直接进入对应工作区。
+            成员通过邀请加入现有工作区，不需要重复创建团队空间。首次加入会创建账号，已有账号则直接复用原账号进入。
           </p>
           {inviteInfo ? (
             <div className={styles.infoCard}>
@@ -102,7 +108,7 @@ const AcceptInvitePage = () => {
           ) : (
             <div className={styles.infoCard}>
               <strong>邀请链接</strong>
-              <span>{inviteLoading ? '正在读取邀请信息...' : '如果链接无效，可手动粘贴邀请令牌继续。'}</span>
+              <span>{inviteLoading ? '正在读取邀请信息...' : '优先从邀请链接直接进入；如果链接缺失，再手动粘贴邀请令牌。'}</span>
             </div>
           )}
         </div>
@@ -111,33 +117,67 @@ const AcceptInvitePage = () => {
           <div className={styles.formHeader}>
             <p className={styles.formEyebrow}>接受邀请</p>
             <h2 className={styles.formTitle}>完成账号并进入工作区</h2>
-            <p className={styles.formDescription}>接受成功后会直接建立真实 session。</p>
+            <p className={styles.formDescription}>
+              {isExistingAccountMode
+                ? '如果你已有同邮箱账号，请填写原用户名和密码；接受成功后会直接进入对应工作区。'
+                : '首次加入会创建登录账号并直接建立真实 session。'}
+            </p>
           </div>
-          <label className={styles.field}>
-            <span>邀请令牌</span>
-            <div className={styles.fieldWithAction}>
-              <input
-                value={token}
-                onChange={(event) => {
-                  const nextToken = event.target.value
-                  setToken(nextToken)
-                  if (inviteInfo?.inviteToken !== nextToken.trim()) {
-                    setInviteInfo(null)
-                  }
-                }}
-                placeholder="请粘贴邀请令牌"
-                required
-              />
-              <button
-                type="button"
-                className={styles.fieldActionButton}
-                onClick={() => loadInvite()}
-                disabled={inviteLoading || !token.trim()}
-              >
-                {inviteLoading ? '读取中...' : '读取邀请'}
-              </button>
+          <div className={styles.modeSwitch}>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${!isExistingAccountMode ? styles.modeButtonActive : ''}`}
+              onClick={() => setAccountMode('new')}
+              aria-pressed={!isExistingAccountMode}
+            >
+              首次加入
+            </button>
+            <button
+              type="button"
+              className={`${styles.modeButton} ${isExistingAccountMode ? styles.modeButtonActive : ''}`}
+              onClick={() => setAccountMode('existing')}
+              aria-pressed={isExistingAccountMode}
+            >
+              已有账号
+            </button>
+          </div>
+          <button
+            type="button"
+            className={styles.textButton}
+            onClick={() => setManualTokenOpen((current) => !current)}
+          >
+            {manualTokenOpen ? '收起邀请令牌输入' : '更换邀请链接或手动输入令牌'}
+          </button>
+          {manualTokenOpen || !inviteLoaded ? (
+            <div className={styles.advancedPanel}>
+              <label className={styles.field}>
+                <span>邀请令牌</span>
+                <div className={styles.fieldWithAction}>
+                  <input
+                    value={token}
+                    onChange={(event) => {
+                      const nextToken = event.target.value
+                      setToken(nextToken)
+                      if (inviteInfo?.inviteToken !== nextToken.trim()) {
+                        setInviteInfo(null)
+                      }
+                    }}
+                    placeholder="请粘贴邀请令牌"
+                    required
+                  />
+                  <button
+                    type="button"
+                    className={styles.fieldActionButton}
+                    onClick={() => loadInvite()}
+                    disabled={inviteLoading || !token.trim()}
+                  >
+                    {inviteLoading ? '读取中...' : '读取邀请'}
+                  </button>
+                </div>
+              </label>
+              <p className={styles.fieldHint}>系统会先校验邀请是否仍然有效，再继续填写账号信息。</p>
             </div>
-          </label>
+          ) : null}
           <div className={styles.splitFields}>
             <label className={styles.field}>
               <span>姓名</span>
@@ -153,28 +193,33 @@ const AcceptInvitePage = () => {
               <input
                 value={form.username}
                 onChange={(event) => setForm((current) => ({ ...current, username: event.target.value }))}
-                placeholder="请输入用户名"
+                placeholder={isExistingAccountMode ? '请输入已有账号用户名' : '请设置登录用户名'}
                 required
               />
             </label>
           </div>
           <label className={styles.field}>
-            <span>邮箱</span>
+            <span>受邀邮箱</span>
             <input
               type="email"
               value={form.email}
               onChange={(event) => setForm((current) => ({ ...current, email: event.target.value }))}
-              placeholder="请输入邮箱"
+              placeholder="请输入受邀邮箱"
+              readOnly={inviteLoaded}
+              className={inviteLoaded ? styles.readonlyInput : ''}
               required
             />
           </label>
+          {inviteLoaded ? (
+            <p className={styles.fieldHint}>邀请邮箱已固定。如需改成其他邮箱，请让管理员重新发送邀请。</p>
+          ) : null}
           <label className={styles.field}>
             <span>密码</span>
             <input
               type="password"
               value={form.password}
               onChange={(event) => setForm((current) => ({ ...current, password: event.target.value }))}
-              placeholder="首次加入请设置密码；已有账号请填写原密码"
+              placeholder={isExistingAccountMode ? '请输入已有账号密码' : '请设置登录密码，至少 6 位'}
               required
             />
           </label>

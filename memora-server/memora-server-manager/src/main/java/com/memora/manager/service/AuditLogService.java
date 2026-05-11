@@ -5,10 +5,12 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.memora.common.exception.BusinessException;
 import com.memora.manager.entity.AuditLog;
+import com.memora.manager.entity.AuditLogArchive;
 import com.memora.manager.entity.Document;
 import com.memora.manager.entity.KnowledgeBase;
 import com.memora.manager.entity.TenantMember;
 import com.memora.manager.entity.UserAccount;
+import com.memora.manager.mapper.AuditLogArchiveMapper;
 import com.memora.manager.mapper.AuditLogMapper;
 import com.memora.manager.mapper.DocumentMapper;
 import com.memora.manager.mapper.KnowledgeBaseMapper;
@@ -19,17 +21,21 @@ import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
 import com.memora.manager.support.TenantAccessService;
 import com.memora.manager.vo.AuditLogVO;
+import com.memora.manager.vo.AuditRetentionExecutionVO;
 import com.memora.manager.vo.AuditRetentionSummaryVO;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -48,10 +54,14 @@ public class AuditLogService {
     @Value("${memora.audit.retention-days:3650}")
     private Integer retentionDays;
 
+    @Value("${memora.audit.archive-batch-size:200}")
+    private Integer archiveBatchSize;
+
     @Value("${memora.audit.export-max-size:1000}")
     private Integer exportMaxSize;
 
     private final AuditLogMapper auditLogMapper;
+    private final AuditLogArchiveMapper auditLogArchiveMapper;
     private final TenantMemberMapper tenantMemberMapper;
     private final UserAccountMapper userAccountMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
@@ -92,62 +102,79 @@ public class AuditLogService {
 
     public AuditRetentionSummaryVO getRetentionSummary(Long knowledgeBaseId, String objectType, Long objectId) {
         AuditQuery auditQuery = prepareAuditQuery(knowledgeBaseId, objectType, objectId, null);
-        LambdaQueryWrapper<AuditLog> totalQuery = buildAuditQuery(
-            auditQuery.tenantId(),
-            knowledgeBaseId,
-            auditQuery.normalizedObjectType(),
-            objectId,
-            null
-        );
-        LambdaQueryWrapper<AuditLog> successQuery = buildAuditQuery(
-            auditQuery.tenantId(),
-            knowledgeBaseId,
-            auditQuery.normalizedObjectType(),
-            objectId,
-            AuditLogConstants.RESULT_SUCCESS
-        );
-        LambdaQueryWrapper<AuditLog> failureQuery = buildAuditQuery(
-            auditQuery.tenantId(),
-            knowledgeBaseId,
-            auditQuery.normalizedObjectType(),
-            objectId,
-            AuditLogConstants.RESULT_FAILURE
-        );
+        LocalDateTime archiveBeforeCreatedAt = resolveArchiveBeforeCreatedAt();
+
+        long activeCount = countActive(auditQuery, null);
+        long archivedCount = countArchived(auditQuery, null);
 
         AuditRetentionSummaryVO summary = new AuditRetentionSummaryVO();
-        summary.setConfiguredRetentionDays(retentionDays);
-        summary.setExportMaxSize(exportMaxSize);
-        summary.setTotalCount(auditLogMapper.selectCount(totalQuery));
-        summary.setSuccessCount(auditLogMapper.selectCount(successQuery));
-        summary.setFailureCount(auditLogMapper.selectCount(failureQuery));
-
-        AuditLog earliest = auditLogMapper.selectOne(buildAuditQuery(
-            auditQuery.tenantId(),
-            knowledgeBaseId,
-            auditQuery.normalizedObjectType(),
-            objectId,
-            null
-        ).orderByAsc(AuditLog::getCreatedAt).orderByAsc(AuditLog::getId).last("LIMIT 1"));
-        AuditLog latest = auditLogMapper.selectOne(buildAuditQuery(
-            auditQuery.tenantId(),
-            knowledgeBaseId,
-            auditQuery.normalizedObjectType(),
-            objectId,
-            null
-        ).orderByDesc(AuditLog::getCreatedAt).orderByDesc(AuditLog::getId).last("LIMIT 1"));
-        summary.setEarliestCreatedAt(earliest == null ? null : earliest.getCreatedAt());
-        summary.setLatestCreatedAt(latest == null ? null : latest.getCreatedAt());
+        summary.setConfiguredRetentionDays(resolveRetentionDaysValue());
+        summary.setArchiveBatchSize(resolveArchiveBatchSize());
+        summary.setExportMaxSize(resolveExportMaxSize());
+        summary.setActiveCount(activeCount);
+        summary.setArchivedCount(archivedCount);
+        summary.setTotalCount(activeCount + archivedCount);
+        summary.setSuccessCount(countActive(auditQuery, AuditLogConstants.RESULT_SUCCESS)
+            + countArchived(auditQuery, AuditLogConstants.RESULT_SUCCESS));
+        summary.setFailureCount(countActive(auditQuery, AuditLogConstants.RESULT_FAILURE)
+            + countArchived(auditQuery, AuditLogConstants.RESULT_FAILURE));
+        summary.setPendingArchiveCount(countPendingArchive(auditQuery, archiveBeforeCreatedAt));
+        summary.setEarliestCreatedAt(minTime(
+            getActiveBoundaryCreatedAt(auditQuery, true),
+            getArchivedBoundaryCreatedAt(auditQuery, true)
+        ));
+        summary.setLatestCreatedAt(maxTime(
+            getActiveBoundaryCreatedAt(auditQuery, false),
+            getArchivedBoundaryCreatedAt(auditQuery, false)
+        ));
+        summary.setArchiveBeforeCreatedAt(archiveBeforeCreatedAt);
+        summary.setLastArchivedAt(getArchivedBoundaryArchivedAt(auditQuery, false));
         return summary;
     }
 
-    public String exportCsv(Long knowledgeBaseId, String objectType, Long objectId, String resultType) {
+    @Transactional
+    public AuditRetentionExecutionVO runRetention(Long knowledgeBaseId, String objectType, Long objectId) {
+        AuditQuery auditQuery = prepareAuditQuery(knowledgeBaseId, objectType, objectId, null);
+        LocalDateTime archiveBeforeCreatedAt = resolveArchiveBeforeCreatedAt();
+        long eligibleCount = countPendingArchive(auditQuery, archiveBeforeCreatedAt);
+        int batchSize = resolveArchiveBatchSize();
+        List<AuditLog> pendingRecords = loadPendingArchiveRecords(auditQuery, archiveBeforeCreatedAt, batchSize);
+        LocalDateTime executedAt = LocalDateTime.now();
+
+        if (!pendingRecords.isEmpty()) {
+            for (AuditLog auditLog : pendingRecords) {
+                auditLogArchiveMapper.insert(copyToArchive(auditLog, executedAt));
+            }
+            auditLogMapper.deleteBatchIds(pendingRecords.stream().map(AuditLog::getId).toList());
+        }
+
+        recordSuccess(buildRetentionAuditCommand(
+            auditQuery,
+            archiveBeforeCreatedAt,
+            eligibleCount,
+            pendingRecords.size()
+        ));
+
+        AuditRetentionExecutionVO execution = new AuditRetentionExecutionVO();
+        execution.setConfiguredRetentionDays(resolveRetentionDaysValue());
+        execution.setArchiveBatchSize(batchSize);
+        execution.setEligibleCount(eligibleCount);
+        execution.setArchivedCount((long) pendingRecords.size());
+        execution.setRemainingPendingArchiveCount(countPendingArchive(auditQuery, archiveBeforeCreatedAt));
+        execution.setActiveCount(countActive(auditQuery, null));
+        execution.setArchivedTotalCount(countArchived(auditQuery, null));
+        execution.setArchiveBeforeCreatedAt(archiveBeforeCreatedAt);
+        execution.setExecutedAt(executedAt);
+        return execution;
+    }
+
+    public String exportCsv(Long knowledgeBaseId, String objectType, Long objectId, String resultType, String storageScope) {
         AuditQuery auditQuery = prepareAuditQuery(knowledgeBaseId, objectType, objectId, resultType);
-        LambdaQueryWrapper<AuditLog> queryWrapper = auditQuery.queryWrapper();
-        queryWrapper.last("LIMIT " + exportMaxSize);
-        List<AuditLog> auditLogs = auditLogMapper.selectList(queryWrapper);
-        recordSuccess(buildExportAuditCommand(auditQuery, knowledgeBaseId, objectId, resultType, auditLogs.size()));
+        String normalizedStorageScope = normalizeStorageScope(storageScope);
+        List<AuditCsvRow> rows = loadExportRows(auditQuery, normalizedStorageScope);
+        recordSuccess(buildExportAuditCommand(auditQuery, resultType, normalizedStorageScope, rows.size()));
         String header = "\uFEFFid,tenantId,knowledgeBaseId,knowledgeBaseName,actorType,actorUserId,actorDisplayName,actorRole,objectType,objectId,objectTitle,actionType,resultType,detail,sourceType,requestMethod,requestPath,createdAt\n";
-        return header + auditLogs.stream()
+        return header + rows.stream()
             .map(this::toCsvRow)
             .collect(Collectors.joining("\n"));
     }
@@ -202,7 +229,7 @@ public class AuditLogService {
 
         authorizeAuditQuery(tenantId, knowledgeBaseId, normalizedObjectType, objectId);
 
-        LambdaQueryWrapper<AuditLog> queryWrapper = buildAuditQuery(
+        LambdaQueryWrapper<AuditLog> queryWrapper = buildActiveAuditQuery(
             tenantId,
             knowledgeBaseId,
             normalizedObjectType,
@@ -210,7 +237,7 @@ public class AuditLogService {
             normalizedResultType
         );
         queryWrapper.orderByDesc(AuditLog::getCreatedAt).orderByDesc(AuditLog::getId);
-        return new AuditQuery(tenantId, normalizedObjectType, normalizedResultType, queryWrapper);
+        return new AuditQuery(tenantId, knowledgeBaseId, normalizedObjectType, objectId, normalizedResultType, queryWrapper);
     }
 
     private void authorizeAuditQuery(Long tenantId, Long knowledgeBaseId, String normalizedObjectType, Long objectId) {
@@ -233,7 +260,7 @@ public class AuditLogService {
         tenantAccessService.requireTenantManage(tenantId);
     }
 
-    private LambdaQueryWrapper<AuditLog> buildAuditQuery(
+    private LambdaQueryWrapper<AuditLog> buildActiveAuditQuery(
         Long tenantId,
         Long knowledgeBaseId,
         String normalizedObjectType,
@@ -250,6 +277,23 @@ public class AuditLogService {
         }
         if (StringUtils.hasText(normalizedResultType)) {
             queryWrapper.eq(AuditLog::getResultType, normalizedResultType);
+        }
+        return queryWrapper;
+    }
+
+    private LambdaQueryWrapper<AuditLogArchive> buildArchivedAuditQuery(AuditQuery auditQuery, String resultType) {
+        LambdaQueryWrapper<AuditLogArchive> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AuditLogArchive::getTenantId, auditQuery.tenantId());
+        if (auditQuery.knowledgeBaseId() != null) {
+            queryWrapper.eq(AuditLogArchive::getKnowledgeBaseId, auditQuery.knowledgeBaseId());
+        }
+        if (StringUtils.hasText(auditQuery.normalizedObjectType())) {
+            queryWrapper.eq(AuditLogArchive::getObjectType, auditQuery.normalizedObjectType())
+                .eq(AuditLogArchive::getObjectId, auditQuery.objectId());
+        }
+        String normalizedResultType = StringUtils.hasText(resultType) ? resultType : auditQuery.normalizedResultType();
+        if (StringUtils.hasText(normalizedResultType)) {
+            queryWrapper.eq(AuditLogArchive::getResultType, normalizedResultType);
         }
         return queryWrapper;
     }
@@ -279,6 +323,19 @@ public class AuditLogService {
         String normalized = resultType.trim().toUpperCase(Locale.ROOT);
         if (!AuditLogConstants.RESULT_SUCCESS.equals(normalized) && !AuditLogConstants.RESULT_FAILURE.equals(normalized)) {
             throw new BusinessException(400, "当前 resultType 不支持审计查询");
+        }
+        return normalized;
+    }
+
+    private String normalizeStorageScope(String storageScope) {
+        if (!StringUtils.hasText(storageScope)) {
+            return AuditLogConstants.STORAGE_SCOPE_ACTIVE;
+        }
+        String normalized = storageScope.trim().toUpperCase(Locale.ROOT);
+        if (!AuditLogConstants.STORAGE_SCOPE_ACTIVE.equals(normalized)
+            && !AuditLogConstants.STORAGE_SCOPE_ARCHIVED.equals(normalized)
+            && !AuditLogConstants.STORAGE_SCOPE_ALL.equals(normalized)) {
+            throw new BusinessException(400, "当前 storageScope 不支持审计导出");
         }
         return normalized;
     }
@@ -374,6 +431,148 @@ public class AuditLogService {
             .toUpperCase(Locale.ROOT);
     }
 
+    private int resolveRetentionDaysValue() {
+        return retentionDays == null ? 3650 : Math.max(retentionDays, 0);
+    }
+
+    private int resolveArchiveBatchSize() {
+        return archiveBatchSize == null ? 200 : Math.max(archiveBatchSize, 1);
+    }
+
+    private int resolveExportMaxSize() {
+        return exportMaxSize == null ? 1000 : Math.max(exportMaxSize, 1);
+    }
+
+    private LocalDateTime resolveArchiveBeforeCreatedAt() {
+        return LocalDateTime.now().minusDays(resolveRetentionDaysValue());
+    }
+
+    private long countActive(AuditQuery auditQuery, String resultType) {
+        return auditLogMapper.selectCount(buildActiveAuditQuery(
+            auditQuery.tenantId(),
+            auditQuery.knowledgeBaseId(),
+            auditQuery.normalizedObjectType(),
+            auditQuery.objectId(),
+            StringUtils.hasText(resultType) ? resultType : auditQuery.normalizedResultType()
+        ));
+    }
+
+    private long countArchived(AuditQuery auditQuery, String resultType) {
+        return auditLogArchiveMapper.selectCount(buildArchivedAuditQuery(auditQuery, resultType));
+    }
+
+    private long countPendingArchive(AuditQuery auditQuery, LocalDateTime archiveBeforeCreatedAt) {
+        return auditLogMapper.selectCount(buildActiveAuditQuery(
+            auditQuery.tenantId(),
+            auditQuery.knowledgeBaseId(),
+            auditQuery.normalizedObjectType(),
+            auditQuery.objectId(),
+            null
+        ).lt(AuditLog::getCreatedAt, archiveBeforeCreatedAt));
+    }
+
+    private List<AuditLog> loadPendingArchiveRecords(AuditQuery auditQuery, LocalDateTime archiveBeforeCreatedAt, int limit) {
+        LambdaQueryWrapper<AuditLog> queryWrapper = buildActiveAuditQuery(
+            auditQuery.tenantId(),
+            auditQuery.knowledgeBaseId(),
+            auditQuery.normalizedObjectType(),
+            auditQuery.objectId(),
+            null
+        );
+        queryWrapper.lt(AuditLog::getCreatedAt, archiveBeforeCreatedAt)
+            .orderByAsc(AuditLog::getCreatedAt)
+            .orderByAsc(AuditLog::getId)
+            .last("LIMIT " + limit);
+        return auditLogMapper.selectList(queryWrapper);
+    }
+
+    private LocalDateTime getActiveBoundaryCreatedAt(AuditQuery auditQuery, boolean earliest) {
+        LambdaQueryWrapper<AuditLog> queryWrapper = buildActiveAuditQuery(
+            auditQuery.tenantId(),
+            auditQuery.knowledgeBaseId(),
+            auditQuery.normalizedObjectType(),
+            auditQuery.objectId(),
+            null
+        );
+        if (earliest) {
+            queryWrapper.orderByAsc(AuditLog::getCreatedAt).orderByAsc(AuditLog::getId);
+        } else {
+            queryWrapper.orderByDesc(AuditLog::getCreatedAt).orderByDesc(AuditLog::getId);
+        }
+        queryWrapper.last("LIMIT 1");
+        AuditLog auditLog = auditLogMapper.selectOne(queryWrapper);
+        return auditLog == null ? null : auditLog.getCreatedAt();
+    }
+
+    private LocalDateTime getArchivedBoundaryCreatedAt(AuditQuery auditQuery, boolean earliest) {
+        LambdaQueryWrapper<AuditLogArchive> queryWrapper = buildArchivedAuditQuery(auditQuery, null);
+        if (earliest) {
+            queryWrapper.orderByAsc(AuditLogArchive::getCreatedAt).orderByAsc(AuditLogArchive::getId);
+        } else {
+            queryWrapper.orderByDesc(AuditLogArchive::getCreatedAt).orderByDesc(AuditLogArchive::getId);
+        }
+        queryWrapper.last("LIMIT 1");
+        AuditLogArchive auditLogArchive = auditLogArchiveMapper.selectOne(queryWrapper);
+        return auditLogArchive == null ? null : auditLogArchive.getCreatedAt();
+    }
+
+    private LocalDateTime getArchivedBoundaryArchivedAt(AuditQuery auditQuery, boolean earliest) {
+        LambdaQueryWrapper<AuditLogArchive> queryWrapper = buildArchivedAuditQuery(auditQuery, null);
+        if (earliest) {
+            queryWrapper.orderByAsc(AuditLogArchive::getArchivedAt).orderByAsc(AuditLogArchive::getId);
+        } else {
+            queryWrapper.orderByDesc(AuditLogArchive::getArchivedAt).orderByDesc(AuditLogArchive::getId);
+        }
+        queryWrapper.last("LIMIT 1");
+        AuditLogArchive auditLogArchive = auditLogArchiveMapper.selectOne(queryWrapper);
+        return auditLogArchive == null ? null : auditLogArchive.getArchivedAt();
+    }
+
+    private List<AuditCsvRow> loadExportRows(AuditQuery auditQuery, String storageScope) {
+        int limit = resolveExportMaxSize();
+        List<AuditCsvRow> rows = new ArrayList<>();
+
+        if (AuditLogConstants.STORAGE_SCOPE_ACTIVE.equals(storageScope)
+            || AuditLogConstants.STORAGE_SCOPE_ALL.equals(storageScope)) {
+            LambdaQueryWrapper<AuditLog> activeQuery = buildActiveAuditQuery(
+                auditQuery.tenantId(),
+                auditQuery.knowledgeBaseId(),
+                auditQuery.normalizedObjectType(),
+                auditQuery.objectId(),
+                auditQuery.normalizedResultType()
+            );
+            activeQuery.orderByDesc(AuditLog::getCreatedAt)
+                .orderByDesc(AuditLog::getId)
+                .last("LIMIT " + limit);
+            rows.addAll(auditLogMapper.selectList(activeQuery).stream().map(AuditCsvRow::fromActive).toList());
+        }
+
+        if (AuditLogConstants.STORAGE_SCOPE_ARCHIVED.equals(storageScope)
+            || AuditLogConstants.STORAGE_SCOPE_ALL.equals(storageScope)) {
+            LambdaQueryWrapper<AuditLogArchive> archivedQuery = buildArchivedAuditQuery(auditQuery, null);
+            archivedQuery.orderByDesc(AuditLogArchive::getCreatedAt)
+                .orderByDesc(AuditLogArchive::getId)
+                .last("LIMIT " + limit);
+            rows.addAll(auditLogArchiveMapper.selectList(archivedQuery).stream().map(AuditCsvRow::fromArchived).toList());
+        }
+
+        rows.sort(Comparator
+            .comparing(AuditCsvRow::createdAt, Comparator.nullsLast(Comparator.reverseOrder()))
+            .thenComparing(AuditCsvRow::id, Comparator.nullsLast(Comparator.reverseOrder())));
+
+        if (rows.size() > limit) {
+            return new ArrayList<>(rows.subList(0, limit));
+        }
+        return rows;
+    }
+
+    private AuditLogArchive copyToArchive(AuditLog auditLog, LocalDateTime archivedAt) {
+        AuditLogArchive archive = new AuditLogArchive();
+        BeanUtils.copyProperties(auditLog, archive);
+        archive.setArchivedAt(archivedAt);
+        return archive;
+    }
+
     private String truncate(String value, int maxLength) {
         if (!StringUtils.hasText(value)) {
             return value;
@@ -387,26 +586,26 @@ public class AuditLogService {
         return vo;
     }
 
-    private String toCsvRow(AuditLog auditLog) {
+    private String toCsvRow(AuditCsvRow auditLog) {
         return String.join(",",
-            csvValue(auditLog.getId()),
-            csvValue(auditLog.getTenantId()),
-            csvValue(auditLog.getKnowledgeBaseId()),
-            csvValue(auditLog.getKnowledgeBaseName()),
-            csvValue(auditLog.getActorType()),
-            csvValue(auditLog.getActorUserId()),
-            csvValue(auditLog.getActorDisplayName()),
-            csvValue(auditLog.getActorRole()),
-            csvValue(auditLog.getObjectType()),
-            csvValue(auditLog.getObjectId()),
-            csvValue(auditLog.getObjectTitle()),
-            csvValue(auditLog.getActionType()),
-            csvValue(auditLog.getResultType()),
-            csvValue(auditLog.getDetail()),
-            csvValue(auditLog.getSourceType()),
-            csvValue(auditLog.getRequestMethod()),
-            csvValue(auditLog.getRequestPath()),
-            csvValue(auditLog.getCreatedAt())
+            csvValue(auditLog.id()),
+            csvValue(auditLog.tenantId()),
+            csvValue(auditLog.knowledgeBaseId()),
+            csvValue(auditLog.knowledgeBaseName()),
+            csvValue(auditLog.actorType()),
+            csvValue(auditLog.actorUserId()),
+            csvValue(auditLog.actorDisplayName()),
+            csvValue(auditLog.actorRole()),
+            csvValue(auditLog.objectType()),
+            csvValue(auditLog.objectId()),
+            csvValue(auditLog.objectTitle()),
+            csvValue(auditLog.actionType()),
+            csvValue(auditLog.resultType()),
+            csvValue(auditLog.detail()),
+            csvValue(auditLog.sourceType()),
+            csvValue(auditLog.requestMethod()),
+            csvValue(auditLog.requestPath()),
+            csvValue(auditLog.createdAt())
         );
     }
 
@@ -420,47 +619,113 @@ public class AuditLogService {
 
     private AuditLogCommand buildExportAuditCommand(
         AuditQuery auditQuery,
-        Long knowledgeBaseId,
-        Long objectId,
         String resultType,
+        String storageScope,
         int exportedCount) {
-        String objectType = AuditLogConstants.OBJECT_TENANT;
-        Long resolvedObjectId = auditQuery.tenantId();
-        String objectTitle = "租户审计导出";
-
-        if (AuditLogConstants.OBJECT_DOCUMENT.equals(auditQuery.normalizedObjectType()) && objectId != null) {
-            Document document = requireDocumentInCurrentTenant(objectId);
-            objectType = AuditLogConstants.OBJECT_DOCUMENT;
-            resolvedObjectId = document.getId();
-            objectTitle = document.getTitle();
-        } else if (AuditLogConstants.OBJECT_KNOWLEDGE_BASE.equals(auditQuery.normalizedObjectType()) && objectId != null) {
-            KnowledgeBase knowledgeBase = requireKnowledgeBaseInCurrentTenant(objectId);
-            objectType = AuditLogConstants.OBJECT_KNOWLEDGE_BASE;
-            resolvedObjectId = knowledgeBase.getId();
-            objectTitle = knowledgeBase.getName();
-        } else if (knowledgeBaseId != null) {
-            KnowledgeBase knowledgeBase = requireKnowledgeBaseInCurrentTenant(knowledgeBaseId);
-            objectType = AuditLogConstants.OBJECT_KNOWLEDGE_BASE;
-            resolvedObjectId = knowledgeBase.getId();
-            objectTitle = knowledgeBase.getName();
-        } else if (StringUtils.hasText(auditQuery.normalizedObjectType()) && objectId != null) {
-            objectType = auditQuery.normalizedObjectType();
-            resolvedObjectId = objectId;
-            objectTitle = "对象审计导出";
-        }
-
-        String detail = "导出审计 CSV " + exportedCount + " 条"
+        AuditTarget auditTarget = resolveAuditTarget(auditQuery);
+        String detail = "导出 " + storageScope + " 审计 CSV " + exportedCount + " 条"
             + (StringUtils.hasText(resultType) ? "，结果过滤 " + resultType.trim().toUpperCase(Locale.ROOT) : "");
         return AuditLogCommand.builder()
             .tenantId(auditQuery.tenantId())
-            .knowledgeBaseId(knowledgeBaseId)
-            .knowledgeBaseName(knowledgeBaseId == null ? null : requireKnowledgeBaseInCurrentTenant(knowledgeBaseId).getName())
-            .objectType(objectType)
-            .objectId(resolvedObjectId)
-            .objectTitle(objectTitle)
+            .knowledgeBaseId(auditTarget.knowledgeBaseId())
+            .knowledgeBaseName(auditTarget.knowledgeBaseName())
+            .objectType(auditTarget.objectType())
+            .objectId(auditTarget.objectId())
+            .objectTitle(auditTarget.objectTitle())
             .actionType(AuditLogConstants.ACTION_EXPORT_AUDIT_LOG)
             .detail(detail)
             .build();
+    }
+
+    private AuditLogCommand buildRetentionAuditCommand(
+        AuditQuery auditQuery,
+        LocalDateTime archiveBeforeCreatedAt,
+        long eligibleCount,
+        int archivedCount) {
+        AuditTarget auditTarget = resolveAuditTarget(auditQuery);
+        String detail = "执行审计归档，归档 " + archivedCount + "/" + eligibleCount
+            + " 条过期记录，保留阈值 " + resolveRetentionDaysValue()
+            + " 天，截止 " + archiveBeforeCreatedAt;
+        return AuditLogCommand.builder()
+            .tenantId(auditQuery.tenantId())
+            .knowledgeBaseId(auditTarget.knowledgeBaseId())
+            .knowledgeBaseName(auditTarget.knowledgeBaseName())
+            .objectType(auditTarget.objectType())
+            .objectId(auditTarget.objectId())
+            .objectTitle(auditTarget.objectTitle())
+            .actionType(AuditLogConstants.ACTION_APPLY_AUDIT_RETENTION)
+            .detail(detail)
+            .build();
+    }
+
+    private AuditTarget resolveAuditTarget(AuditQuery auditQuery) {
+        if (AuditLogConstants.OBJECT_DOCUMENT.equals(auditQuery.normalizedObjectType()) && auditQuery.objectId() != null) {
+            Document document = requireDocumentInCurrentTenant(auditQuery.objectId());
+            KnowledgeBase knowledgeBase = requireKnowledgeBaseInCurrentTenant(document.getKnowledgeBaseId());
+            return new AuditTarget(
+                AuditLogConstants.OBJECT_DOCUMENT,
+                document.getId(),
+                document.getTitle(),
+                knowledgeBase.getId(),
+                knowledgeBase.getName()
+            );
+        }
+        if (AuditLogConstants.OBJECT_KNOWLEDGE_BASE.equals(auditQuery.normalizedObjectType()) && auditQuery.objectId() != null) {
+            KnowledgeBase knowledgeBase = requireKnowledgeBaseInCurrentTenant(auditQuery.objectId());
+            return new AuditTarget(
+                AuditLogConstants.OBJECT_KNOWLEDGE_BASE,
+                knowledgeBase.getId(),
+                knowledgeBase.getName(),
+                knowledgeBase.getId(),
+                knowledgeBase.getName()
+            );
+        }
+        if (auditQuery.knowledgeBaseId() != null) {
+            KnowledgeBase knowledgeBase = requireKnowledgeBaseInCurrentTenant(auditQuery.knowledgeBaseId());
+            return new AuditTarget(
+                AuditLogConstants.OBJECT_KNOWLEDGE_BASE,
+                knowledgeBase.getId(),
+                knowledgeBase.getName(),
+                knowledgeBase.getId(),
+                knowledgeBase.getName()
+            );
+        }
+        if (StringUtils.hasText(auditQuery.normalizedObjectType()) && auditQuery.objectId() != null) {
+            return new AuditTarget(
+                auditQuery.normalizedObjectType(),
+                auditQuery.objectId(),
+                "对象审计治理",
+                null,
+                null
+            );
+        }
+        return new AuditTarget(
+            AuditLogConstants.OBJECT_TENANT,
+            auditQuery.tenantId(),
+            "租户审计治理",
+            null,
+            null
+        );
+    }
+
+    private LocalDateTime minTime(LocalDateTime left, LocalDateTime right) {
+        if (left == null) {
+            return right;
+        }
+        if (right == null) {
+            return left;
+        }
+        return left.isBefore(right) ? left : right;
+    }
+
+    private LocalDateTime maxTime(LocalDateTime left, LocalDateTime right) {
+        if (left == null) {
+            return right;
+        }
+        if (right == null) {
+            return left;
+        }
+        return left.isAfter(right) ? left : right;
     }
 
     private record ActorSnapshot(Long actorUserId, String actorDisplayName, String actorRole) {
@@ -469,10 +734,86 @@ public class AuditLogService {
     private record RequestSnapshot(String sourceType, String requestMethod, String requestPath) {
     }
 
+    private record AuditTarget(
+        String objectType,
+        Long objectId,
+        String objectTitle,
+        Long knowledgeBaseId,
+        String knowledgeBaseName) {
+    }
+
     private record AuditQuery(
         Long tenantId,
+        Long knowledgeBaseId,
         String normalizedObjectType,
+        Long objectId,
         String normalizedResultType,
         LambdaQueryWrapper<AuditLog> queryWrapper) {
+    }
+
+    private record AuditCsvRow(
+        Long id,
+        Long tenantId,
+        Long knowledgeBaseId,
+        String knowledgeBaseName,
+        String actorType,
+        Long actorUserId,
+        String actorDisplayName,
+        String actorRole,
+        String objectType,
+        Long objectId,
+        String objectTitle,
+        String actionType,
+        String resultType,
+        String detail,
+        String sourceType,
+        String requestMethod,
+        String requestPath,
+        LocalDateTime createdAt) {
+        private static AuditCsvRow fromActive(AuditLog auditLog) {
+            return new AuditCsvRow(
+                auditLog.getId(),
+                auditLog.getTenantId(),
+                auditLog.getKnowledgeBaseId(),
+                auditLog.getKnowledgeBaseName(),
+                auditLog.getActorType(),
+                auditLog.getActorUserId(),
+                auditLog.getActorDisplayName(),
+                auditLog.getActorRole(),
+                auditLog.getObjectType(),
+                auditLog.getObjectId(),
+                auditLog.getObjectTitle(),
+                auditLog.getActionType(),
+                auditLog.getResultType(),
+                auditLog.getDetail(),
+                auditLog.getSourceType(),
+                auditLog.getRequestMethod(),
+                auditLog.getRequestPath(),
+                auditLog.getCreatedAt()
+            );
+        }
+
+        private static AuditCsvRow fromArchived(AuditLogArchive auditLogArchive) {
+            return new AuditCsvRow(
+                auditLogArchive.getId(),
+                auditLogArchive.getTenantId(),
+                auditLogArchive.getKnowledgeBaseId(),
+                auditLogArchive.getKnowledgeBaseName(),
+                auditLogArchive.getActorType(),
+                auditLogArchive.getActorUserId(),
+                auditLogArchive.getActorDisplayName(),
+                auditLogArchive.getActorRole(),
+                auditLogArchive.getObjectType(),
+                auditLogArchive.getObjectId(),
+                auditLogArchive.getObjectTitle(),
+                auditLogArchive.getActionType(),
+                auditLogArchive.getResultType(),
+                auditLogArchive.getDetail(),
+                auditLogArchive.getSourceType(),
+                auditLogArchive.getRequestMethod(),
+                auditLogArchive.getRequestPath(),
+                auditLogArchive.getCreatedAt()
+            );
+        }
     }
 }

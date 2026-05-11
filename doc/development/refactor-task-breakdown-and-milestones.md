@@ -494,11 +494,11 @@ P3 目标：
 
 当前验收结果：
 
-- `OnlineDocumentApiIntegrationTest` 已覆盖认证 / 邀请审计、知识库 / 文档审计写入与查询、viewer 拒绝查询
+- `OnlineDocumentApiIntegrationTest` 已覆盖认证 / 邀请审计、知识库 / 文档审计写入与查询、viewer 拒绝查询、手动归档与归档导出
 - Web 首页已展示工作区最近审计记录
 - 知识库上下文面板已展示知识库和当前节点最近审计记录
 - 已覆盖失败登录、公开分享访问失败、Open API 并发冲突等高风险失败审计
-- Web 首页已展示审计汇总与 CSV 导出入口
+- Web 首页已展示审计汇总、活跃/归档导出与手动归档入口
 
 ---
 

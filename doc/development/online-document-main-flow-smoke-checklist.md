@@ -17,17 +17,20 @@
 启动命令：
 
 ```bash
-./start-backend.sh
+./start-backend-dev.sh
 ```
 
 当前已知状态：
 
 - 后端主链路的最小集成测试已具备
 - `start-backend.sh` 默认会通过共享脚本优先使用 `./gradlew`
+- `./start-backend.sh` 默认运行持久化配置，不加载种子账号，并把默认 H2 文件库固定到项目目录下的 `var/memora-runtime/`
+- `./start-backend-dev.sh` 会启用 `dev` profile，加载种子账号并开启 H2 控制台
 - 使用 wrapper 时会在仓库内设置 `GRADLE_USER_HOME`，避免写入用户主目录
 - 如果本地既没有可用的系统 Gradle，也没有已缓存的 wrapper 分发包，后端启动仍会受本机 Gradle 环境限制
 - 关键测试文件：
   - [OnlineDocumentApiIntegrationTest.java](../../memora-server/memora-server-start/src/test/java/com/memora/OnlineDocumentApiIntegrationTest.java)
+  - [DefaultRuntimeSafetyIntegrationTest.java](../../memora-server/memora-server-start/src/test/java/com/memora/DefaultRuntimeSafetyIntegrationTest.java)
 
 ### 2.2 Web
 
@@ -46,6 +49,8 @@ npm run dev
 - `npm run build` 已通过
 
 ### 2.3 本地种子账号
+
+以下种子账号只在后端以 `dev` profile 启动时可用：
 
 - `admin / 123456`
 - `editor / 123456`
@@ -67,7 +72,7 @@ npm run dev
 - admin 创建文档成功
 - admin 编辑文档并生成新版本成功
 - 关键操作审计写入与查询成功
-- 失败登录审计、审计汇总与 CSV 导出成功
+- 失败登录审计、审计汇总、活跃/归档 CSV 导出与手动归档成功
 - 文档受控分享创建、访问、撤销成功
 - Service Account / API key 创建、轮换、禁用与开放文档写入成功
 - viewer 查询工作区审计被拒绝成功
@@ -75,6 +80,7 @@ npm run dev
 - 知识库回收站与恢复成功
 - 文档回收站与恢复成功
 - 编辑后的文档详情、版本列表、知识库树、工作台列表可读回
+- 默认运行态拒绝 `demo:{tenantId}:{userId}` 且不会自动加载种子账号
 
 这部分主要由：
 

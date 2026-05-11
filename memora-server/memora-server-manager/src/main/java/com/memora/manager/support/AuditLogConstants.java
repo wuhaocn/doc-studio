@@ -36,6 +36,7 @@ public final class AuditLogConstants {
     public static final String ACTION_RESTORE_DOCUMENT = "RESTORE_DOCUMENT";
     public static final String ACTION_ROLLBACK_DOCUMENT = "ROLLBACK_DOCUMENT";
     public static final String ACTION_EXPORT_AUDIT_LOG = "EXPORT_AUDIT_LOG";
+    public static final String ACTION_APPLY_AUDIT_RETENTION = "APPLY_AUDIT_RETENTION";
     public static final String ACTION_CREATE_DOCUMENT_SHARE = "CREATE_DOCUMENT_SHARE";
     public static final String ACTION_REVOKE_DOCUMENT_SHARE = "REVOKE_DOCUMENT_SHARE";
     public static final String ACTION_ACCESS_DOCUMENT_SHARE = "ACCESS_DOCUMENT_SHARE";
@@ -53,6 +54,10 @@ public final class AuditLogConstants {
 
     public static final String RESULT_SUCCESS = "SUCCESS";
     public static final String RESULT_FAILURE = "FAILURE";
+
+    public static final String STORAGE_SCOPE_ACTIVE = "ACTIVE";
+    public static final String STORAGE_SCOPE_ARCHIVED = "ARCHIVED";
+    public static final String STORAGE_SCOPE_ALL = "ALL";
 
     public static final String SOURCE_DIRECT_API = "DIRECT_API";
     public static final String SOURCE_PUBLIC_SHARE = "PUBLIC_SHARE";

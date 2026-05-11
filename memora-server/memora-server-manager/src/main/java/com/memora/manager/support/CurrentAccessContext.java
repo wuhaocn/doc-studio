@@ -6,6 +6,7 @@ import com.memora.manager.entity.UserSession;
 import com.memora.manager.mapper.UserSessionMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
@@ -23,6 +24,9 @@ public class CurrentAccessContext {
     private static final String SESSION_TOKEN_PREFIX = "session:";
 
     private final UserSessionMapper userSessionMapper;
+
+    @Value("${memora.auth.allow-demo-token:false}")
+    private boolean allowDemoToken;
 
     public Long getCurrentTenantId() {
         return requireAccessTokenPayload().tenantId();
@@ -48,10 +52,6 @@ public class CurrentAccessContext {
 
     public boolean isCurrentSessionToken() {
         return requireAccessTokenPayload().sessionToken();
-    }
-
-    public String buildDemoAccessToken(Long tenantId, Long userId) {
-        return DEMO_TOKEN_PREFIX + tenantId + ":" + userId;
     }
 
     private AccessTokenPayload requireAccessTokenPayload() {
@@ -83,7 +83,7 @@ public class CurrentAccessContext {
         AccessTokenPayload resolvedPayload;
         if (token.startsWith(SESSION_TOKEN_PREFIX)) {
             resolvedPayload = resolveSessionAccessToken(token);
-        } else if (token.startsWith(DEMO_TOKEN_PREFIX)) {
+        } else if (allowDemoToken && token.startsWith(DEMO_TOKEN_PREFIX)) {
             resolvedPayload = resolveDemoAccessToken(token);
         } else {
             resolvedPayload = null;

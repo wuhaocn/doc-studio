@@ -6,7 +6,6 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
  * Web配置
- * 当前主链路使用 demo bearer token 作为统一会话入口。
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {

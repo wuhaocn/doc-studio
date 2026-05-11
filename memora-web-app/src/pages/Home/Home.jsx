@@ -29,6 +29,11 @@ const INVITE_STATUS = {
   REVOKED: 3,
 }
 
+const AUDIT_STORAGE_SCOPE_LABELS = {
+  ACTIVE: '活跃审计',
+  ARCHIVED: '归档审计',
+}
+
 const decorateInvite = (invite) => {
   if (!invite) {
     return null
@@ -82,7 +87,8 @@ const Home = () => {
   const [auditError, setAuditError] = useState('')
   const [auditSummary, setAuditSummary] = useState(null)
   const [auditSummaryLoading, setAuditSummaryLoading] = useState(false)
-  const [auditExporting, setAuditExporting] = useState(false)
+  const [auditExportingScope, setAuditExportingScope] = useState('')
+  const [auditRetentionRunning, setAuditRetentionRunning] = useState(false)
   const [serviceAccountModalOpen, setServiceAccountModalOpen] = useState(false)
   const canCreateKnowledgeBase = canCreateKnowledgeBaseForRole(currentUser?.role)
   const canInviteMembers = canInviteTenantMembersForRole(currentUser?.role)
@@ -348,19 +354,43 @@ const Home = () => {
   const recentDocuments = dashboard.recentDocuments || []
   const knowledgeBaseMap = new Map(knowledgeBases.map((item) => [item.id, item]))
 
-  const handleExportAuditLogs = async () => {
+  const handleExportAuditLogs = async (storageScope = 'ACTIVE') => {
     try {
-      setAuditExporting(true)
+      setAuditExportingScope(storageScope)
       setAuditError('')
-      await auditApi.exportAuditLogs()
-      await loadRecentAuditEvents()
-      await loadAuditSummary()
-      setFeedback({ type: 'success', message: '审计 CSV 已开始下载' })
+      await auditApi.exportAuditLogs({ storageScope })
+      await Promise.all([loadRecentAuditEvents(), loadAuditSummary()])
+      setFeedback({
+        type: 'success',
+        message: `${AUDIT_STORAGE_SCOPE_LABELS[storageScope] || '审计'} CSV 已开始下载`,
+      })
     } catch (error) {
       console.error('导出审计记录失败', error)
       setAuditError(error?.message || '导出审计记录失败，请稍后重试')
     } finally {
-      setAuditExporting(false)
+      setAuditExportingScope('')
+    }
+  }
+
+  const handleRunAuditRetention = async () => {
+    try {
+      setAuditRetentionRunning(true)
+      setAuditError('')
+      const response = await auditApi.runAuditRetention()
+      const archivedCount = response?.data?.archivedCount ?? 0
+      const remainingPendingArchiveCount = response?.data?.remainingPendingArchiveCount ?? 0
+      await Promise.all([loadRecentAuditEvents(), loadAuditSummary()])
+      setFeedback({
+        type: 'success',
+        message: archivedCount > 0
+          ? `已归档 ${archivedCount} 条过期审计记录，剩余待归档 ${remainingPendingArchiveCount} 条`
+          : '当前没有需要归档的过期审计记录',
+      })
+    } catch (error) {
+      console.error('执行审计归档失败', error)
+      setAuditError(error?.message || '执行审计归档失败，请稍后重试')
+    } finally {
+      setAuditRetentionRunning(false)
     }
   }
 
@@ -500,14 +530,32 @@ const Home = () => {
                 </div>
                 <div className={styles.auditHeaderActions}>
                   <span className={styles.stageMeta}>{recentAuditEvents.length} 条</span>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={auditExporting}
-                    onClick={handleExportAuditLogs}
-                  >
-                    {auditExporting ? '导出中...' : '导出 CSV'}
-                  </button>
+                  <div className={styles.auditActionButtons}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={Boolean(auditExportingScope) || auditRetentionRunning}
+                      onClick={handleRunAuditRetention}
+                    >
+                      {auditRetentionRunning ? '归档中...' : '执行归档'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={Boolean(auditExportingScope) || auditRetentionRunning}
+                      onClick={() => handleExportAuditLogs('ACTIVE')}
+                    >
+                      {auditExportingScope === 'ACTIVE' ? '导出中...' : '导出活跃 CSV'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={Boolean(auditExportingScope) || auditRetentionRunning}
+                      onClick={() => handleExportAuditLogs('ARCHIVED')}
+                    >
+                      {auditExportingScope === 'ARCHIVED' ? '导出中...' : '导出归档 CSV'}
+                    </button>
+                  </div>
                 </div>
               </div>
               <div className={styles.auditSummaryGrid}>
@@ -516,13 +564,33 @@ const Home = () => {
                   <strong>{auditSummaryLoading ? '...' : auditSummary?.totalCount ?? '-'}</strong>
                 </article>
                 <article className={styles.auditSummaryCard}>
+                  <span>活跃记录</span>
+                  <strong>{auditSummaryLoading ? '...' : auditSummary?.activeCount ?? '-'}</strong>
+                </article>
+                <article className={styles.auditSummaryCard}>
+                  <span>归档记录</span>
+                  <strong>{auditSummaryLoading ? '...' : auditSummary?.archivedCount ?? '-'}</strong>
+                </article>
+                <article className={styles.auditSummaryCard}>
                   <span>失败记录</span>
                   <strong>{auditSummaryLoading ? '...' : auditSummary?.failureCount ?? '-'}</strong>
                 </article>
                 <article className={styles.auditSummaryCard}>
-                  <span>长期留存</span>
+                  <span>待归档</span>
+                  <strong>{auditSummaryLoading ? '...' : auditSummary?.pendingArchiveCount ?? '-'}</strong>
+                </article>
+                <article className={styles.auditSummaryCard}>
+                  <span>归档阈值</span>
                   <strong>{auditSummaryLoading ? '...' : `${auditSummary?.configuredRetentionDays ?? '-'} 天`}</strong>
                 </article>
+              </div>
+              <div className={styles.auditGovernanceMeta}>
+                <span>
+                  最近归档：
+                  {auditSummary?.lastArchivedAt ? dayjs(auditSummary.lastArchivedAt).format('YYYY-MM-DD HH:mm') : '未执行'}
+                </span>
+                <span>单次批量：{auditSummary?.archiveBatchSize ?? '-'}</span>
+                <span>导出上限：{auditSummary?.exportMaxSize ?? '-'}</span>
               </div>
               <AuditEventList
                 events={recentAuditEvents}

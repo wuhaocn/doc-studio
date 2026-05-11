@@ -8,15 +8,27 @@ import java.time.LocalDateTime;
 public class AuditRetentionSummaryVO {
     private Integer configuredRetentionDays;
 
+    private Integer archiveBatchSize;
+
     private Integer exportMaxSize;
 
     private Long totalCount;
+
+    private Long activeCount;
+
+    private Long archivedCount;
 
     private Long successCount;
 
     private Long failureCount;
 
+    private Long pendingArchiveCount;
+
     private LocalDateTime earliestCreatedAt;
 
     private LocalDateTime latestCreatedAt;
+
+    private LocalDateTime archiveBeforeCreatedAt;
+
+    private LocalDateTime lastArchivedAt;
 }

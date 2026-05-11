@@ -9,8 +9,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -23,6 +26,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @SpringBootTest(classes = MemoraApplication.class)
 @AutoConfigureMockMvc
 @Transactional
+@ActiveProfiles("test")
 class OnlineDocumentApiIntegrationTest {
 
     @Autowired
@@ -1596,6 +1600,91 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItem("EXPORT_AUDIT_LOG")));
+    }
+
+    @Test
+    void shouldArchiveExpiredAuditLogsAndExportArchivedCsv() throws Exception {
+        String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+        LocalDateTime firstExpiredAt = LocalDateTime.now().minusDays(4100);
+        LocalDateTime secondExpiredAt = LocalDateTime.now().minusDays(3900);
+
+        jdbcTemplate.update("""
+            INSERT INTO audit_log (
+              id, tenant_id, knowledge_base_id, knowledge_base_name, actor_type, actor_user_id,
+              actor_display_name, actor_role, object_type, object_id, object_title, action_type,
+              result_type, detail, source_type, request_method, request_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            9001L, 1L, null, null, "USER", 1L,
+            "管理员", "OWNER", "TENANT", 1L, "旧成功审计", "LOGIN",
+            "SUCCESS", "过期成功记录", "DIRECT_API", "POST", "/api/v1/auth/login", firstExpiredAt
+        );
+        jdbcTemplate.update("""
+            INSERT INTO audit_log (
+              id, tenant_id, knowledge_base_id, knowledge_base_name, actor_type, actor_user_id,
+              actor_display_name, actor_role, object_type, object_id, object_title, action_type,
+              result_type, detail, source_type, request_method, request_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            9002L, 1L, null, null, "USER", 1L,
+            "管理员", "OWNER", "TENANT", 1L, "旧失败审计", "LOGIN",
+            "FAILURE", "过期失败记录", "DIRECT_API", "POST", "/api/v1/auth/login", secondExpiredAt
+        );
+
+        mockMvc.perform(get("/api/v1/audit-logs/summary")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.archiveBatchSize").value(200))
+            .andExpect(jsonPath("$.data.archivedCount").value(0))
+            .andExpect(jsonPath("$.data.pendingArchiveCount").value(2));
+
+        mockMvc.perform(post("/api/v1/audit-logs/retention/run")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.eligibleCount").value(2))
+            .andExpect(jsonPath("$.data.archivedCount").value(2))
+            .andExpect(jsonPath("$.data.remainingPendingArchiveCount").value(0))
+            .andExpect(jsonPath("$.data.archivedTotalCount").value(2));
+
+        Long activeExpiredCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM audit_log WHERE id IN (9001, 9002)",
+            Long.class
+        );
+        Long archivedExpiredCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM audit_log_archive WHERE id IN (9001, 9002)",
+            Long.class
+        );
+
+        assertTrue(activeExpiredCount != null && activeExpiredCount == 0L);
+        assertTrue(archivedExpiredCount != null && archivedExpiredCount == 2L);
+
+        mockMvc.perform(get("/api/v1/audit-logs/summary")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.archivedCount").value(2))
+            .andExpect(jsonPath("$.data.pendingArchiveCount").value(0))
+            .andExpect(jsonPath("$.data.lastArchivedAt").isNotEmpty());
+
+        String archivedCsv = mockMvc.perform(get("/api/v1/audit-logs/export")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .param("storageScope", "ARCHIVED"))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        assertTrue(archivedCsv.contains("旧成功审计"));
+        assertTrue(archivedCsv.contains("旧失败审计"));
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .param("size", "50"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItem("APPLY_AUDIT_RETENTION")));
     }
 
     @Test

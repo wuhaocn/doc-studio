@@ -20,7 +20,7 @@
 - 工作区统一搜索 V1
 - 文档版本快照与回滚
 - 文档与知识库软删除恢复接口
-- 关键操作审计、失败审计、汇总与导出
+- 关键操作审计、失败审计、汇总、导出与手动归档
 - 文档受控分享与外部只读访问
 - Service Account、API key 与开放文档接口
 - 初始化种子数据
@@ -62,7 +62,7 @@ memora-server/
 - Spring Boot 启动入口
 - `application.yml`
 - `schema.sql`
-- `data.sql`
+- `seed-data.sql`
 - 集成测试
 
 ---
@@ -81,6 +81,7 @@ memora-server/
 - `Document`
 - `DocumentVersion`
 - `AuditLog`
+- `AuditLogArchive`
 - `DocumentShareLink`
 - `ServiceAccount`
 - `ApiKey`
@@ -89,7 +90,7 @@ memora-server/
 数据库脚本：
 
 - [schema.sql](./memora-server-start/src/main/resources/db/schema.sql)
-- [data.sql](./memora-server-start/src/main/resources/db/data.sql)
+- [seed-data.sql](./memora-server-start/src/main/resources/db/seed-data.sql)
 
 ---
 
@@ -156,6 +157,7 @@ memora-server/
 - `GET /api/v1/audit-logs`
 - `GET /api/v1/audit-logs/summary`
 - `GET /api/v1/audit-logs/export`
+- `POST /api/v1/audit-logs/retention/run`
 
 ### 受控分享
 
@@ -197,6 +199,12 @@ memora-server/
 ./start-backend.sh
 ```
 
+本地开发如需种子账号、H2 控制台和 `demo` token 测试入口：
+
+```bash
+./start-backend-dev.sh
+```
+
 ### 验证
 
 ```bash
@@ -219,17 +227,22 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 
 - `com.memora.MemoraApplication`
 
-### 开发数据库
+### 运行配置
 
-默认开发环境使用 H2 内存库：
+默认运行配置使用持久化 H2 文件库：
 
-- JDBC URL: `jdbc:h2:mem:memora_doc`
+- JDBC URL: `jdbc:h2:file:./var/memora-runtime/memora_doc`
+- 通过 `./start-backend.sh` 启动时，会自动把文件库固定到启动脚本所在目录下的 `var/memora-runtime/memora_doc`，并自动创建目录
 - 用户名：`sa`
 - 密码：空
+- 默认不加载种子数据
+- 默认不接受 `Bearer demo:{tenantId}:{userId}`
 
-H2 控制台：
+`dev` profile 使用 H2 内存库并加载种子数据：
 
-- `http://localhost:8080/h2-console`
+- 启动命令：`./start-backend-dev.sh`
+- H2 控制台：`http://localhost:8080/h2-console`
+- 仅 `dev/test` profile 会开启 `demo` token 和种子账号
 
 ---
 
@@ -261,11 +274,11 @@ H2 控制台：
 - 工作区统一搜索 V1
 - 版本快照与回滚
 - 删除元数据与恢复接口
-- 关键操作审计与最小查询
+- 关键操作审计、最小查询与手动归档
 - Owner 注册、登录、登出、刷新与 session
 - 工作区邀请、邀请列表、撤销与接受邀请
 - bearer token 真实 session
-- 面向企业知识库场景的种子数据
+- 面向企业知识库场景的开发 / 测试种子数据
 
 ### 未实现
 
@@ -273,13 +286,13 @@ H2 控制台：
 - 更完整的会话治理与跨端一致性
 - 完整协作编辑模型
 - 更成熟的搜索质量、索引和回归覆盖
-- 更长期的归档型审计留存与批量治理
+- 独立归档服务与自动化批量治理
 
 ### 当前会话策略
 
 后端控制器已不再硬编码 tenant 或 user，主业务链路统一从 `CurrentAccessContext` 解析当前主体。
 
-当前本地种子账号：
+当前本地种子账号仅在 `dev/test` profile 下可用：
 
 - `admin / 123456`
 - `editor / 123456`
@@ -292,6 +305,8 @@ H2 控制台：
 
 除 `POST /api/v1/auth/login` 外，主流程接口都要求有效 bearer token。
 
+`Authorization: Bearer demo:{tenantId}:{userId}` 仅保留给 `dev/test` profile 和自动化验证，不属于默认运行态能力。
+
 ### 当前测试覆盖
 
 仓库已具备在线文档主流程的最小集成测试基线，包括：
@@ -301,7 +316,7 @@ H2 控制台：
 - 知识库创建
 - 文档树查询
 - 知识库 / 文档关键动作审计写入与查询
-- 失败登录审计、审计汇总与 CSV 导出
+- 失败登录审计、审计汇总、CSV 导出与手动归档
 - 文档受控分享生命周期与访问审计
 - Service Account / API key 与开放文档接口
 - 跨租户拒绝

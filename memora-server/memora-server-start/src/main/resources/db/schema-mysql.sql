@@ -199,6 +199,34 @@ CREATE INDEX `idx_audit_log_tenant_created_at` ON `audit_log` (`tenant_id`, `cre
 CREATE INDEX `idx_audit_log_kb_created_at` ON `audit_log` (`knowledge_base_id`, `created_at`);
 CREATE INDEX `idx_audit_log_object_created_at` ON `audit_log` (`object_type`, `object_id`, `created_at`);
 
+CREATE TABLE IF NOT EXISTS `audit_log_archive` (
+  `id` BIGINT PRIMARY KEY,
+  `tenant_id` BIGINT NOT NULL,
+  `knowledge_base_id` BIGINT DEFAULT NULL,
+  `knowledge_base_name` VARCHAR(120) DEFAULT NULL,
+  `actor_type` VARCHAR(30) NOT NULL,
+  `actor_user_id` BIGINT DEFAULT NULL,
+  `actor_display_name` VARCHAR(120) DEFAULT NULL,
+  `actor_role` VARCHAR(40) DEFAULT NULL,
+  `object_type` VARCHAR(40) NOT NULL,
+  `object_id` BIGINT DEFAULT NULL,
+  `object_title` VARCHAR(200) DEFAULT NULL,
+  `action_type` VARCHAR(60) NOT NULL,
+  `result_type` VARCHAR(30) NOT NULL,
+  `detail` VARCHAR(500) DEFAULT NULL,
+  `source_type` VARCHAR(60) DEFAULT NULL,
+  `request_method` VARCHAR(20) DEFAULT NULL,
+  `request_path` VARCHAR(255) DEFAULT NULL,
+  `created_at` DATETIME NOT NULL,
+  `archived_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT `fk_audit_log_archive_tenant` FOREIGN KEY (`tenant_id`) REFERENCES `tenant`(`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='审计归档表';
+
+CREATE INDEX `idx_audit_log_archive_tenant_created_at` ON `audit_log_archive` (`tenant_id`, `created_at`);
+CREATE INDEX `idx_audit_log_archive_kb_created_at` ON `audit_log_archive` (`knowledge_base_id`, `created_at`);
+CREATE INDEX `idx_audit_log_archive_object_created_at` ON `audit_log_archive` (`object_type`, `object_id`, `created_at`);
+CREATE INDEX `idx_audit_log_archive_archived_at` ON `audit_log_archive` (`archived_at`);
+
 CREATE TABLE IF NOT EXISTS `document_share_link` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
   `tenant_id` BIGINT NOT NULL,

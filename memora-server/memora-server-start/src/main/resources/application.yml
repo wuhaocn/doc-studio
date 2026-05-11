@@ -1,20 +1,14 @@
 spring:
   application:
     name: memora-server
-  # JDBC配置（用于MyBatis Plus，暂时保留）
   datasource:
     driver-class-name: org.h2.Driver
-    url: jdbc:h2:mem:memora_doc;MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
+    url: jdbc:h2:file:${MEMORA_DB_FILE:./var/memora-runtime/memora_doc};MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;AUTO_SERVER=TRUE
     username: sa
-    password: 
-  # R2DBC配置（用于响应式数据库访问）
-  r2dbc:
-    url: r2dbc:h2:mem:///memora_doc?options=MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH;DB_CLOSE_DELAY=-1
-    username: sa
-    password: 
+    password:
   h2:
     console:
-      enabled: true
+      enabled: false
       path: /h2-console
       settings:
         web-allow-others: false
@@ -22,17 +16,12 @@ spring:
     init:
       mode: always
       schema-locations: classpath:db/schema.sql
-      data-locations: classpath:db/data.sql
   jackson:
     time-zone: Asia/Shanghai
     date-format: yyyy-MM-dd HH:mm:ss
     serialization:
       write-dates-as-timestamps: false
-  # WebFlux配置
-  webflux:
-    base-path: /
 
-# MyBatis Plus配置
 mybatis-plus:
   configuration:
     map-underscore-to-camel-case: true
@@ -43,21 +32,22 @@ mybatis-plus:
   mapper-locations: classpath*:/mapper/**/*.xml
   type-aliases-package: com.memora.manager.entity
 
-# 服务器配置
 server:
   port: 8080
   servlet:
     context-path: /
 
-# 日志配置
 logging:
   level:
-    com.memora: debug
+    com.memora: info
     root: info
 
 memora:
+  auth:
+    allow-demo-token: false
   audit:
     retention-days: 3650
+    archive-batch-size: 200
     export-max-size: 1000
   share:
     default-expire-days: 7

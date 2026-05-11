@@ -24,6 +24,13 @@ export const auditApi = {
     })
   },
 
+  runAuditRetention: async (params = {}) => {
+    const { knowledgeBaseId, objectType, objectId } = params
+    return httpClient.post('/api/v1/audit-logs/retention/run', null, {
+      params: { knowledgeBaseId, objectType, objectId },
+    })
+  },
+
   exportAuditLogs: async (params = {}) => {
     const currentUser = getCurrentUser()
     const searchParams = new URLSearchParams()
@@ -51,8 +58,10 @@ export const auditApi = {
     const blob = await response.blob()
     const downloadUrl = window.URL.createObjectURL(blob)
     const anchor = document.createElement('a')
+    const contentDisposition = response.headers.get('content-disposition') || ''
+    const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/i)
     anchor.href = downloadUrl
-    anchor.download = 'memora-audit-log.csv'
+    anchor.download = filenameMatch?.[1] || 'memora-audit-log.csv'
     document.body.appendChild(anchor)
     anchor.click()
     document.body.removeChild(anchor)

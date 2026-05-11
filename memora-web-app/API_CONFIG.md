@@ -47,8 +47,11 @@ VITE_API_BASE_URL=http://localhost:8080
 
 说明：
 
-- 上述账号仅用于本地联调。
+- 上述账号仅在后端以 `dev` profile 启动时用于本地联调。
 - 从空环境进入产品应优先走 `Owner 注册 -> 邀请成员 -> 接受邀请`。
+- `/login` 默认只要求 `username + password`；`tenantSlug` 只在多工作区显式指定时展开。
+- `/register` 默认自动生成 `tenantSlug`；只有需要固定工作区地址时才手动展开填写。
+- `/accept-invite` 会优先从链接读取 `token`，邀请读取成功后会锁定受邀邮箱，避免与邀请记录不一致。
 
 ---
 
@@ -110,6 +113,7 @@ VITE_API_BASE_URL=http://localhost:8080
 - `GET /api/v1/audit-logs`
 - `GET /api/v1/audit-logs/summary`
 - `GET /api/v1/audit-logs/export`
+- `POST /api/v1/audit-logs/retention/run`
 
 查询参数：
 
@@ -119,6 +123,7 @@ VITE_API_BASE_URL=http://localhost:8080
 - `objectType`
 - `objectId`
 - `resultType`
+- `storageScope`：导出时支持 `ACTIVE`、`ARCHIVED`、`ALL`
 
 当前约束：
 
@@ -163,5 +168,5 @@ VITE_API_BASE_URL=http://localhost:8080
 1. Web 主链路已不再依赖 `demo:{tenantId}:{userId}` 占位 token。
 2. 登录、注册、邀请接受都会直接建立真实 session。
 3. 邀请链路已支持生成、查看、列出和撤销。
-4. 工作台首页已展示最近审计记录、汇总和导出入口，知识库上下文面板继续展示最近记录。
+4. 工作台首页已展示最近审计记录、汇总、活跃/归档导出和手动归档入口，知识库上下文面板继续展示最近记录。
 5. 文档受控分享、公开分享页、Service Account / API key 与开放文档接口已属于当前基线能力。

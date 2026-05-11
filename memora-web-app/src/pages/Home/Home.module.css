@@ -67,6 +67,13 @@
   transform: translateY(1px);
 }
 
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.66;
+  cursor: not-allowed;
+  transform: none;
+}
+
 .feedback {
   margin-top: 10px;
   padding: 12px 14px;
@@ -172,6 +179,13 @@
   gap: 8px;
 }
 
+.auditActionButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
 .stageHeader {
   padding-bottom: 10px;
   border-bottom: 1px solid rgba(15, 23, 42, 0.06);
@@ -210,6 +224,16 @@
   color: #111827;
   font-size: 18px;
   line-height: 1.2;
+}
+
+.auditGovernanceMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: -2px 0 16px;
+  color: #66707c;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .documentList,
@@ -396,6 +420,10 @@
   .auditHeaderActions {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .auditActionButtons {
+    justify-content: stretch;
   }
 
   .auditSummaryGrid {

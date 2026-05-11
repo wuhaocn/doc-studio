@@ -30,6 +30,7 @@ const ACTION_LABELS = {
   RESTORE_DOCUMENT: '恢复节点',
   ROLLBACK_DOCUMENT: '回滚文档版本',
   EXPORT_AUDIT_LOG: '导出审计记录',
+  APPLY_AUDIT_RETENTION: '执行审计归档',
   CREATE_DOCUMENT_SHARE: '创建受控分享',
   REVOKE_DOCUMENT_SHARE: '撤销受控分享',
   ACCESS_DOCUMENT_SHARE: '访问受控分享',
