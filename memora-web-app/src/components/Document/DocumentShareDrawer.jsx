@@ -33,6 +33,7 @@ const DocumentShareDrawer = ({
   onChanged,
 }) => {
   const [shares, setShares] = useState([])
+  const [latestCreatedShare, setLatestCreatedShare] = useState(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [revokingShareId, setRevokingShareId] = useState(null)
@@ -69,6 +70,7 @@ const DocumentShareDrawer = ({
     }
 
     setForm(DEFAULT_FORM)
+    setLatestCreatedShare(null)
     setErrorMessage('')
     setFeedback('')
     void loadShares()
@@ -91,12 +93,13 @@ const DocumentShareDrawer = ({
         accessCode: form.accessCode.trim() || undefined,
       })
       const createdShare = response?.data
+      setLatestCreatedShare(createdShare || null)
       await loadShares()
       await onChanged?.()
       setForm(DEFAULT_FORM)
       setFeedback(createdShare?.accessCodeProtected
-        ? '新的受控分享已创建，访问方需要访问码。'
-        : '新的受控分享已创建，可直接复制外链。')
+        ? '新的受控分享已创建，请立即复制外链；访问码沿用你刚输入的值，不会再次回显。'
+        : '新的受控分享已创建，请立即复制外链。')
     } catch (error) {
       console.error('创建受控分享失败', error)
       setErrorMessage(error?.message || '创建受控分享失败，请稍后重试')
@@ -124,6 +127,7 @@ const DocumentShareDrawer = ({
       setRevokingShareId(shareId)
       setErrorMessage('')
       await documentShareApi.revokeShare(shareId)
+      setLatestCreatedShare((current) => (current?.id === shareId ? null : current))
       await loadShares()
       await onChanged?.()
       setFeedback('受控分享已撤销，外部访问将立即被阻断')
@@ -201,6 +205,27 @@ const DocumentShareDrawer = ({
           </div>
         </form>
 
+        {latestCreatedShare?.shareUrl ? (
+          <section className={styles.historySection}>
+            <div className={styles.historyHeader}>
+              <strong>刚创建的分享</strong>
+              <span>仅展示一次</span>
+            </div>
+            <article className={styles.shareItem}>
+              <div className={styles.shareTopline}>
+                <strong>{latestCreatedShare.accessCodeProtected ? '需访问码' : '直接访问'}</strong>
+                <span>{latestCreatedShare.expiresAt ? `到期 ${dayjs(latestCreatedShare.expiresAt).format('YYYY-MM-DD HH:mm')}` : '未设置到期'}</span>
+              </div>
+              <div className={styles.shareLinkRow}>
+                <input readOnly value={resolveShareUrl(latestCreatedShare)} className={styles.shareInput} />
+                <button type="button" className={styles.secondaryButton} onClick={() => handleCopyShare(latestCreatedShare)}>
+                  复制
+                </button>
+              </div>
+            </article>
+          </section>
+        ) : null}
+
         <section className={styles.historySection}>
           <div className={styles.historyHeader}>
             <strong>已有分享</strong>
@@ -212,7 +237,6 @@ const DocumentShareDrawer = ({
           ) : shares.length > 0 ? (
             <div className={styles.shareList}>
               {shares.map((share) => {
-                const shareUrl = resolveShareUrl(share)
                 const statusText = share.expired && share.status === 1
                   ? '已过期'
                   : SHARE_STATUS_LABELS[share.status] || '未知状态'
@@ -223,13 +247,8 @@ const DocumentShareDrawer = ({
                       <strong>{statusText}</strong>
                       <span>{share.accessCodeProtected ? '需访问码' : '直接访问'}</span>
                     </div>
-                    <div className={styles.shareLinkRow}>
-                      <input readOnly value={shareUrl} className={styles.shareInput} />
-                      <button type="button" className={styles.secondaryButton} onClick={() => handleCopyShare(share)}>
-                        复制
-                      </button>
-                    </div>
                     <div className={styles.shareMeta}>
+                      <span>链接仅创建时展示，遗失请撤销后重新创建</span>
                       <span>到期 {share.expiresAt ? dayjs(share.expiresAt).format('YYYY-MM-DD HH:mm') : '未设置'}</span>
                       <span>创建于 {share.createdAt ? dayjs(share.createdAt).format('MM-DD HH:mm') : '刚刚'}</span>
                       <span>{share.lastAccessedAt ? `最近访问 ${dayjs(share.lastAccessedAt).format('MM-DD HH:mm')}` : '尚未访问'}</span>

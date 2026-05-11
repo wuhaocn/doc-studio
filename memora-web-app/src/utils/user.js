@@ -1,8 +1,10 @@
 const STORAGE_KEY = 'memora-auth-session'
 export const AUTH_SESSION_CHANGED_EVENT = 'memora:auth-session-changed'
+const primaryStorage = () => window.sessionStorage
+const legacyStorage = () => window.localStorage
 
 const normalizeSessionUser = (session) => {
-  if (!session?.userId || !session?.tenantId || !session?.accessToken) {
+  if (!session?.userId || !session?.tenantId) {
     return null
   }
 
@@ -19,23 +21,50 @@ const normalizeSessionUser = (session) => {
     industry: session.industry,
     planName: session.planName,
     role: session.role,
-    accessToken: session.accessToken,
+  }
+}
+
+const normalizeStoredUser = (storedUser) => {
+  if (!storedUser?.id || !storedUser?.tenantId) {
+    return null
+  }
+
+  return {
+    id: storedUser.id,
+    username: storedUser.username || `user-${storedUser.id}`,
+    nickname: storedUser.nickname || storedUser.username || `用户${storedUser.id}`,
+    email: storedUser.email || `${storedUser.id}@memora.local`,
+    avatar: storedUser.avatar || '',
+    status: storedUser.status ?? 1,
+    tenantId: storedUser.tenantId,
+    tenantName: storedUser.tenantName,
+    tenantSlug: storedUser.tenantSlug,
+    industry: storedUser.industry,
+    planName: storedUser.planName,
+    role: storedUser.role,
   }
 }
 
 const readStoredUser = () => {
   try {
-    const rawValue = window.localStorage.getItem(STORAGE_KEY)
+    const rawValue = primaryStorage().getItem(STORAGE_KEY) || legacyStorage().getItem(STORAGE_KEY)
     if (!rawValue) {
       return null
     }
 
     const parsed = JSON.parse(rawValue)
-    if (!parsed?.id || !parsed?.accessToken) {
+    const normalized = normalizeStoredUser(parsed)
+    if (!normalized) {
       return null
     }
 
-    return parsed
+    const normalizedValue = JSON.stringify(normalized)
+    if (!primaryStorage().getItem(STORAGE_KEY) || primaryStorage().getItem(STORAGE_KEY) !== normalizedValue) {
+      primaryStorage().setItem(STORAGE_KEY, normalizedValue)
+      legacyStorage().removeItem(STORAGE_KEY)
+    }
+
+    return normalized
   } catch (error) {
     console.error('读取本地会话失败', error)
     return null
@@ -48,12 +77,13 @@ const persistUser = (user) => {
   }
 
   const nextValue = JSON.stringify(user)
-  const currentValue = window.localStorage.getItem(STORAGE_KEY)
+  const currentValue = primaryStorage().getItem(STORAGE_KEY)
   if (currentValue === nextValue) {
     return user
   }
 
-  window.localStorage.setItem(STORAGE_KEY, nextValue)
+  primaryStorage().setItem(STORAGE_KEY, nextValue)
+  legacyStorage().removeItem(STORAGE_KEY)
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT, { detail: user }))
   return user
 }
@@ -68,7 +98,8 @@ export const hydrateCurrentUser = (session) => {
 }
 
 export const clearCurrentUser = () => {
-  window.localStorage.removeItem(STORAGE_KEY)
+  primaryStorage().removeItem(STORAGE_KEY)
+  legacyStorage().removeItem(STORAGE_KEY)
   window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT))
 }
 

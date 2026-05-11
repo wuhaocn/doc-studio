@@ -15,6 +15,7 @@ import com.memora.manager.mapper.UserAccountMapper;
 import com.memora.manager.support.AuditLogCommand;
 import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
+import com.memora.manager.support.OpaqueTokenCodec;
 import com.memora.manager.support.PasswordCodec;
 import com.memora.manager.support.TenantAccessService;
 import com.memora.manager.vo.AuthSessionVO;
@@ -48,6 +49,7 @@ public class TenantInviteService {
     private final UserAccountMapper userAccountMapper;
     private final TenantAccessService tenantAccessService;
     private final CurrentAccessContext currentAccessContext;
+    private final OpaqueTokenCodec opaqueTokenCodec;
     private final PasswordCodec passwordCodec;
     private final AuthService authService;
     private final AuditLogService auditLogService;
@@ -69,13 +71,14 @@ public class TenantInviteService {
 
         revokeActiveInvitesForEmail(tenantId, inviteeEmail, inviter.getUserId());
 
+        String rawInviteToken = UUID.randomUUID().toString().replace("-", "");
         TenantInvite invite = new TenantInvite();
         invite.setTenantId(tenantId);
         invite.setInviterUserId(inviter.getUserId());
         invite.setInviteeEmail(inviteeEmail);
         invite.setInviteeDisplayName(normalizeOptional(dto.getDisplayName()));
         invite.setRole(inviteRole);
-        invite.setInviteToken(UUID.randomUUID().toString().replace("-", ""));
+        invite.setInviteToken(opaqueTokenCodec.hash(rawInviteToken));
         invite.setStatus(STATUS_ACTIVE);
         invite.setExpiresAt(LocalDateTime.now().plusDays(resolveExpiresInDays(dto.getExpiresInDays())));
         invite.setCreatedAt(LocalDateTime.now());
@@ -93,7 +96,7 @@ public class TenantInviteService {
             .detail("创建工作区邀请，角色：" + inviteRole + "，接收邮箱：" + inviteeEmail)
             .build());
 
-        return convertInvite(invite, tenant, inviter.getDisplayName());
+        return convertInvite(invite, tenant, inviter.getDisplayName(), rawInviteToken);
     }
 
     public List<TenantInviteVO> listInvites() {
@@ -108,14 +111,14 @@ public class TenantInviteService {
             .last("LIMIT 50");
 
         return tenantInviteMapper.selectList(queryWrapper).stream()
-            .map(invite -> convertInvite(invite, tenant, resolveInviterDisplayName(invite)))
+            .map(invite -> convertInvite(invite, tenant, resolveInviterDisplayName(invite), null))
             .collect(Collectors.toList());
     }
 
     public TenantInviteVO getInvite(String inviteToken) {
         TenantInvite invite = requireActiveInvite(inviteToken);
         Tenant tenant = requireActiveTenant(invite.getTenantId());
-        return convertInvite(invite, tenant, resolveInviterDisplayName(invite));
+        return convertInvite(invite, tenant, resolveInviterDisplayName(invite), null);
     }
 
     @Transactional(rollbackFor = Exception.class)
@@ -199,7 +202,7 @@ public class TenantInviteService {
                 .build());
         }
 
-        return convertInvite(invite, tenant, resolveInviterDisplayName(invite));
+        return convertInvite(invite, tenant, resolveInviterDisplayName(invite), null);
     }
 
     private UserAccount resolveOrCreateUser(TenantInviteAcceptDTO dto) {
@@ -231,10 +234,16 @@ public class TenantInviteService {
             throw new BusinessException(401, "密码错误，请使用该账号原有密码接受邀请");
         }
 
+        if (passwordCodec.needsRehash(userByUsername.getPasswordHash())) {
+            userByUsername.setPasswordHash(passwordCodec.hash(dto.getPassword()));
+            userByUsername.setUpdatedAt(LocalDateTime.now());
+            userAccountMapper.updateById(userByUsername);
+        }
+
         return userByUsername;
     }
 
-    private TenantInviteVO convertInvite(TenantInvite invite, Tenant tenant, String inviterDisplayName) {
+    private TenantInviteVO convertInvite(TenantInvite invite, Tenant tenant, String inviterDisplayName, String rawInviteToken) {
         TenantInviteVO vo = new TenantInviteVO();
         vo.setId(invite.getId());
         vo.setTenantId(invite.getTenantId());
@@ -244,7 +253,7 @@ public class TenantInviteService {
         vo.setInviteeEmail(invite.getInviteeEmail());
         vo.setInviteeDisplayName(invite.getInviteeDisplayName());
         vo.setRole(invite.getRole());
-        vo.setInviteToken(invite.getInviteToken());
+        vo.setInviteToken(StringUtils.hasText(rawInviteToken) ? rawInviteToken : null);
         vo.setStatus(invite.getStatus());
         vo.setExpiresAt(invite.getExpiresAt());
         vo.setAcceptedByUserId(invite.getAcceptedByUserId());
@@ -256,16 +265,32 @@ public class TenantInviteService {
     }
 
     private TenantInvite requireActiveInvite(String inviteToken) {
-        LambdaQueryWrapper<TenantInvite> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(TenantInvite::getInviteToken, inviteToken)
-            .eq(TenantInvite::getStatus, STATUS_ACTIVE)
-            .gt(TenantInvite::getExpiresAt, LocalDateTime.now())
-            .last("LIMIT 1");
-        TenantInvite invite = tenantInviteMapper.selectOne(queryWrapper);
+        if (!StringUtils.hasText(inviteToken)) {
+            throw new BusinessException(404, "当前邀请不存在、已失效或已被使用");
+        }
+        String normalizedToken = inviteToken.trim();
+        String hashedToken = opaqueTokenCodec.hash(normalizedToken);
+        TenantInvite invite = findActiveInviteByStoredToken(hashedToken);
+        if (invite == null) {
+            invite = findActiveInviteByStoredToken(normalizedToken);
+            if (invite != null && normalizedToken.equals(invite.getInviteToken())) {
+                invite.setInviteToken(hashedToken);
+                tenantInviteMapper.updateById(invite);
+            }
+        }
         if (invite == null) {
             throw new BusinessException(404, "当前邀请不存在、已失效或已被使用");
         }
         return invite;
+    }
+
+    private TenantInvite findActiveInviteByStoredToken(String storedToken) {
+        LambdaQueryWrapper<TenantInvite> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(TenantInvite::getInviteToken, storedToken)
+            .eq(TenantInvite::getStatus, STATUS_ACTIVE)
+            .gt(TenantInvite::getExpiresAt, LocalDateTime.now())
+            .last("LIMIT 1");
+        return tenantInviteMapper.selectOne(queryWrapper);
     }
 
     private Tenant requireActiveTenant(Long tenantId) {

@@ -231,9 +231,13 @@ Axios 基础配置：
 
 - [axios.js](./src/services/http/axios.js)
 
-当前真实会话 token 形式：
+当前浏览器真实会话形式：
 
-- `Authorization: Bearer session:{opaqueToken}`
+- `HttpOnly Cookie`
+
+当前浏览器本地保存内容：
+
+- `sessionStorage` 只保存当前用户与工作区快照，不保存 bearer token
 
 本地种子账号：
 
@@ -245,6 +249,9 @@ Axios 基础配置：
 - 上述种子账号仅在后端以 `dev` profile 启动时可用；真实进入产品应优先走 Owner 注册和邀请接受。
 - Axios 在受保护请求遇到 `401` 时会先尝试一次 `refresh`，失败后再清空本地会话。
 - Axios 默认附带 `X-Memora-Client: memora-web-app`，用于后端审计来源标记。
+- 前端会优先把旧 `localStorage` 会话迁移到 `sessionStorage`，并清除其中遗留 bearer token。
+- 根页面已补 `Referrer-Policy: no-referrer`，减少公开分享 token 因外链资源被带出站外。
+- 邀请链接和文档分享链接都只在创建当下展示一次，历史列表只保留状态与治理动作。
 
 前端启动后会调用：
 

@@ -3,10 +3,16 @@ import { clearCurrentUser, getCurrentUser, hydrateCurrentUser } from '../../util
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
 
+const hasLocalSession = () => {
+  const currentUser = getCurrentUser()
+  return !!currentUser?.id && !!currentUser?.tenantId
+}
+
 // 创建axios实例
 const httpClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'X-Memora-Client': 'memora-web-app',
@@ -16,6 +22,7 @@ const httpClient = axios.create({
 const refreshClient = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
     'X-Memora-Client': 'memora-web-app',
@@ -28,7 +35,7 @@ const shouldAttemptRefresh = (config, code) => {
   return code === 401
     && !config?._skipAuthRefresh
     && !config?._retriedAuthRefresh
-    && !!getCurrentUser()?.accessToken
+    && hasLocalSession()
 }
 
 const refreshAccessToken = async () => {
@@ -36,12 +43,7 @@ const refreshAccessToken = async () => {
     return refreshPromise
   }
 
-  const currentUser = getCurrentUser()
-  refreshPromise = refreshClient.post('/api/v1/auth/refresh', {}, {
-    headers: currentUser?.accessToken
-      ? { Authorization: `Bearer ${currentUser.accessToken}` }
-      : {},
-  })
+  refreshPromise = refreshClient.post('/api/v1/auth/refresh', {})
     .then((response) => {
       const payload = response.data
       if (payload?.code !== 200) {
@@ -49,10 +51,10 @@ const refreshAccessToken = async () => {
       }
 
       const nextUser = hydrateCurrentUser(payload.data)
-      if (!nextUser?.accessToken) {
+      if (!nextUser?.id || !nextUser?.tenantId) {
         throw { code: 401, message: '会话刷新失败' }
       }
-      return nextUser.accessToken
+      return nextUser
     })
     .finally(() => {
       refreshPromise = null
@@ -71,34 +73,16 @@ const retryWithRefreshedSession = async (config, errorPayload) => {
   }
 
   try {
-    const nextAccessToken = await refreshAccessToken()
+    await refreshAccessToken()
     return httpClient({
       ...config,
       _retriedAuthRefresh: true,
-      headers: {
-        ...(config?.headers || {}),
-        Authorization: `Bearer ${nextAccessToken}`,
-      },
     })
   } catch (refreshError) {
     clearCurrentUser()
     return Promise.reject(errorPayload)
   }
 }
-
-// 请求拦截器
-httpClient.interceptors.request.use(
-  (config) => {
-    const currentUser = getCurrentUser()
-    if (currentUser?.accessToken) {
-      config.headers.Authorization = `Bearer ${currentUser.accessToken}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
 
 // 响应拦截器
 httpClient.interceptors.response.use(

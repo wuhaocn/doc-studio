@@ -1,4 +1,3 @@
-import { getCurrentUser } from '../../utils/user'
 import httpClient, { API_BASE_URL } from '../http/axios'
 
 export const auditApi = {
@@ -32,7 +31,6 @@ export const auditApi = {
   },
 
   exportAuditLogs: async (params = {}) => {
-    const currentUser = getCurrentUser()
     const searchParams = new URLSearchParams()
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null && value !== '') {
@@ -42,9 +40,9 @@ export const auditApi = {
 
     const response = await fetch(`${API_BASE_URL}/api/v1/audit-logs/export?${searchParams.toString()}`, {
       method: 'GET',
+      credentials: 'include',
       headers: {
         Accept: 'text/csv,application/json',
-        Authorization: currentUser?.accessToken ? `Bearer ${currentUser.accessToken}` : '',
         'X-Memora-Client': 'memora-web-app',
       },
     })

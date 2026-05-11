@@ -2,6 +2,9 @@ package com.memora;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.memora.manager.support.AuditLogConstants;
+import com.memora.manager.support.OpaqueTokenCodec;
+import jakarta.servlet.http.Cookie;
 import org.hamcrest.Matchers;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +24,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @SpringBootTest(classes = MemoraApplication.class)
@@ -28,6 +33,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 @Transactional
 @ActiveProfiles("test")
 class OnlineDocumentApiIntegrationTest {
+    private static final String WEB_CLIENT_HEADER = "X-Memora-Client";
+    private static final String WEB_CLIENT_VALUE = "memora-web-app";
+    private static final String SESSION_COOKIE_NAME = "MEMORA_SESSION";
 
     @Autowired
     private MockMvc mockMvc;
@@ -37,6 +45,9 @@ class OnlineDocumentApiIntegrationTest {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    private OpaqueTokenCodec opaqueTokenCodec;
 
     @Test
     void shouldRejectWorkspaceDashboardWithoutBearerToken() throws Exception {
@@ -88,6 +99,66 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(jsonPath("$.data.userId").value(1))
             .andExpect(jsonPath("$.data.role").value("OWNER"))
             .andExpect(jsonPath("$.data.accessToken").value(Matchers.startsWith("session:")));
+    }
+
+    @Test
+    void shouldUseHttpOnlyCookieSessionForWebClient() throws Exception {
+        String loginResponse = mockMvc.perform(post("/api/v1/auth/login")
+                .header(WEB_CLIENT_HEADER, WEB_CLIENT_VALUE)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "username": "admin",
+                      "password": "123456"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.username").value("admin"))
+            .andExpect(jsonPath("$.data.accessToken").doesNotExist())
+            .andReturn()
+            .getResponse()
+            .getHeader("Set-Cookie");
+
+        assertTrue(loginResponse != null && loginResponse.contains(SESSION_COOKIE_NAME + "="));
+        assertTrue(loginResponse.contains("HttpOnly"));
+
+        String sessionCookieValue = extractCookieValue(loginResponse, SESSION_COOKIE_NAME);
+        mockMvc.perform(get("/api/v1/auth/session")
+                .header(WEB_CLIENT_HEADER, WEB_CLIENT_VALUE)
+                .cookie(new Cookie(SESSION_COOKIE_NAME, sessionCookieValue)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.userId").value(1))
+            .andExpect(jsonPath("$.data.role").value("OWNER"))
+            .andExpect(jsonPath("$.data.accessToken").doesNotExist());
+    }
+
+    @Test
+    void shouldStoreSessionTokenAsHash() throws Exception {
+        String response = mockMvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "username": "admin",
+                      "password": "123456"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        String accessToken = objectMapper.readTree(response).path("data").path("accessToken").asText();
+        String storedToken = jdbcTemplate.queryForObject(
+            "SELECT access_token FROM user_session WHERE user_id = ? ORDER BY id DESC LIMIT 1",
+            String.class,
+            1L
+        );
+
+        assertNotEquals(accessToken, storedToken);
+        assertEquals(opaqueTokenCodec.hash(accessToken), storedToken);
     }
 
     @Test
@@ -156,7 +227,8 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.inviteeEmail").value("invited.editor@memora.local"))
-            .andExpect(jsonPath("$.data.role").value("EDITOR"));
+            .andExpect(jsonPath("$.data.role").value("EDITOR"))
+            .andExpect(jsonPath("$.data.inviteToken").doesNotExist());
 
         String acceptResponse = mockMvc.perform(post("/api/v1/invites/accept")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -218,6 +290,14 @@ class OnlineDocumentApiIntegrationTest {
         JsonNode inviteNode = objectMapper.readTree(inviteResponse).path("data");
         long inviteId = inviteNode.path("id").asLong();
         String inviteToken = inviteNode.path("inviteToken").asText();
+        String storedInviteToken = jdbcTemplate.queryForObject(
+            "SELECT invite_token FROM tenant_invite WHERE id = ?",
+            String.class,
+            inviteId
+        );
+
+        assertNotEquals(inviteToken, storedInviteToken);
+        assertEquals(opaqueTokenCodec.hash(inviteToken), storedInviteToken);
 
         mockMvc.perform(get("/api/v1/tenants/current/invites")
                 .header("Authorization", "Bearer " + ownerAccessToken))
@@ -225,7 +305,8 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data[0].id").value((int) inviteId))
             .andExpect(jsonPath("$.data[0].inviteeEmail").value("revoke.editor@memora.local"))
-            .andExpect(jsonPath("$.data[0].status").value(1));
+            .andExpect(jsonPath("$.data[0].status").value(1))
+            .andExpect(jsonPath("$.data[0].inviteToken").doesNotExist());
 
         mockMvc.perform(post("/api/v1/tenants/current/invites/{id}/revoke", inviteId)
                 .header("Authorization", "Bearer " + ownerAccessToken))
@@ -233,12 +314,47 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.id").value((int) inviteId))
             .andExpect(jsonPath("$.data.status").value(3))
-            .andExpect(jsonPath("$.data.revokedAt").isNotEmpty());
+            .andExpect(jsonPath("$.data.revokedAt").isNotEmpty())
+            .andExpect(jsonPath("$.data.inviteToken").doesNotExist());
 
         mockMvc.perform(get("/api/v1/invites/{token}", inviteToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(404))
             .andExpect(jsonPath("$.message").value("当前邀请不存在、已失效或已被使用"));
+    }
+
+    @Test
+    void shouldRedactPublicShareTokenFromAuditRequestPath() throws Exception {
+        String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+        String shareResponse = mockMvc.perform(post("/api/v1/document-shares")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "documentId": 2,
+                      "expiresInDays": 7
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        String shareToken = objectMapper.readTree(shareResponse).path("data").path("shareToken").asText();
+
+        mockMvc.perform(post("/api/v1/public-shares/{token}/access", shareToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        String requestPath = jdbcTemplate.queryForObject(
+            "SELECT request_path FROM audit_log WHERE action_type = ? ORDER BY id DESC LIMIT 1",
+            String.class,
+            AuditLogConstants.ACTION_ACCESS_DOCUMENT_SHARE
+        );
+        assertEquals("/api/v1/public-shares/[token]/access", requestPath);
     }
 
     @Test
@@ -1712,12 +1828,22 @@ class OnlineDocumentApiIntegrationTest {
         JsonNode shareNode = objectMapper.readTree(shareResponse).path("data");
         long shareId = shareNode.path("id").asLong();
         String shareToken = shareNode.path("shareToken").asText();
+        String storedShareToken = jdbcTemplate.queryForObject(
+            "SELECT share_token FROM document_share_link WHERE id = ?",
+            String.class,
+            shareId
+        );
+
+        assertNotEquals(shareToken, storedShareToken);
+        assertEquals(opaqueTokenCodec.hash(shareToken), storedShareToken);
 
         mockMvc.perform(get("/api/v1/documents/2/shares")
                 .header("Authorization", "Bearer " + ownerAccessToken))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
-            .andExpect(jsonPath("$.data[0].id").value((int) shareId));
+            .andExpect(jsonPath("$.data[0].id").value((int) shareId))
+            .andExpect(jsonPath("$.data[0].shareToken").doesNotExist())
+            .andExpect(jsonPath("$.data[0].shareUrl").doesNotExist());
 
         mockMvc.perform(get("/api/v1/public-shares/{token}", shareToken))
             .andExpect(status().isOk())
@@ -1930,5 +2056,17 @@ class OnlineDocumentApiIntegrationTest {
             .getContentAsString();
 
         return objectMapper.readTree(loginResponse).path("data").path("accessToken").asText();
+    }
+
+    private String extractCookieValue(String setCookieHeader, String cookieName) {
+        String cookiePrefix = cookieName + "=";
+        if (setCookieHeader == null || !setCookieHeader.startsWith(cookiePrefix)) {
+            return "";
+        }
+        int delimiterIndex = setCookieHeader.indexOf(';');
+        if (delimiterIndex < 0) {
+            return setCookieHeader.substring(cookiePrefix.length());
+        }
+        return setCookieHeader.substring(cookiePrefix.length(), delimiterIndex);
     }
 }

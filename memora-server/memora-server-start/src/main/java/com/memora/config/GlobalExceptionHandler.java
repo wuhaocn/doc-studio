@@ -9,6 +9,8 @@ import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.util.UUID;
+
 /**
  * 全局异常处理器
  */
@@ -21,7 +23,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException e) {
-        log.error("业务异常: {}", e.getMessage());
+        log.warn("业务异常: {}", e.getMessage());
         return Result.error(e.getCode(), e.getMessage());
     }
     
@@ -30,7 +32,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(BindException.class)
     public Result<Void> handleBindException(BindException e) {
-        log.error("参数校验异常: {}", e.getMessage());
+        log.warn("参数校验异常: {}", e.getMessage());
         String message = e.getBindingResult().getFieldErrors().stream()
             .map(error -> error.getField() + ": " + error.getDefaultMessage())
             .reduce((a, b) -> a + "; " + b)
@@ -40,7 +42,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public Result<Void> handleMethodArgumentNotValidException(MethodArgumentNotValidException e) {
-        log.error("请求体参数校验异常: {}", e.getMessage());
+        log.warn("请求体参数校验异常: {}", e.getMessage());
         String message = e.getBindingResult().getFieldErrors().stream()
             .map(error -> error.getField() + ": " + error.getDefaultMessage())
             .reduce((a, b) -> a + "; " + b)
@@ -61,8 +63,9 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public Result<Void> handleException(Exception e) {
-        log.error("系统异常", e);
-        return Result.error(500, "系统异常: " + e.getMessage());
+        String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
+        log.error("系统异常 requestId={}", requestId, e);
+        return Result.error(500, "系统异常，请稍后重试（requestId: " + requestId + "）");
     }
 
     private String resolveConflictMessage(String rootMessage) {

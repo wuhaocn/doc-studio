@@ -19,5 +19,7 @@ dependencies {
     
     // Validation
     implementation("org.springframework.boot:spring-boot-starter-validation:3.3.5")
-}
 
+    // Password hashing
+    implementation("org.springframework.security:spring-security-crypto:6.3.4")
+}

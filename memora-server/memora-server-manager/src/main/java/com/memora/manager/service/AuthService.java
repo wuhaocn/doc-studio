@@ -15,6 +15,7 @@ import com.memora.manager.mapper.UserSessionMapper;
 import com.memora.manager.support.AuditLogCommand;
 import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
+import com.memora.manager.support.OpaqueTokenCodec;
 import com.memora.manager.support.PasswordCodec;
 import com.memora.manager.support.SlugUtils;
 import com.memora.manager.vo.AuthSessionVO;
@@ -25,6 +26,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.UUID;
 
 @Service
@@ -37,6 +39,7 @@ public class AuthService {
     private final UserAccountMapper userAccountMapper;
     private final UserSessionMapper userSessionMapper;
     private final CurrentAccessContext currentAccessContext;
+    private final OpaqueTokenCodec opaqueTokenCodec;
     private final PasswordCodec passwordCodec;
     private final AuditLogService auditLogService;
 
@@ -108,6 +111,7 @@ public class AuthService {
             throw ex;
         }
         Tenant tenant = requireActiveTenant(member.getTenantId());
+        upgradePasswordHashIfNeeded(user, dto.getPassword());
         AuthSessionVO session = openSessionForTenantMember(user, tenant, member);
         auditLogService.recordSuccess(AuditLogCommand.builder()
             .tenantId(tenant.getId())
@@ -182,7 +186,7 @@ public class AuthService {
         UserSession session = new UserSession();
         session.setUserId(user.getId());
         session.setTenantId(tenant.getId());
-        session.setAccessToken(accessToken);
+        session.setAccessToken(opaqueTokenCodec.hash(accessToken));
         session.setStatus(1);
         session.setExpiresAt(LocalDateTime.now().plusDays(SESSION_EXPIRES_IN_DAYS));
         session.setLastActiveAt(LocalDateTime.now());
@@ -211,11 +215,7 @@ public class AuthService {
     }
 
     private void touchSession(String accessToken, TenantMember member) {
-        LambdaQueryWrapper<UserSession> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(UserSession::getAccessToken, accessToken)
-            .eq(UserSession::getStatus, 1)
-            .last("LIMIT 1");
-        UserSession session = userSessionMapper.selectOne(queryWrapper);
+        UserSession session = findActiveSessionByRawToken(accessToken);
         if (session != null) {
             session.setLastActiveAt(LocalDateTime.now());
             userSessionMapper.updateById(session);
@@ -230,11 +230,7 @@ public class AuthService {
             return;
         }
 
-        LambdaQueryWrapper<UserSession> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(UserSession::getAccessToken, currentAccessContext.getCurrentAccessToken())
-            .eq(UserSession::getStatus, 1)
-            .last("LIMIT 1");
-        UserSession session = userSessionMapper.selectOne(queryWrapper);
+        UserSession session = findActiveSessionByRawToken(currentAccessContext.getCurrentAccessToken());
         if (session == null) {
             return;
         }
@@ -263,6 +259,37 @@ public class AuthService {
                 .detail("主动退出当前工作区会话")
                 .build());
         }
+    }
+
+    private void upgradePasswordHashIfNeeded(UserAccount user, String rawPassword) {
+        if (user == null || !passwordCodec.needsRehash(user.getPasswordHash())) {
+            return;
+        }
+        user.setPasswordHash(passwordCodec.hash(rawPassword));
+        user.setUpdatedAt(LocalDateTime.now());
+        userAccountMapper.updateById(user);
+    }
+
+    private UserSession findActiveSessionByRawToken(String rawToken) {
+        String hashedToken = opaqueTokenCodec.hash(rawToken);
+        UserSession session = findActiveSessionByStoredToken(hashedToken);
+        if (session != null) {
+            return session;
+        }
+        session = findActiveSessionByStoredToken(rawToken);
+        if (session != null && Objects.equals(session.getAccessToken(), rawToken)) {
+            session.setAccessToken(hashedToken);
+            userSessionMapper.updateById(session);
+        }
+        return session;
+    }
+
+    private UserSession findActiveSessionByStoredToken(String storedToken) {
+        LambdaQueryWrapper<UserSession> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserSession::getAccessToken, storedToken)
+            .eq(UserSession::getStatus, 1)
+            .last("LIMIT 1");
+        return userSessionMapper.selectOne(queryWrapper);
     }
 
     private void auditFailedLogin(UserAccount user, AuthLoginDTO dto, String reason) {

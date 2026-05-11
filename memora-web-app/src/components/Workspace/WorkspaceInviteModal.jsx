@@ -152,16 +152,22 @@ const WorkspaceInviteModal = ({
                 <strong>{inviteResult.inviteeEmail}</strong>
                 <span>{inviteResult.role} · 截止 {inviteResult.expiresAtText}</span>
               </div>
-              <textarea value={inviteResult.inviteLink} readOnly rows={3} />
-              <div className={styles.inviteActions}>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => handleCopyInviteLink(inviteResult.inviteLink)}
-                >
-                  复制邀请链接
-                </button>
-              </div>
+              {inviteResult.inviteLink ? (
+                <>
+                  <textarea value={inviteResult.inviteLink} readOnly rows={3} />
+                  <div className={styles.inviteActions}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => handleCopyInviteLink(inviteResult.inviteLink)}
+                    >
+                      复制邀请链接
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className={styles.description}>该邀请链接只会在创建当下展示一次；若已丢失，请撤销后重新生成。</p>
+              )}
             </div>
           ) : null}
 
@@ -169,7 +175,7 @@ const WorkspaceInviteModal = ({
             <div className={styles.inviteHistoryHeader}>
               <div>
                 <strong>最近邀请</strong>
-                <span>查看当前工作区最近生成的邀请，并及时撤销过时链接。</span>
+                <span>这里只保留邀请状态；原始链接只在创建当下展示，丢失后需撤销重建。</span>
               </div>
               <button
                 type="button"
@@ -200,23 +206,14 @@ const WorkspaceInviteModal = ({
                     </div>
                     <div className={styles.inviteHistoryActions}>
                       {invite.canRevoke ? (
-                        <>
-                          <button
-                            type="button"
-                            className={styles.secondaryButton}
-                            onClick={() => handleCopyInviteLink(invite.inviteLink)}
-                          >
-                            复制链接
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.secondaryButton}
-                            onClick={() => onRevoke(invite.id)}
-                            disabled={revokingInviteId === invite.id}
-                          >
-                            {revokingInviteId === invite.id ? '撤销中...' : '撤销'}
-                          </button>
-                        </>
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          onClick={() => onRevoke(invite.id)}
+                          disabled={revokingInviteId === invite.id}
+                        >
+                          {revokingInviteId === invite.id ? '撤销中...' : '撤销'}
+                        </button>
                       ) : null}
                     </div>
                   </article>

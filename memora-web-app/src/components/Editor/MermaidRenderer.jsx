@@ -12,10 +12,10 @@ const initializeMermaid = async () => {
       mermaidInstance.initialize({
         startOnLoad: false,
         theme: 'default',
-        securityLevel: 'loose',
+        securityLevel: 'strict',
         flowchart: {
           useMaxWidth: true,
-          htmlLabels: true,
+          htmlLabels: false,
           curve: 'basis',
         },
         themeVariables: {

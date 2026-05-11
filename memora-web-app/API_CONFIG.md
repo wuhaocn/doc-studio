@@ -32,11 +32,12 @@ VITE_API_BASE_URL=http://localhost:8080
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/refresh`
 
-登录或接受邀请成功后，本地会保存：
+登录、注册、接受邀请、刷新或切换工作区成功后：
 
-- `Authorization: Bearer session:{opaqueToken}`
+- 后端会通过 `Set-Cookie` 下发 `HttpOnly` session cookie
+- `sessionStorage` 只保存当前用户与工作区快照，不保存 bearer token
 
-请求拦截器会自动带上 bearer token；当会话过期且本地仍持有 token 时，会先尝试一次 `refresh`，失败后再清空本地会话。
+Web 端请求默认开启 `withCredentials`；当会话过期且本地仍有当前用户快照时，会先尝试一次 `refresh`，失败后再清空本地会话。
 
 本地种子账号：
 
@@ -52,6 +53,8 @@ VITE_API_BASE_URL=http://localhost:8080
 - `/login` 默认只要求 `username + password`；`tenantSlug` 只在多工作区显式指定时展开。
 - `/register` 默认自动生成 `tenantSlug`；只有需要固定工作区地址时才手动展开填写。
 - `/accept-invite` 会优先从链接读取 `token`，邀请读取成功后会锁定受邀邮箱，避免与邀请记录不一致。
+- 邀请链接和文档分享链接都只在创建当下展示一次；如果丢失，需要撤销后重新创建。
+- 根页面默认声明 `Referrer-Policy: no-referrer`，公开分享页不应把 token 当作来源信息发给第三方站点。
 
 ---
 
@@ -166,7 +169,7 @@ VITE_API_BASE_URL=http://localhost:8080
 ## 当前说明
 
 1. Web 主链路已不再依赖 `demo:{tenantId}:{userId}` 占位 token。
-2. 登录、注册、邀请接受都会直接建立真实 session。
-3. 邀请链路已支持生成、查看、列出和撤销。
+2. Web 端真实会话默认通过 `HttpOnly Cookie` 维持，前端不再持有可读 bearer token。
+3. 邀请链路已支持生成、查看、列出和撤销，但原始邀请链接只在创建时展示一次。
 4. 工作台首页已展示最近审计记录、汇总、活跃/归档导出和手动归档入口，知识库上下文面板继续展示最近记录。
-5. 文档受控分享、公开分享页、Service Account / API key 与开放文档接口已属于当前基线能力。
+5. 文档受控分享、公开分享页、Service Account / API key 与开放文档接口已属于当前基线能力，原始分享链接同样只在创建时展示一次。

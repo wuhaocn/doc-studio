@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -24,6 +25,8 @@ public class CurrentAccessContext {
     private static final String SESSION_TOKEN_PREFIX = "session:";
 
     private final UserSessionMapper userSessionMapper;
+    private final OpaqueTokenCodec opaqueTokenCodec;
+    private final BrowserSessionSupport browserSessionSupport;
 
     @Value("${memora.auth.allow-demo-token:false}")
     private boolean allowDemoToken;
@@ -74,12 +77,14 @@ public class CurrentAccessContext {
             return accessTokenPayload;
         }
 
-        String authorization = request.getHeader(AUTHORIZATION_HEADER);
-        if (authorization == null || authorization.isBlank() || !authorization.startsWith(BEARER_PREFIX)) {
+        String token = resolveBearerToken(request);
+        if (!StringUtils.hasText(token)) {
+            token = browserSessionSupport.resolveSessionCookie(request);
+        }
+        if (!StringUtils.hasText(token)) {
             return null;
         }
 
-        String token = authorization.substring(BEARER_PREFIX.length()).trim();
         AccessTokenPayload resolvedPayload;
         if (token.startsWith(SESSION_TOKEN_PREFIX)) {
             resolvedPayload = resolveSessionAccessToken(token);
@@ -95,17 +100,37 @@ public class CurrentAccessContext {
         return resolvedPayload;
     }
 
+    private String resolveBearerToken(HttpServletRequest request) {
+        String authorization = request.getHeader(AUTHORIZATION_HEADER);
+        if (!StringUtils.hasText(authorization) || !authorization.startsWith(BEARER_PREFIX)) {
+            return null;
+        }
+        return authorization.substring(BEARER_PREFIX.length()).trim();
+    }
+
     private AccessTokenPayload resolveSessionAccessToken(String token) {
-        LambdaQueryWrapper<UserSession> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(UserSession::getAccessToken, token)
-            .eq(UserSession::getStatus, 1)
-            .gt(UserSession::getExpiresAt, LocalDateTime.now())
-            .last("LIMIT 1");
-        UserSession session = userSessionMapper.selectOne(queryWrapper);
+        String hashedToken = opaqueTokenCodec.hash(token);
+        UserSession session = findActiveSessionByStoredToken(hashedToken);
+        if (session == null) {
+            session = findActiveSessionByStoredToken(token);
+            if (session != null) {
+                session.setAccessToken(hashedToken);
+                userSessionMapper.updateById(session);
+            }
+        }
         if (session == null) {
             return null;
         }
         return new AccessTokenPayload(session.getTenantId(), session.getUserId(), token, true);
+    }
+
+    private UserSession findActiveSessionByStoredToken(String storedToken) {
+        LambdaQueryWrapper<UserSession> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(UserSession::getAccessToken, storedToken)
+            .eq(UserSession::getStatus, 1)
+            .gt(UserSession::getExpiresAt, LocalDateTime.now())
+            .last("LIMIT 1");
+        return userSessionMapper.selectOne(queryWrapper);
     }
 
     private AccessTokenPayload resolveDemoAccessToken(String token) {

@@ -1,8 +1,10 @@
 package com.memora.manager.vo;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import lombok.Data;
 
 @Data
+@JsonInclude(JsonInclude.Include.NON_NULL)
 public class AuthSessionVO {
     private String username;
 

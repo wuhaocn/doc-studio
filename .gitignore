@@ -71,6 +71,10 @@ release/
 *.tmp
 *.temp
 .cache/
+*.mv.db
+*.lock.db
+*.trace.db
+var/
 
 # Environment files
 .env

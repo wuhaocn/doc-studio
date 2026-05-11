@@ -237,6 +237,8 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 - 密码：空
 - 默认不加载种子数据
 - 默认不接受 `Bearer demo:{tenantId}:{userId}`
+- 默认不输出 MyBatis SQL stdout
+- 默认只接受显式允许的 Web Origin；可通过 `MEMORA_WEB_ALLOWED_ORIGINS` 覆盖
 
 `dev` profile 使用 H2 内存库并加载种子数据：
 
@@ -277,7 +279,7 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 - 关键操作审计、最小查询与手动归档
 - Owner 注册、登录、登出、刷新与 session
 - 工作区邀请、邀请列表、撤销与接受邀请
-- bearer token 真实 session
+- 真实 session 与浏览器 `HttpOnly Cookie`
 - 面向企业知识库场景的开发 / 测试种子数据
 
 ### 未实现
@@ -299,11 +301,21 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 - `reviewer / 123456`
 - `viewer / 123456`
 
-当前真实会话 token 形式：
+当前真实会话形式：
 
-- `Authorization: Bearer session:{opaqueToken}`
+- Web 管理台：`HttpOnly Cookie`
+- 直连或自动化客户端：`Authorization: Bearer session:{opaqueToken}`
 
-除 `POST /api/v1/auth/login` 外，主流程接口都要求有效 bearer token。
+当前安全收口：
+
+- `UserSession.access_token` 仅保存哈希值，后端不再明文落库存储真实 session token
+- 浏览器登录、注册、刷新、邀请接受和工作区切换默认下发 `HttpOnly Cookie`，响应体不再回传前端可读 token
+- 用户密码、API key 和分享访问码新写入时统一使用强哈希；历史 `SHA-256` 数据在首次成功校验后自动升级
+- 邀请 token 与公开分享 token 仅在创建当下明文返回一次，数据库与后续列表接口只保留哈希或脱敏结果
+- 公开分享与邀请访问路径进入审计前会先做 token 脱敏
+- 500 响应不再直接回显内部异常文本，只返回通用文案和 `requestId`
+
+除公开分享与邀请读取入口外，主流程接口都要求有效会话；Web 端默认通过 Cookie 续期，非浏览器客户端继续使用 bearer token。
 
 `Authorization: Bearer demo:{tenantId}:{userId}` 仅保留给 `dev/test` profile 和自动化验证，不属于默认运行态能力。
 

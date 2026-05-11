@@ -3,9 +3,13 @@ package com.memora.manager.controller;
 import com.memora.common.result.Result;
 import com.memora.manager.service.AuthService;
 import com.memora.manager.service.WorkspaceService;
+import com.memora.manager.support.BrowserSessionSupport;
 import com.memora.manager.vo.AuthSessionVO;
 import com.memora.manager.vo.WorkspaceMembershipVO;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,6 +24,7 @@ import java.util.List;
 public class WorkspaceAccessController {
     private final WorkspaceService workspaceService;
     private final AuthService authService;
+    private final BrowserSessionSupport browserSessionSupport;
 
     @GetMapping("/joined")
     public Result<List<WorkspaceMembershipVO>> listJoinedWorkspaces() {
@@ -27,7 +32,18 @@ public class WorkspaceAccessController {
     }
 
     @PostMapping("/{tenantId}/switch")
-    public Result<AuthSessionVO> switchWorkspace(@PathVariable("tenantId") Long tenantId) {
-        return Result.success(authService.switchWorkspace(tenantId));
+    public Result<AuthSessionVO> switchWorkspace(
+        @PathVariable("tenantId") Long tenantId,
+        HttpServletRequest request,
+        HttpServletResponse response
+    ) {
+        AuthSessionVO session = authService.switchWorkspace(tenantId);
+        if (!browserSessionSupport.isWebAppClient(request)) {
+            return Result.success(session);
+        }
+        if (StringUtils.hasText(session.getAccessToken())) {
+            browserSessionSupport.writeSessionCookie(response, session.getAccessToken());
+        }
+        return Result.success(browserSessionSupport.sanitizeBrowserSession(session));
     }
 }

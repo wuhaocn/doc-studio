@@ -158,7 +158,7 @@ const AcceptInvitePage = () => {
                     onChange={(event) => {
                       const nextToken = event.target.value
                       setToken(nextToken)
-                      if (inviteInfo?.inviteToken !== nextToken.trim()) {
+                      if (inviteInfo) {
                         setInviteInfo(null)
                       }
                     }}

@@ -3,7 +3,7 @@ import { authApi } from '../services/api/authApi'
 import { tenantInviteApi } from '../services/api/tenantInviteApi'
 import { workspaceApi } from '../services/api/workspaceApi'
 import { clearRememberedKnowledgeBase } from '../utils/knowledgeBaseRoute'
-import { AUTH_SESSION_CHANGED_EVENT, clearCurrentUser, getCurrentUser, hydrateCurrentUser, isLoggedIn } from '../utils/user'
+import { AUTH_SESSION_CHANGED_EVENT, clearCurrentUser, getCurrentUser, hydrateCurrentUser } from '../utils/user'
 
 const AuthContext = createContext(null)
 
@@ -14,27 +14,28 @@ export const AuthProvider = ({ children }) => {
   const [workspaceSwitching, setWorkspaceSwitching] = useState(false)
 
   const refreshCurrentSession = useCallback(async () => {
-    if (!isLoggedIn()) {
-      setCurrentUser(null)
-      return null
-    }
-
     try {
       const response = await authApi.getCurrentSession()
       if (response.code !== 200) {
-        return null
+        throw response
       }
 
-      return hydrateCurrentUser(response.data)
+      const nextUser = hydrateCurrentUser(response.data)
+      setCurrentUser(nextUser)
+      return nextUser
     } catch (error) {
-      console.error('同步当前会话失败', error)
+      if (error?.code !== 401) {
+        console.error('同步当前会话失败', error)
+      }
       clearCurrentUser()
+      setCurrentUser(null)
       return null
     }
   }, [])
 
   const loadJoinedWorkspaces = useCallback(async () => {
-    if (!isLoggedIn()) {
+    const currentSessionUser = getCurrentUser()
+    if (!currentSessionUser?.id || !currentSessionUser?.tenantId) {
       setJoinedWorkspaces([])
       return []
     }
@@ -66,13 +67,6 @@ export const AuthProvider = ({ children }) => {
     let cancelled = false
 
     const bootstrapSession = async () => {
-      if (!isLoggedIn()) {
-        if (!cancelled) {
-          setSessionLoading(false)
-        }
-        return
-      }
-
       await refreshCurrentSession()
       if (!cancelled) {
         setSessionLoading(false)
@@ -151,7 +145,7 @@ export const AuthProvider = ({ children }) => {
 
   const logout = useCallback(async () => {
     try {
-      if (isLoggedIn()) {
+      if (getCurrentUser()?.id) {
         await authApi.logout()
       }
     } catch (error) {
@@ -169,7 +163,7 @@ export const AuthProvider = ({ children }) => {
     sessionLoading,
     joinedWorkspaces,
     workspaceSwitching,
-    isAuthenticated: !!currentUser?.accessToken,
+    isAuthenticated: !!currentUser?.id && !!currentUser?.tenantId,
     login,
     registerOwner,
     acceptInvite,

@@ -50,6 +50,7 @@ public class AuditLogService {
     private static final int SOURCE_MAX_LENGTH = 60;
     private static final int METHOD_MAX_LENGTH = 20;
     private static final int PATH_MAX_LENGTH = 255;
+    private static final String TOKEN_PLACEHOLDER = "[token]";
 
     @Value("${memora.audit.retention-days:3650}")
     private Integer retentionDays;
@@ -205,7 +206,7 @@ public class AuditLogService {
         auditLog.setDetail(truncate(command.getDetail(), DETAIL_MAX_LENGTH));
         auditLog.setSourceType(truncate(requestSnapshot.sourceType(), SOURCE_MAX_LENGTH));
         auditLog.setRequestMethod(truncate(requestSnapshot.requestMethod(), METHOD_MAX_LENGTH));
-        auditLog.setRequestPath(truncate(requestSnapshot.requestPath(), PATH_MAX_LENGTH));
+        auditLog.setRequestPath(truncate(sanitizeRequestPath(requestSnapshot.requestPath()), PATH_MAX_LENGTH));
         auditLog.setCreatedAt(LocalDateTime.now());
         auditLogMapper.insert(auditLog);
     }
@@ -398,13 +399,21 @@ public class AuditLogService {
     }
 
     private RequestSnapshot resolveRequestSnapshot(AuditLogCommand command) {
+        String commandSourceType = normalizeSourceType(command.getSourceType());
+        String commandRequestMethod = command.getRequestMethod();
+        String commandRequestPath = sanitizeRequestPath(command.getRequestPath());
         if (StringUtils.hasText(command.getSourceType())
             || StringUtils.hasText(command.getRequestMethod())
             || StringUtils.hasText(command.getRequestPath())) {
+            if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
+                return new RequestSnapshot(commandSourceType, commandRequestMethod, commandRequestPath);
+            }
+            HttpServletRequest request = attributes.getRequest();
+            String clientHeader = request.getHeader(CLIENT_HEADER);
             return new RequestSnapshot(
-                normalizeSourceType(command.getSourceType()),
-                command.getRequestMethod(),
-                command.getRequestPath()
+                StringUtils.hasText(command.getSourceType()) ? commandSourceType : normalizeSourceType(clientHeader),
+                StringUtils.hasText(commandRequestMethod) ? commandRequestMethod : request.getMethod(),
+                StringUtils.hasText(commandRequestPath) ? commandRequestPath : sanitizeRequestPath(request.getRequestURI())
             );
         }
         if (!(RequestContextHolder.getRequestAttributes() instanceof ServletRequestAttributes attributes)) {
@@ -416,8 +425,18 @@ public class AuditLogService {
         return new RequestSnapshot(
             normalizeSourceType(clientHeader),
             request.getMethod(),
-            request.getRequestURI()
+            sanitizeRequestPath(request.getRequestURI())
         );
+    }
+
+    private String sanitizeRequestPath(String requestPath) {
+        if (!StringUtils.hasText(requestPath)) {
+            return requestPath;
+        }
+        return requestPath.trim()
+            .replaceAll("(/api/v1/public-shares/)[^/]+", "$1" + TOKEN_PLACEHOLDER)
+            .replaceAll("(/api/v1/invites/)[^/]+", "$1" + TOKEN_PLACEHOLDER)
+            .replaceAll("(/share/)[^/]+", "$1" + TOKEN_PLACEHOLDER);
     }
 
     private String normalizeSourceType(String sourceType) {

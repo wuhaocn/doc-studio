@@ -53,7 +53,7 @@ const decorateInvite = (invite) => {
     expired,
     statusText,
     canRevoke: invite.status === INVITE_STATUS.ACTIVE && !expired,
-    inviteLink: `${window.location.origin}/accept-invite?token=${invite.inviteToken}`,
+    inviteLink: invite.inviteToken ? `${window.location.origin}/accept-invite?token=${invite.inviteToken}` : '',
     expiresAtText: invite.expiresAt ? dayjs(invite.expiresAt).format('YYYY-MM-DD HH:mm') : '未设置',
     createdAtText: invite.createdAt ? dayjs(invite.createdAt).format('YYYY-MM-DD HH:mm') : '刚刚',
   }

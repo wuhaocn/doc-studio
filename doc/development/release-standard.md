@@ -150,6 +150,8 @@
 - 确认数据库脚本和版本兼容性
 - 确认前后端构建产物一致
 - 优先通过 `./scripts/release-build.sh` 生成统一发布目录
+- 确认 `release/BUILD_INFO.txt` 与 `release/README.md` 已生成，便于交付时说明构建来源和启动方式
+- 确认运行态数据库文件 `var/` 未被重新纳入版本控制
 - 确认回滚方式可执行
 - 如果项目接入 `ai-context/share-skills/`，确认：
   - 事实源目录是唯一修改来源

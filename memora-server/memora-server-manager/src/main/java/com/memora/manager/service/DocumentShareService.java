@@ -13,6 +13,7 @@ import com.memora.manager.mapper.KnowledgeBaseMapper;
 import com.memora.manager.support.AuditLogCommand;
 import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
+import com.memora.manager.support.OpaqueTokenCodec;
 import com.memora.manager.support.OpaqueTokenGenerator;
 import com.memora.manager.support.PasswordCodec;
 import com.memora.manager.support.TenantAccessService;
@@ -42,6 +43,7 @@ public class DocumentShareService {
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final TenantAccessService tenantAccessService;
     private final CurrentAccessContext currentAccessContext;
+    private final OpaqueTokenCodec opaqueTokenCodec;
     private final OpaqueTokenGenerator opaqueTokenGenerator;
     private final PasswordCodec passwordCodec;
     private final AuditLogService auditLogService;
@@ -49,13 +51,14 @@ public class DocumentShareService {
     public DocumentShareLinkVO createShare(DocumentShareCreateDTO dto) {
         ShareContext context = requireManageableDocument(dto.getDocumentId());
         String actorRole = tenantAccessService.requireKnowledgeBaseManageAccess(context.knowledgeBase());
-        String shareToken = opaqueTokenGenerator.generate("share_");
+        String rawShareToken = opaqueTokenGenerator.generate("share_");
+        String hashedShareToken = opaqueTokenCodec.hash(rawShareToken);
         DocumentShareLink shareLink = new DocumentShareLink();
         shareLink.setTenantId(context.knowledgeBase().getTenantId());
         shareLink.setKnowledgeBaseId(context.knowledgeBase().getId());
         shareLink.setDocumentId(context.document().getId());
-        shareLink.setShareToken(shareToken);
-        shareLink.setSecretHash(passwordCodec.hash(shareToken));
+        shareLink.setShareToken(hashedShareToken);
+        shareLink.setSecretHash(hashedShareToken);
         shareLink.setStatus(SHARE_STATUS_ACTIVE);
         shareLink.setExpiresAt(LocalDateTime.now().plusDays(resolveExpiresInDays(dto.getExpiresInDays())));
         shareLink.setAccessCodeHash(StringUtils.hasText(dto.getAccessCode()) ? passwordCodec.hash(dto.getAccessCode().trim()) : null);
@@ -76,7 +79,7 @@ public class DocumentShareService {
             .actionType(AuditLogConstants.ACTION_CREATE_DOCUMENT_SHARE)
             .detail("创建文档受控分享" + (shareLink.getAccessCodeHash() != null ? "，需访问码" : ""))
             .build());
-        return convertToVO(shareLink, context.document());
+        return convertToVO(shareLink, context.document(), rawShareToken);
     }
 
     public List<DocumentShareLinkVO> listShares(Long documentId) {
@@ -87,7 +90,7 @@ public class DocumentShareService {
             .orderByDesc(DocumentShareLink::getCreatedAt)
             .orderByDesc(DocumentShareLink::getId);
         return documentShareLinkMapper.selectList(queryWrapper).stream()
-            .map(item -> convertToVO(item, context.document()))
+            .map(item -> convertToVO(item, context.document(), null))
             .toList();
     }
 
@@ -132,10 +135,15 @@ public class DocumentShareService {
     public PublicShareDocumentVO accessPublicShare(String token, PublicShareAccessDTO dto) {
         ShareContext context = requirePublicShare(token, true, null);
         String accessCode = dto == null ? null : dto.getAccessCode();
+        String normalizedAccessCode = StringUtils.hasText(accessCode) ? accessCode.trim() : null;
         if (StringUtils.hasText(context.shareLink().getAccessCodeHash())
-            && !passwordCodec.matches(StringUtils.hasText(accessCode) ? accessCode.trim() : null, context.shareLink().getAccessCodeHash())) {
+            && !passwordCodec.matches(normalizedAccessCode, context.shareLink().getAccessCodeHash())) {
             auditShareFailure(context, "访问码错误");
             throw new BusinessException(403, "当前分享访问码错误");
+        }
+        if (StringUtils.hasText(context.shareLink().getAccessCodeHash())
+            && passwordCodec.needsRehash(context.shareLink().getAccessCodeHash())) {
+            context.shareLink().setAccessCodeHash(passwordCodec.hash(normalizedAccessCode));
         }
 
         context.shareLink().setLastAccessedAt(LocalDateTime.now());
@@ -221,8 +229,25 @@ public class DocumentShareService {
         if (!StringUtils.hasText(token)) {
             return null;
         }
+        String normalizedToken = token.trim();
+        String hashedToken = opaqueTokenCodec.hash(normalizedToken);
+        DocumentShareLink shareLink = findShareByStoredToken(hashedToken);
+        if (shareLink != null) {
+            return shareLink;
+        }
+        shareLink = findShareByStoredToken(normalizedToken);
+        if (shareLink != null && normalizedToken.equals(shareLink.getShareToken())) {
+            shareLink.setShareToken(hashedToken);
+            shareLink.setSecretHash(hashedToken);
+            shareLink.setUpdatedAt(LocalDateTime.now());
+            documentShareLinkMapper.updateById(shareLink);
+        }
+        return shareLink;
+    }
+
+    private DocumentShareLink findShareByStoredToken(String storedToken) {
         LambdaQueryWrapper<DocumentShareLink> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(DocumentShareLink::getShareToken, token.trim()).last("LIMIT 1");
+        queryWrapper.eq(DocumentShareLink::getShareToken, storedToken).last("LIMIT 1");
         return documentShareLinkMapper.selectOne(queryWrapper);
     }
 
@@ -257,15 +282,15 @@ public class DocumentShareService {
         return expiresInDays == null || expiresInDays <= 0 ? defaultExpireDays : expiresInDays;
     }
 
-    private DocumentShareLinkVO convertToVO(DocumentShareLink shareLink, Document document) {
+    private DocumentShareLinkVO convertToVO(DocumentShareLink shareLink, Document document, String rawShareToken) {
         DocumentShareLinkVO vo = new DocumentShareLinkVO();
         vo.setId(shareLink.getId());
         vo.setTenantId(shareLink.getTenantId());
         vo.setKnowledgeBaseId(shareLink.getKnowledgeBaseId());
         vo.setDocumentId(shareLink.getDocumentId());
         vo.setDocumentTitle(document == null ? null : document.getTitle());
-        vo.setShareToken(shareLink.getShareToken());
-        vo.setShareUrl("/share/" + shareLink.getShareToken());
+        vo.setShareToken(StringUtils.hasText(rawShareToken) ? rawShareToken : null);
+        vo.setShareUrl(StringUtils.hasText(rawShareToken) ? "/share/" + rawShareToken : null);
         vo.setStatus(shareLink.getStatus());
         vo.setExpired(shareLink.getExpiresAt() != null && shareLink.getExpiresAt().isBefore(LocalDateTime.now()));
         vo.setAccessCodeProtected(StringUtils.hasText(shareLink.getAccessCodeHash()));
