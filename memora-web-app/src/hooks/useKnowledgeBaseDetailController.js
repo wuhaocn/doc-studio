@@ -1,4 +1,6 @@
 import { useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useConfirm } from '../components/Feedback/ConfirmDialog'
+import { useToast } from '../components/Feedback/Toast'
 import { documentApi } from '../services/api/documentApi'
 import { knowledgeBaseApi } from '../services/api/knowledgeBaseApi'
 import { workspaceApi } from '../services/api/workspaceApi'
@@ -29,6 +31,8 @@ export const PAGE_STATUS = {
 }
 
 export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, locationState }) => {
+  const confirm = useConfirm()
+  const toast = useToast()
   const [pageStatus, setPageStatus] = useState(PAGE_STATUS.LOADING)
   const [pageErrorMessage, setPageErrorMessage] = useState('')
   const [knowledgeBase, setKnowledgeBase] = useState(null)
@@ -38,7 +42,6 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
   const [editing, setEditing] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [modalError, setModalError] = useState('')
-  const [feedback, setFeedback] = useState(null)
   const [documentModalOpen, setDocumentModalOpen] = useState(false)
   const [documentModalMode, setDocumentModalMode] = useState('create')
   const [documentModalType, setDocumentModalType] = useState('DOC')
@@ -255,7 +258,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setEditing(false)
       await loadData()
       emitKnowledgeBasesChanged()
-      setFeedback({ type: 'success', message: `知识库“${formData.name}”已更新` })
+      toast.success(`知识库”${formData.name}”已更新`)
     } catch (error) {
       console.error('更新知识库失败', error)
       setModalError(error?.message || '更新知识库失败，请稍后重试')
@@ -325,10 +328,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
         loadDeletedDocuments(),
       ])
       setSelectedDocumentId(documentId)
-      setFeedback({
-        type: 'success',
-        message: '文档已从回收站恢复',
-      })
+      toast.success('文档已从回收站恢复')
     } catch (error) {
       console.error('恢复文档失败', error)
       setDocumentTrashError(error?.message || '恢复文档失败，请稍后重试')
@@ -348,10 +348,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setPermissionModalOpen(false)
       await loadData()
       emitKnowledgeBasesChanged()
-      setFeedback({
-        type: 'success',
-        message: members.length > 0 ? '知识库独立权限已更新' : '知识库已恢复继承租户权限',
-      })
+      toast.success(members.length > 0 ? '知识库独立权限已更新' : '知识库已恢复继承租户权限')
     } catch (error) {
       console.error('保存知识库权限配置失败', error)
       setPermissionError(error?.message || '保存知识库权限配置失败，请稍后重试')
@@ -500,10 +497,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
         if (documentModalType === 'DOC') {
           navigateToEditor(createdDocumentId)
         }
-        setFeedback({
-          type: 'success',
-          message: `${TYPE_LABELS[documentModalType] || documentModalType}“${formData.title}”已创建`,
-        })
+        toast.success(`${TYPE_LABELS[documentModalType] || documentModalType}”${formData.title}”已创建`)
         return
       }
 
@@ -519,10 +513,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setDocumentModalOpen(false)
       await loadData()
       setSelectedDocumentId(selectedDocument.id)
-      setFeedback({
-        type: 'success',
-        message: `${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}“${formData.title}”已更新`,
-      })
+      toast.success(`${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}”${formData.title}”已更新`)
     } catch (error) {
       console.error('保存文档节点失败', error)
       setDocumentModalError(error?.message || '保存文档节点失败，请稍后重试')
@@ -536,21 +527,22 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       return
     }
 
-    if (!window.confirm(`确认删除${TYPE_LABELS[selectedDocument.docType] || '节点'}“${selectedDocument.title}”吗？`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: '确认删除',
+      description: `确认删除${TYPE_LABELS[selectedDocument.docType] || '节点'}”${selectedDocument.title}”吗？删除后可在文档回收站恢复。`,
+      confirmLabel: '确认删除',
+      danger: true,
+    })
+    if (!confirmed) return
 
     try {
       await documentApi.deleteDocument(selectedDocument.id)
       setSelectedDocumentId(null)
       await loadData()
-      setFeedback({
-        type: 'success',
-        message: `${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}“${selectedDocument.title}”已删除，可在文档回收站恢复`,
-      })
+      toast.success(`${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}”${selectedDocument.title}”已删除，可在文档回收站恢复`)
     } catch (error) {
       console.error('删除文档节点失败', error)
-      setFeedback({ type: 'error', message: error?.message || '删除文档节点失败，请稍后重试' })
+      toast.error(error?.message || '删除文档节点失败，请稍后重试')
     }
   }
 
@@ -577,13 +569,10 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       )
       await loadData()
       setSelectedDocumentId(selectedDocument.id)
-      setFeedback({
-        type: 'success',
-        message: `已调整${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}“${selectedDocument.title}”的顺序`,
-      })
+      toast.success(`已调整${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}”${selectedDocument.title}”的顺序`)
     } catch (error) {
       console.error('调整文档顺序失败', error)
-      setFeedback({ type: 'error', message: error?.message || '调整文档顺序失败，请稍后重试' })
+      toast.error(error?.message || '调整文档顺序失败，请稍后重试')
     }
   }
 
@@ -609,10 +598,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       await loadData()
       setSelectedDocumentId(topLevelSelectedDocuments[0]?.id || null)
       clearBatchSelection()
-      setFeedback({
-        type: 'success',
-        message: `已批量移动 ${topLevelSelectedDocuments.length} 个节点`,
-      })
+      toast.success(`已批量移动 ${topLevelSelectedDocuments.length} 个节点`)
     } catch (error) {
       console.error('批量移动文档节点失败', error)
       setBatchMoveError(error?.message || '批量移动失败，请稍后重试')
@@ -686,13 +672,10 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       )
       await loadData()
       setSelectedDocumentId(draggingDocument.id)
-      setFeedback({
-        type: 'success',
-        message: `已通过拖拽调整${TYPE_LABELS[draggingDocument.docType] || draggingDocument.docType}“${draggingDocument.title}”的顺序`,
-      })
+      toast.success(`已通过拖拽调整${TYPE_LABELS[draggingDocument.docType] || draggingDocument.docType}”${draggingDocument.title}”的顺序`)
     } catch (error) {
       console.error('拖拽调整文档顺序失败', error)
-      setFeedback({ type: 'error', message: error?.message || '拖拽调整文档顺序失败，请稍后重试' })
+      toast.error(error?.message || '拖拽调整文档顺序失败，请稍后重试')
     } finally {
       setDragSorting(false)
       clearDragState()
@@ -706,13 +689,17 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
 
     const validationMessage = validateBatchDeleteSelection(documents, selectedDocumentIds)
     if (validationMessage) {
-      setFeedback({ type: 'error', message: validationMessage })
+      toast.error(validationMessage)
       return
     }
 
-    if (!window.confirm(`确认批量删除已选择的 ${selectedDocumentIds.length} 个节点吗？`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: '确认批量删除',
+      description: `确认批量删除已选择的 ${selectedDocumentIds.length} 个节点吗？删除后可在文档回收站恢复。`,
+      confirmLabel: '确认删除',
+      danger: true,
+    })
+    if (!confirmed) return
 
     try {
       setBatchDeleting(true)
@@ -720,13 +707,10 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setSelectedDocumentId(null)
       await loadData()
       clearBatchSelection()
-      setFeedback({
-        type: 'success',
-        message: `已批量删除 ${selectedDocumentIds.length} 个节点，可在文档回收站恢复`,
-      })
+      toast.success(`已批量删除 ${selectedDocumentIds.length} 个节点，可在文档回收站恢复`)
     } catch (error) {
       console.error('批量删除文档节点失败', error)
-      setFeedback({ type: 'error', message: error?.message || '批量删除失败，请稍后重试' })
+      toast.error(error?.message || '批量删除失败，请稍后重试')
     } finally {
       setBatchDeleting(false)
     }
@@ -737,9 +721,13 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       return
     }
 
-    if (!window.confirm(`确认删除知识库“${knowledgeBase.name}”吗？`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: '确认删除知识库',
+      description: `确认删除知识库”${knowledgeBase.name}”吗？删除后可在知识库回收站恢复。`,
+      confirmLabel: '确认删除',
+      danger: true,
+    })
+    if (!confirmed) return
 
     try {
       await knowledgeBaseApi.deleteKnowledgeBase(id)
@@ -748,14 +736,14 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
         state: {
           feedback: {
             type: 'success',
-            message: `知识库“${knowledgeBase.name}”已删除，可在知识库回收站恢复`,
+            message: `知识库”${knowledgeBase.name}”已删除，可在知识库回收站恢复`,
           },
           openKnowledgeBaseTrash: true,
         },
       })
     } catch (error) {
       console.error('删除知识库失败', error)
-      setFeedback({ type: 'error', message: error?.message || '删除知识库失败，请稍后重试' })
+      toast.error(error?.message || '删除知识库失败，请稍后重试')
     }
   }
 
@@ -772,7 +760,6 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     submitting,
     modalError,
     setModalError,
-    feedback,
     documentModalOpen,
     setDocumentModalOpen,
     documentModalMode,

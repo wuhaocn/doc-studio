@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import styles from './KnowledgeBaseFormModal.module.css'
 
 const DEFAULT_FORM = {
@@ -18,6 +19,7 @@ const KnowledgeBaseFormModal = ({
 }) => {
   const [form, setForm] = useState(DEFAULT_FORM)
   const [localError, setLocalError] = useState('')
+  useEscapeKey(open, onClose)
 
   useEffect(() => {
     if (!open) {
@@ -52,6 +54,11 @@ const KnowledgeBaseFormModal = ({
 
     if (!form.name.trim()) {
       setLocalError('知识库名称不能为空')
+      return
+    }
+
+    if (form.name.trim().length > 50) {
+      setLocalError('知识库名称不能超过 50 个字符')
       return
     }
 

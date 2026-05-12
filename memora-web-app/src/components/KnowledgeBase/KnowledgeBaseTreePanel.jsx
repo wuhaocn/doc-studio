@@ -2,7 +2,6 @@ import { Link } from 'react-router-dom'
 
 const KnowledgeBaseTreePanel = ({
   styles,
-  feedback,
   knowledgeBase,
   roleLabels,
   compactKnowledgeBaseDescription,
@@ -166,11 +165,6 @@ const KnowledgeBaseTreePanel = ({
           .filter(Boolean)
           .join(' ')}
       >
-        {feedback && (
-          <div className={`${styles.feedback} ${feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess}`}>
-            {feedback.message}
-          </div>
-        )}
         <div className={styles.panelHeader}>
           <div>
             <h2>目录</h2>

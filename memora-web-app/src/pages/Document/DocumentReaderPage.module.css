@@ -267,8 +267,8 @@
   margin: 14px 0;
   padding: 16px 18px;
   border-radius: 16px;
-  background: #162033;
-  color: #f8fafc;
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
   overflow-x: auto;
 }
 

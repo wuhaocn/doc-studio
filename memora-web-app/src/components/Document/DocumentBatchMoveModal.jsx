@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import styles from './DocumentActionModal.module.css'
 
 const DocumentBatchMoveModal = ({
@@ -12,6 +13,7 @@ const DocumentBatchMoveModal = ({
   onSubmit,
 }) => {
   const [parentId, setParentId] = useState(initialParentId)
+  useEscapeKey(open, onClose)
 
   useEffect(() => {
     if (!open) {

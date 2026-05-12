@@ -60,6 +60,17 @@
   --field-border-focus: rgba(51, 112, 255, 0.3);
   --field-ring-focus: 0 0 0 3px rgba(51, 112, 255, 0.08);
   --selection-accent: #3370ff;
+  --color-error: #f53f3f;
+  --color-error-light: rgba(239, 68, 68, 0.08);
+  --color-success: #00b42a;
+  --color-success-light: rgba(0, 180, 42, 0.08);
+  --color-text-tertiary: #8b93a1;
+  --color-text-placeholder: #a0a7b4;
+  --color-code-bg: #162033;
+  --color-code-text: #f8fafc;
+  --color-accent-alt: #245bdb;
+  --color-bg-elevated: rgba(248, 250, 252, 0.96);
+  --color-bg-subtle: #f8fafc;
 }
 
 body {
@@ -113,4 +124,102 @@ button, input, textarea, select {
   background: rgba(31, 111, 255, 0.1);
   color: #1f4dbd;
   font-weight: 700;
+}
+
+.ui-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: var(--type-body-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  border-radius: var(--button-radius-sm);
+  padding: var(--button-padding-sm);
+  transition: background 0.15s, color 0.15s, opacity 0.15s;
+}
+
+.ui-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ui-btn-primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+}
+
+.ui-btn-primary:hover:not(:disabled) {
+  background: var(--button-primary-bg-hover);
+}
+
+.ui-btn-primary:active:not(:disabled) {
+  background: var(--button-primary-bg-active);
+}
+
+.ui-btn-secondary {
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--color-border);
+}
+
+.ui-btn-secondary:hover:not(:disabled) {
+  background: var(--button-secondary-bg-hover);
+}
+
+.ui-btn-danger {
+  background: var(--button-danger-bg);
+  color: var(--button-danger-text);
+}
+
+.ui-btn-danger:hover:not(:disabled) {
+  background: var(--button-danger-bg-hover);
+}
+
+.ui-btn-ghost {
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.ui-btn-ghost:hover:not(:disabled) {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.ui-btn-lg {
+  padding: var(--button-padding-lg);
+  border-radius: var(--button-radius-lg);
+  font-size: var(--type-body-md);
+}
+
+.ui-btn-md {
+  padding: var(--button-padding-md);
+  border-radius: var(--button-radius-md);
+}
+
+/* Accessibility: focus-visible */
+:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+  box-shadow: var(--field-ring-focus);
+}
+
+/* Accessibility: reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

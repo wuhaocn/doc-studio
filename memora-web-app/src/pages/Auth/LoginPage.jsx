@@ -1,12 +1,15 @@
 import { useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
+import { prefetchHome } from '../../router/prefetch'
 import styles from './LoginPage.module.css'
 
 const LoginPage = () => {
   const location = useLocation()
   const navigate = useNavigate()
   const { isAuthenticated, login, sessionLoading } = useAuth()
+  useDocumentTitle('登录')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [tenantSlug, setTenantSlug] = useState('')
@@ -23,10 +26,20 @@ const LoginPage = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const trimmedUsername = username.trim()
+    if (!trimmedUsername) {
+      setErrorMessage('请输入用户名')
+      return
+    }
+    if (!password) {
+      setErrorMessage('请输入密码')
+      return
+    }
     try {
       setSubmitting(true)
       setErrorMessage('')
-      await login({ username: username.trim(), password, tenantSlug: tenantSlug.trim() || undefined })
+      await login({ username: trimmedUsername, password, tenantSlug: tenantSlug.trim() || undefined })
+      prefetchHome()
       navigate(from, { replace: true })
     } catch (error) {
       setErrorMessage(error?.message || '登录失败，请稍后重试')
@@ -113,18 +126,22 @@ const LoginPage = () => {
               <span>通过邀请加入现有工作区</span>
             </Link>
           </div>
-          <button
-            type="button"
-            className={styles.textButton}
-            onClick={() => setShowDevHint((current) => !current)}
-          >
-            {showDevHint ? '收起本地联调说明' : '查看本地联调账号说明'}
-          </button>
-          {showDevHint ? (
-            <div className={styles.inlineNote}>
-              <strong>admin / 123456</strong>
-              <span>仅当后端通过 ./start-backend-dev.sh 以 dev profile 启动时可用。</span>
-            </div>
+          {import.meta.env.DEV ? (
+            <>
+              <button
+                type="button"
+                className={styles.textButton}
+                onClick={() => setShowDevHint((current) => !current)}
+              >
+                {showDevHint ? '收起本地联调说明' : '查看本地联调账号说明'}
+              </button>
+              {showDevHint ? (
+                <div className={styles.inlineNote}>
+                  <strong>admin / 123456</strong>
+                  <span>仅当后端通过 ./start-backend-dev.sh 以 dev profile 启动时可用。</span>
+                </div>
+              ) : null}
+            </>
           ) : null}
         </form>
       </section>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import styles from './DocumentActionModal.module.css'
 
 const EMPTY_FORM = {
@@ -21,6 +22,7 @@ const DocumentActionModal = ({
   const [form, setForm] = useState(EMPTY_FORM)
   const [localError, setLocalError] = useState('')
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  useEscapeKey(open, onClose)
 
   useEffect(() => {
     if (!open) {

@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-do
 import { IconMenuFold, IconMenuUnfold, IconHome, IconFolder } from '@arco-design/web-react/icon'
 import { Avatar } from '@arco-design/web-react'
 import { useAuth } from '../../contexts/AuthContext'
+import { useToast } from '../Feedback/Toast'
 import { useKnowledgeBaseNavigation } from '../../hooks/useKnowledgeBaseNavigation'
 import { getRememberedKnowledgeBaseId } from '../../utils/knowledgeBaseRoute'
 import styles from './Header.module.css'
@@ -12,9 +13,9 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { currentUser, joinedWorkspaces, workspaceSwitching, switchWorkspace, logout } = useAuth()
+  const toast = useToast()
   const [scrolled, setScrolled] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '')
-  const [workspaceError, setWorkspaceError] = useState('')
   const { knowledgeBases } = useKnowledgeBaseNavigation(currentUser.tenantId, {
     errorMessage: '加载头部知识库导航失败',
   })
@@ -106,12 +107,11 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
     }
 
     try {
-      setWorkspaceError('')
       await switchWorkspace(nextTenantId)
       navigate('/', { replace: true })
     } catch (error) {
       console.error('切换工作区失败', error)
-      setWorkspaceError(error?.message || '切换工作区失败，请稍后重试')
+      toast.error(error?.message || '切换工作区失败，请稍后重试')
     }
   }
 
@@ -174,7 +174,6 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
                 </option>
               ))}
             </select>
-            {workspaceError ? <span className={styles.workspaceError}>{workspaceError}</span> : null}
           </div>
         ) : null}
         <div className={styles.userCard}>

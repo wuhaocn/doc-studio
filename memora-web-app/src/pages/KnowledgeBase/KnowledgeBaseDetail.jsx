@@ -2,11 +2,14 @@ import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
+import { prefetchEditor, prefetchReader } from '../../router/prefetch'
 import DocumentActionModal from '../../components/Document/DocumentActionModal'
 import DocumentBatchMoveModal from '../../components/Document/DocumentBatchMoveModal'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import PageState from '../../components/Feedback/PageState'
+import { KnowledgeBaseSkeleton } from '../../components/Feedback/Skeleton'
 import KnowledgeBaseContextPanel from '../../components/KnowledgeBase/KnowledgeBaseContextPanel'
 import KnowledgeBaseFormModal from '../../components/KnowledgeBase/KnowledgeBaseFormModal'
 import KnowledgeBaseDocumentPanel from '../../components/KnowledgeBase/KnowledgeBaseDocumentPanel'
@@ -57,7 +60,6 @@ const KnowledgeBaseDetail = () => {
     submitting,
     modalError,
     setModalError,
-    feedback,
     documentModalOpen,
     setDocumentModalOpen,
     documentModalMode,
@@ -152,6 +154,15 @@ const KnowledgeBaseDetail = () => {
     setSelectedDocumentId,
   } = controller
 
+  useDocumentTitle(knowledgeBase?.name ? `${knowledgeBase.name}` : '知识库')
+
+  useEffect(() => {
+    if (pageStatus === 'ready') {
+      prefetchEditor()
+      prefetchReader()
+    }
+  }, [pageStatus])
+
   const loadKnowledgeBaseAuditEvents = useCallback(async () => {
     if (!knowledgeBase?.id || !canManageKnowledgeBase) {
       setKnowledgeBaseAuditEvents([])
@@ -203,14 +214,14 @@ const KnowledgeBaseDetail = () => {
 
   useEffect(() => {
     loadKnowledgeBaseAuditEvents()
-  }, [documents, feedback?.message, knowledgeBase?.updatedAt, loadKnowledgeBaseAuditEvents])
+  }, [documents, knowledgeBase?.updatedAt, loadKnowledgeBaseAuditEvents])
 
   useEffect(() => {
     loadDocumentAuditEvents()
-  }, [feedback?.message, loadDocumentAuditEvents, selectedDocument?.id, selectedDocument?.updatedAt])
+  }, [loadDocumentAuditEvents, selectedDocument?.id, selectedDocument?.updatedAt])
 
   if (pageStatus === PAGE_STATUS.LOADING) {
-    return <div className={styles.state}>正在加载知识库...</div>
+    return <KnowledgeBaseSkeleton />
   }
 
   if (pageStatus !== PAGE_STATUS.READY || !knowledgeBase) {
@@ -229,7 +240,6 @@ const KnowledgeBaseDetail = () => {
     <div className={`${styles.page} ${scrolled ? styles.pageScrolled : ''}`}>
       <KnowledgeBaseTreePanel
         styles={styles}
-        feedback={feedback}
         knowledgeBase={knowledgeBase}
         roleLabels={ROLE_LABELS}
         compactKnowledgeBaseDescription={compactKnowledgeBaseDescription}

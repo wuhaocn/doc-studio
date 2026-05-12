@@ -3,10 +3,13 @@ import dayjs from 'dayjs'
 import { useLocation, useNavigate } from 'react-router-dom'
 import AuditEventList from '../../components/Audit/AuditEventList'
 import PageState from '../../components/Feedback/PageState'
+import { useToast } from '../../components/Feedback/Toast'
+import { DashboardSkeleton } from '../../components/Feedback/Skeleton'
 import TrashListModal from '../../components/KnowledgeBase/TrashListModal'
 import ServiceAccountModal from '../../components/Workspace/ServiceAccountModal'
 import WorkspaceInviteModal from '../../components/Workspace/WorkspaceInviteModal'
 import { useAuth } from '../../contexts/AuthContext'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import KnowledgeBaseFormModal from '../../components/KnowledgeBase/KnowledgeBaseFormModal'
 import { auditApi } from '../../services/api/auditApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
@@ -63,13 +66,14 @@ const Home = () => {
   const navigate = useNavigate()
   const location = useLocation()
   const { currentUser } = useAuth()
+  const toast = useToast()
+  useDocumentTitle('工作台')
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [dashboardError, setDashboardError] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [modalError, setModalError] = useState('')
-  const [feedback, setFeedback] = useState(null)
   const [knowledgeBaseTrashOpen, setKnowledgeBaseTrashOpen] = useState(false)
   const [deletedKnowledgeBases, setDeletedKnowledgeBases] = useState([])
   const [knowledgeBaseTrashLoading, setKnowledgeBaseTrashLoading] = useState(false)
@@ -219,7 +223,9 @@ const Home = () => {
     }
 
     if (routeState.feedback) {
-      setFeedback(routeState.feedback)
+      const rf = routeState.feedback
+      if (rf.type === 'error') toast.error(rf.message)
+      else toast.success(rf.message)
     }
 
     if (shouldAutoOpenKnowledgeBaseTrash(routeState, currentUser?.role)) {
@@ -227,7 +233,7 @@ const Home = () => {
     }
 
     navigate(location.pathname, { replace: true, state: null })
-  }, [currentUser?.role, location.pathname, location.state, navigate, openKnowledgeBaseTrash])
+  }, [currentUser?.role, location.pathname, location.state, navigate, openKnowledgeBaseTrash, toast])
 
   useEffect(() => {
     const handleKnowledgeBasesChanged = () => {
@@ -253,7 +259,7 @@ const Home = () => {
         tenantId: currentUser.tenantId,
       })
       const createdKnowledgeBaseId = response?.data?.id
-      setFeedback({ type: 'success', message: `知识库“${formData.name}”已创建` })
+      toast.success(`知识库”${formData.name}”已创建`)
       setModalOpen(false)
       await loadDashboard()
       await loadRecentAuditEvents()
@@ -282,10 +288,7 @@ const Home = () => {
         loadAuditSummary(),
       ])
       emitKnowledgeBasesChanged()
-      setFeedback({
-        type: 'success',
-        message: '知识库已从回收站恢复，可重新进入继续维护',
-      })
+      toast.success('知识库已从回收站恢复，可重新进入继续维护')
     } catch (error) {
       console.error('恢复知识库失败', error)
       setKnowledgeBaseTrashError(error?.message || '恢复知识库失败，请稍后重试')
@@ -324,7 +327,7 @@ const Home = () => {
         }
         return nextInvites.find((item) => item.id === inviteId) || current
       })
-      setFeedback({ type: 'success', message: '邀请已撤销，原邀请链接将不再可用' })
+      toast.success('邀请已撤销，原邀请链接将不再可用')
       await loadRecentAuditEvents()
       await loadAuditSummary()
     } catch (error) {
@@ -336,7 +339,7 @@ const Home = () => {
   }
 
   if (loading) {
-    return <div className={styles.state}>正在加载工作台...</div>
+    return <DashboardSkeleton />
   }
 
   if (!dashboard) {
@@ -360,10 +363,7 @@ const Home = () => {
       setAuditError('')
       await auditApi.exportAuditLogs({ storageScope })
       await Promise.all([loadRecentAuditEvents(), loadAuditSummary()])
-      setFeedback({
-        type: 'success',
-        message: `${AUDIT_STORAGE_SCOPE_LABELS[storageScope] || '审计'} CSV 已开始下载`,
-      })
+      toast.success(`${AUDIT_STORAGE_SCOPE_LABELS[storageScope] || '审计'} CSV 已开始下载`)
     } catch (error) {
       console.error('导出审计记录失败', error)
       setAuditError(error?.message || '导出审计记录失败，请稍后重试')
@@ -380,12 +380,9 @@ const Home = () => {
       const archivedCount = response?.data?.archivedCount ?? 0
       const remainingPendingArchiveCount = response?.data?.remainingPendingArchiveCount ?? 0
       await Promise.all([loadRecentAuditEvents(), loadAuditSummary()])
-      setFeedback({
-        type: 'success',
-        message: archivedCount > 0
-          ? `已归档 ${archivedCount} 条过期审计记录，剩余待归档 ${remainingPendingArchiveCount} 条`
-          : '当前没有需要归档的过期审计记录',
-      })
+      toast.success(archivedCount > 0
+        ? `已归档 ${archivedCount} 条过期审计记录，剩余待归档 ${remainingPendingArchiveCount} 条`
+        : '当前没有需要归档的过期审计记录')
     } catch (error) {
       console.error('执行审计归档失败', error)
       setAuditError(error?.message || '执行审计归档失败，请稍后重试')
@@ -396,12 +393,6 @@ const Home = () => {
 
   return (
     <div className={styles.page}>
-      {feedback && (
-        <div className={`${styles.feedback} ${feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess}`}>
-          {feedback.message}
-        </div>
-      )}
-
       <section className={styles.contentGrid}>
         <aside className={styles.sidebarColumn}>
           <section className={styles.sidebarCard}>

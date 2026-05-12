@@ -24,14 +24,33 @@ const RegisterOwnerPage = () => {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    const trimmedTenantName = form.tenantName.trim()
+    const trimmedUsername = form.username.trim()
+    const trimmedDisplayName = form.displayName.trim()
+    if (!trimmedTenantName) {
+      setErrorMessage('请输入工作区名称')
+      return
+    }
+    if (!trimmedDisplayName) {
+      setErrorMessage('请输入显示名称')
+      return
+    }
+    if (!trimmedUsername) {
+      setErrorMessage('请输入用户名')
+      return
+    }
+    if (!form.password || form.password.length < 6) {
+      setErrorMessage('密码长度不能少于 6 位')
+      return
+    }
     try {
       setSubmitting(true)
       setErrorMessage('')
       await registerOwner({
-        tenantName: form.tenantName.trim(),
+        tenantName: trimmedTenantName,
         tenantSlug: form.tenantSlug.trim() || undefined,
-        displayName: form.displayName.trim(),
-        username: form.username.trim(),
+        displayName: trimmedDisplayName,
+        username: trimmedUsername,
         email: form.email.trim(),
         password: form.password,
       })

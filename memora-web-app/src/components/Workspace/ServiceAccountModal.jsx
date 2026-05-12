@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { serviceAccountApi } from '../../services/api/serviceAccountApi'
 import { copyText } from '../../utils/copyText'
 import styles from './ServiceAccountModal.module.css'
@@ -33,6 +34,7 @@ const ServiceAccountModal = ({
   const [feedback, setFeedback] = useState('')
   const [issuedKey, setIssuedKey] = useState(null)
   const [form, setForm] = useState(DEFAULT_FORM)
+  useEscapeKey(open, onClose)
 
   const knowledgeBaseNameMap = useMemo(() => {
     return new Map(knowledgeBases.map((item) => [item.id, item.name]))

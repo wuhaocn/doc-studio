@@ -1,5 +1,6 @@
 import { Suspense, lazy } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
+import { DashboardSkeleton } from '../components/Feedback/Skeleton'
 
 const RequireAuth = lazy(() => import('../components/Auth/RequireAuth'))
 const Layout = lazy(() => import('../components/Layout/Layout'))
@@ -15,7 +16,7 @@ const KnowledgeBaseDetail = lazy(() => import('../pages/KnowledgeBase/KnowledgeB
 const NotFound = lazy(() => import('../pages/NotFound/NotFound'))
 
 const renderLazyPage = (Component) => (
-  <Suspense fallback={<div>页面加载中...</div>}>
+  <Suspense fallback={<DashboardSkeleton />}>
     <Component />
   </Suspense>
 )

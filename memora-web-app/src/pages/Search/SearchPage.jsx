@@ -3,8 +3,10 @@ import dayjs from 'dayjs'
 import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import PageState from '../../components/Feedback/PageState'
 import { useAuth } from '../../contexts/AuthContext'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { useKnowledgeBaseNavigation } from '../../hooks/useKnowledgeBaseNavigation'
 import { documentApi } from '../../services/api/documentApi'
+import { addRecentSearch, clearRecentSearches, getRecentSearches } from '../../utils/searchHistory'
 import { groupSearchResultsByKnowledgeBase } from '../../utils/workspaceSearch'
 import styles from './SearchPage.module.css'
 
@@ -20,6 +22,7 @@ const SearchPage = () => {
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { currentUser } = useAuth()
+  useDocumentTitle('搜索')
   const { knowledgeBases } = useKnowledgeBaseNavigation(currentUser.tenantId, {
     errorMessage: '加载搜索知识库上下文失败',
   })
@@ -88,18 +91,59 @@ const SearchPage = () => {
         setSearchParams({})
         return
       }
+      addRecentSearch(nextKeyword)
+      setRecentSearches(getRecentSearches())
       setSearchParams({ keyword: nextKeyword })
     })
   }
 
+  const [recentSearches, setRecentSearches] = useState(() => getRecentSearches())
+
   if (status === SEARCH_STATUS.IDLE) {
     return (
-      <PageState
-        eyebrow="统一搜索"
-        title="从整个工作区里找文档"
-        description="输入标题或正文关键词后，会按知识库分组返回当前工作区里你有权阅读的结果。"
-        primaryAction={{ label: '回到工作台', onClick: () => navigate('/') }}
-      />
+      <div className={styles.page}>
+        <section className={styles.hero}>
+          <div>
+            <p className={styles.eyebrow}>统一搜索</p>
+            <h1 className={styles.title}>从整个工作区里找文档</h1>
+            <p className={styles.description}>
+              输入标题或正文关键词后，会按知识库分组返回当前工作区里你有权阅读的结果。
+            </p>
+          </div>
+        </section>
+        <form className={styles.searchForm} onSubmit={handleSubmit}>
+          <input
+            className={styles.searchInput}
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+            placeholder="输入关键词搜索..."
+            autoFocus
+          />
+          <button type="submit" className={styles.searchButton}>搜索</button>
+        </form>
+        {recentSearches.length > 0 && (
+          <section className={styles.recentSection}>
+            <div className={styles.recentHeader}>
+              <span className={styles.recentLabel}>最近搜索</span>
+              <button type="button" className={styles.recentClear} onClick={() => { clearRecentSearches(); setRecentSearches([]) }}>
+                清除
+              </button>
+            </div>
+            <div className={styles.recentList}>
+              {recentSearches.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  className={styles.recentItem}
+                  onClick={() => { setKeyword(item); setSearchParams({ keyword: item }) }}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
     )
   }
 

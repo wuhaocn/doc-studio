@@ -5,17 +5,23 @@ import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 import DiagramExtension from '../../extensions/DiagramExtension'
 import { sanitizeRichHtml, toEditorHtml } from '../../utils/documentContent'
+import { saveDraft } from '../../utils/editorDraft'
 import styles from './DocumentRichEditor.module.css'
+
+const AUTOSAVE_INTERVAL = 30000
 
 const DocumentRichEditor = ({
   focusMode = false,
   initialContent = '',
   placeholder = '开始输入内容...',
   saving = false,
+  documentId,
   onCancel,
   onSave,
+  onDirtyChange,
 }) => {
   const lastContentRef = useRef(initialContent)
+  const dirtyRef = useRef(false)
 
   const editor = useEditor({
     extensions: [
@@ -27,6 +33,12 @@ const DocumentRichEditor = ({
       DiagramExtension,
     ],
     content: toEditorHtml(initialContent),
+    onUpdate: () => {
+      if (!dirtyRef.current) {
+        dirtyRef.current = true
+        onDirtyChange?.(true)
+      }
+    },
   })
 
   useEffect(() => {
@@ -36,6 +48,16 @@ const DocumentRichEditor = ({
     editor.commands.setContent(toEditorHtml(initialContent))
     lastContentRef.current = initialContent
   }, [editor, initialContent])
+
+  useEffect(() => {
+    if (!editor || !documentId) return
+    const timer = setInterval(() => {
+      if (dirtyRef.current) {
+        saveDraft(documentId, sanitizeRichHtml(editor.getHTML()))
+      }
+    }, AUTOSAVE_INTERVAL)
+    return () => clearInterval(timer)
+  }, [editor, documentId])
 
   const handleInsertImage = () => {
     if (!editor) {
@@ -70,6 +92,8 @@ const DocumentRichEditor = ({
       content: sanitizeRichHtml(editor.getHTML()),
       contentText: editor.getText(),
     })
+    dirtyRef.current = false
+    onDirtyChange?.(false)
   }
 
   const tools = [

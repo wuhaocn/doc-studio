@@ -1,6 +1,9 @@
-import { Suspense, lazy, useCallback, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
+import { useConfirm } from '../../components/Feedback/ConfirmDialog'
+import { useToast } from '../../components/Feedback/Toast'
+import { EditorSkeleton } from '../../components/Feedback/Skeleton'
 import PageState from '../../components/Feedback/PageState'
 import Header from '../../components/Layout/Header'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
@@ -9,8 +12,10 @@ import DocumentVersionDiff from '../../components/Document/DocumentVersionDiff'
 import DocumentVersionList from '../../components/Document/DocumentVersionList'
 import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { buildLineDiff } from '../../utils/documentDiff'
 import { summarizePlainText } from '../../utils/documentContent'
+import { removeDraft } from '../../utils/editorDraft'
 import styles from './DocumentEditorPage.module.css'
 
 const DocumentRichEditor = lazy(() => import('../../components/Document/DocumentRichEditor'))
@@ -27,6 +32,8 @@ const PAGE_STATUS = {
 const DocumentEditorPage = () => {
   const { documentId } = useParams()
   const navigate = useNavigate()
+  const confirm = useConfirm()
+  const toast = useToast()
   const [pageStatus, setPageStatus] = useState(PAGE_STATUS.LOADING)
   const [pageErrorMessage, setPageErrorMessage] = useState('')
   const [document, setDocument] = useState(null)
@@ -37,9 +44,24 @@ const DocumentEditorPage = () => {
   const [readLinkOpen, setReadLinkOpen] = useState(false)
   const [shareDrawerOpen, setShareDrawerOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [feedback, setFeedback] = useState(null)
   const [rollingBackVersionId, setRollingBackVersionId] = useState(null)
   const [comparingVersionId, setComparingVersionId] = useState(null)
+  const dirtyRef = useRef(false)
+  useDocumentTitle(document ? `编辑 ${document.title}` : '文档编辑')
+
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (dirtyRef.current) {
+        e.preventDefault()
+      }
+    }
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [])
+
+  const handleDirtyChange = useCallback((dirty) => {
+    dirtyRef.current = dirty
+  }, [])
 
   const loadData = useCallback(async ({ resetState = false } = {}) => {
     try {
@@ -152,12 +174,13 @@ const DocumentEditorPage = () => {
         contentText,
         summary: summarizePlainText(contentText),
       })
+      removeDraft(documentId)
       await loadData()
       await loadVersions()
-      setFeedback({ type: 'success', message: '文档已保存，已生成新版本' })
+      toast.success('文档已保存，已生成新版本')
     } catch (error) {
       console.error('保存文档失败', error)
-      setFeedback({ type: 'error', message: error?.message || '保存文档失败，请稍后重试' })
+      toast.error(error?.message || '保存文档失败，请稍后重试')
     } finally {
       setSaving(false)
     }
@@ -168,26 +191,30 @@ const DocumentEditorPage = () => {
       return
     }
 
-    if (!window.confirm(`确认将“${document.title}”回滚到该版本吗？`)) {
-      return
-    }
+    const confirmed = await confirm({
+      title: '确认回滚版本',
+      description: `将”${document.title}”回滚到该历史版本，当前内容将被覆盖。`,
+      confirmLabel: '确认回滚',
+      danger: true,
+    })
+    if (!confirmed) return
 
     try {
       setRollingBackVersionId(versionId)
       await documentApi.rollbackToVersion(document.id, versionId)
       await loadData()
       await loadVersions()
-      setFeedback({ type: 'success', message: `文档“${document.title}”已回滚到历史版本` })
+      toast.success(`文档”${document.title}”已回滚到历史版本`)
     } catch (error) {
       console.error('回滚文档失败', error)
-      setFeedback({ type: 'error', message: error?.message || '回滚文档失败，请稍后重试' })
+      toast.error(error?.message || '回滚文档失败，请稍后重试')
     } finally {
       setRollingBackVersionId(null)
     }
   }
 
   if (pageStatus === PAGE_STATUS.LOADING) {
-    return <div className={styles.state}>正在加载文档编辑页...</div>
+    return <EditorSkeleton />
   }
 
   if (pageStatus !== PAGE_STATUS.READY || !document) {
@@ -217,12 +244,6 @@ const DocumentEditorPage = () => {
     <div className={styles.page}>
       <Header onToggleSidebar={() => {}} showMenuButton={false} />
       <div className={`${styles.pageShell} ${versionsOpen ? styles.pageShellWide : ''}`}>
-        {feedback && (
-          <div className={`${styles.feedback} ${feedback.type === 'error' ? styles.feedbackError : styles.feedbackSuccess}`}>
-            {feedback.message}
-          </div>
-        )}
-
         <section className={`${styles.workspace} ${versionsOpen ? styles.workspaceWithDrawer : ''}`}>
           <div className={styles.editorPanel}>
             <header className={styles.topbar}>
@@ -278,11 +299,13 @@ const DocumentEditorPage = () => {
             <Suspense fallback={<div className={styles.editorLoading}>正在加载编辑器...</div>}>
               <DocumentRichEditor
                 focusMode
+                documentId={documentId}
                 initialContent={document.content || document.contentText || ''}
                 placeholder="开始编写文档正文..."
                 saving={saving}
                 onCancel={backToKnowledgeBase}
                 onSave={handleSave}
+                onDirtyChange={handleDirtyChange}
               />
             </Suspense>
           </div>

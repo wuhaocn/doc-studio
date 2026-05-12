@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { copyText } from '../../utils/copyText'
 import styles from './DocumentReadLinkDrawer.module.css'
 
@@ -9,6 +10,7 @@ const DocumentReadLinkDrawer = ({
   onClose,
 }) => {
   const [copied, setCopied] = useState(false)
+  useEscapeKey(open, onClose)
   const documentLink = useMemo(() => {
     if (!documentId) {
       return ''

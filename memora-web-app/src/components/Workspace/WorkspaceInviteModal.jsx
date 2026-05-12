@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import styles from './WorkspaceInviteModal.module.css'
 
 const OWNER_ROLE_OPTIONS = [
@@ -36,6 +37,7 @@ const WorkspaceInviteModal = ({
   onRefreshInvites,
 }) => {
   const [form, setForm] = useState(DEFAULT_FORM)
+  useEscapeKey(open, onClose)
   const [localError, setLocalError] = useState('')
   const roleOptions = useMemo(() => (currentRole === 'OWNER' ? OWNER_ROLE_OPTIONS : ADMIN_ROLE_OPTIONS), [currentRole])
 

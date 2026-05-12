@@ -229,3 +229,56 @@
     justify-content: flex-start;
   }
 }
+
+.recentSection {
+  margin-top: 20px;
+  padding: 16px 18px;
+  border-radius: 16px;
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.recentHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.recentLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.recentClear {
+  font-size: 12px;
+  color: var(--color-text-tertiary);
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.recentClear:hover {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.recentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recentItem {
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--color-text);
+  background: var(--color-bg-subtle);
+  border: 1px solid var(--color-border);
+}
+
+.recentItem:hover {
+  background: var(--color-primary-light);
+  border-color: rgba(31, 111, 255, 0.2);
+  color: var(--color-primary);
+}

@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
+import { useConfirm } from '../Feedback/ConfirmDialog'
+import { useToast } from '../Feedback/Toast'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import { documentShareApi } from '../../services/api/documentShareApi'
 import { copyText } from '../../utils/copyText'
 import styles from './DocumentShareDrawer.module.css'
@@ -32,13 +35,15 @@ const DocumentShareDrawer = ({
   onClose,
   onChanged,
 }) => {
+  const confirm = useConfirm()
+  const toast = useToast()
+  useEscapeKey(open, onClose)
   const [shares, setShares] = useState([])
   const [latestCreatedShare, setLatestCreatedShare] = useState(null)
   const [loading, setLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [revokingShareId, setRevokingShareId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
-  const [feedback, setFeedback] = useState('')
   const [form, setForm] = useState(DEFAULT_FORM)
 
   const hasActiveShares = useMemo(() => {
@@ -72,7 +77,6 @@ const DocumentShareDrawer = ({
     setForm(DEFAULT_FORM)
     setLatestCreatedShare(null)
     setErrorMessage('')
-    setFeedback('')
     void loadShares()
   }, [loadShares, open])
 
@@ -86,7 +90,6 @@ const DocumentShareDrawer = ({
     try {
       setSubmitting(true)
       setErrorMessage('')
-      setFeedback('')
       const response = await documentShareApi.createShare({
         documentId,
         expiresInDays: Number(form.expiresInDays) || 7,
@@ -97,7 +100,7 @@ const DocumentShareDrawer = ({
       await loadShares()
       await onChanged?.()
       setForm(DEFAULT_FORM)
-      setFeedback(createdShare?.accessCodeProtected
+      toast.success(createdShare?.accessCodeProtected
         ? '新的受控分享已创建，请立即复制外链；访问码沿用你刚输入的值，不会再次回显。'
         : '新的受控分享已创建，请立即复制外链。')
     } catch (error) {
@@ -111,17 +114,21 @@ const DocumentShareDrawer = ({
   const handleCopyShare = async (share) => {
     try {
       await copyText(resolveShareUrl(share))
-      setFeedback('受控分享链接已复制')
+      toast.success('受控分享链接已复制')
     } catch (error) {
       console.error('复制受控分享链接失败', error)
-      setErrorMessage('复制受控分享链接失败，请手动复制')
+      toast.error('复制受控分享链接失败，请手动复制')
     }
   }
 
   const handleRevokeShare = async (shareId) => {
-    if (!window.confirm('撤销后，外部链接将立即失效。确认继续吗？')) {
-      return
-    }
+    const confirmed = await confirm({
+      title: '撤销受控分享',
+      description: '撤销后，外部链接将立即失效，已分享的用户将无法继续访问。',
+      confirmLabel: '确认撤销',
+      danger: true,
+    })
+    if (!confirmed) return
 
     try {
       setRevokingShareId(shareId)
@@ -130,7 +137,7 @@ const DocumentShareDrawer = ({
       setLatestCreatedShare((current) => (current?.id === shareId ? null : current))
       await loadShares()
       await onChanged?.()
-      setFeedback('受控分享已撤销，外部访问将立即被阻断')
+      toast.success('受控分享已撤销，外部访问将立即被阻断')
     } catch (error) {
       console.error('撤销受控分享失败', error)
       setErrorMessage(error?.message || '撤销受控分享失败，请稍后重试')
@@ -191,9 +198,9 @@ const DocumentShareDrawer = ({
             </label>
           </div>
 
-          {(errorMessage || feedback) ? (
-            <div className={`${styles.message} ${errorMessage ? styles.messageError : styles.messageSuccess}`}>
-              {errorMessage || feedback}
+          {errorMessage ? (
+            <div className={`${styles.message} ${styles.messageError}`}>
+              {errorMessage}
             </div>
           ) : null}
 

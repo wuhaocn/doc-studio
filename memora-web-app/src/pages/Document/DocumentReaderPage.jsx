@@ -7,6 +7,7 @@ import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDr
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
+import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { sanitizeRichHtml } from '../../utils/documentContent'
 import styles from './DocumentReaderPage.module.css'
 
@@ -28,6 +29,7 @@ const DocumentReaderPage = () => {
   const [knowledgeBaseAccess, setKnowledgeBaseAccess] = useState(null)
   const [readLinkOpen, setReadLinkOpen] = useState(false)
   const [shareDrawerOpen, setShareDrawerOpen] = useState(false)
+  useDocumentTitle(document ? document.title : '文档阅读')
 
   const loadDocument = useCallback(async () => {
     try {

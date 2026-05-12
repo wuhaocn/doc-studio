@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import styles from './KnowledgeBasePermissionModal.module.css'
 
 const ROLE_OPTIONS = [
@@ -85,6 +86,7 @@ const KnowledgeBasePermissionModal = ({
   const [selectionMap, setSelectionMap] = useState({})
   const [localError, setLocalError] = useState('')
   const [search, setSearch] = useState('')
+  useEscapeKey(open, onClose)
 
   useEffect(() => {
     if (!open) {

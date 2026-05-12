@@ -1,3 +1,4 @@
+import { useEscapeKey } from '../../hooks/useEscapeKey'
 import styles from './TrashListModal.module.css'
 
 const TrashListModal = ({
@@ -18,6 +19,8 @@ const TrashListModal = ({
   getItemDescription,
   getItemMeta,
 }) => {
+  useEscapeKey(open, onClose)
+
   if (!open) {
     return null
   }

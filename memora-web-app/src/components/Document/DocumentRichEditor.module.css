@@ -160,8 +160,8 @@
   margin: 18px 0;
   padding: 18px 20px;
   border-radius: 14px;
-  background: #162033;
-  color: #f8fafc;
+  background: var(--color-code-bg);
+  color: var(--color-code-text);
   overflow-x: auto;
 }
 
