@@ -52,32 +52,16 @@ const LoginPage = () => {
     <div className={styles.page}>
       <section className={styles.panel}>
         <div className={styles.hero}>
-          <p className={styles.eyebrow}>Memora 登录</p>
-          <h1 className={styles.title}>先进入工作区，再继续写作</h1>
+          <p className={styles.eyebrow}>Memora</p>
+          <h1 className={styles.title}>进入工作区</h1>
           <p className={styles.description}>
-            已有账号默认只需要用户名和密码。首次进入请创建工作区，收到邀请则通过邀请入口加入现有团队。
+            输入账号登录，或创建新工作区开始使用。
           </p>
-          <div className={styles.heroChecklist}>
-            <div className={styles.heroChecklistItem}>
-              <strong>已有账号</strong>
-              <span>登录后会直接返回你刚才要访问的页面。</span>
-            </div>
-            <div className={styles.heroChecklistItem}>
-              <strong>首次使用</strong>
-              <span>创建工作区后自动成为管理员，再邀请成员加入。</span>
-            </div>
-            <div className={styles.heroChecklistItem}>
-              <strong>收到邀请</strong>
-              <span>使用邀请链接加入现有工作区，不需要重复创建团队空间。</span>
-            </div>
-          </div>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.formHeader}>
-            <p className={styles.formEyebrow}>登录</p>
-            <h2 className={styles.formTitle}>继续进入工作区</h2>
-            <p className={styles.formDescription}>默认使用用户名和密码登录；只有多工作区账号才需要展开高级选项。</p>
+            <h2 className={styles.formTitle}>登录</h2>
           </div>
           <label className={styles.field}>
             <span>用户名</span>
@@ -97,7 +81,7 @@ const LoginPage = () => {
             className={styles.textButton}
             onClick={() => setShowWorkspaceField((current) => !current)}
           >
-            {showWorkspaceField ? '收起高级选项' : '多工作区账号？指定工作区地址'}
+            {showWorkspaceField ? '收起' : '指定工作区'}
           </button>
           {showWorkspaceField ? (
             <div className={styles.advancedPanel}>
@@ -106,10 +90,9 @@ const LoginPage = () => {
                 <input
                   value={tenantSlug}
                   onChange={(event) => setTenantSlug(event.target.value)}
-                  placeholder="可选，例如 east-manufacturing-docs"
+                  placeholder="可选，如 my-team"
                 />
               </label>
-              <p className={styles.fieldHint}>仅当同一账号加入多个工作区，且需要显式指定进入哪一个时使用。</p>
             </div>
           ) : null}
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}
@@ -118,12 +101,12 @@ const LoginPage = () => {
           </button>
           <div className={styles.secondaryActions}>
             <Link to="/register" className={styles.secondaryActionCard}>
-              <strong>首次使用</strong>
-              <span>创建工作区并成为当前管理员</span>
+              <strong>创建工作区</strong>
+              <span>注册并成为管理员</span>
             </Link>
             <Link to="/accept-invite" className={styles.secondaryActionCard}>
-              <strong>收到邀请</strong>
-              <span>通过邀请加入现有工作区</span>
+              <strong>接受邀请</strong>
+              <span>通过邀请链接加入</span>
             </Link>
           </div>
           {import.meta.env.DEV ? (

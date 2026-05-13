@@ -94,34 +94,26 @@ const AcceptInvitePage = () => {
     <div className={styles.page}>
       <section className={styles.panel}>
         <div className={styles.hero}>
-          <p className={styles.eyebrow}>加入工作区</p>
-          <h1 className={styles.title}>确认邀请后，直接进入团队空间</h1>
+          <p className={styles.eyebrow}>Memora</p>
+          <h1 className={styles.title}>接受邀请</h1>
           <p className={styles.description}>
-            成员通过邀请加入现有工作区，不需要重复创建团队空间。首次加入会创建账号，已有账号则直接复用原账号进入。
+            加入现有工作区，首次加入会创建账号。
           </p>
           {inviteInfo ? (
             <div className={styles.infoCard}>
               <strong>{inviteInfo.tenantName}</strong>
-              <span>{inviteInfo.role} · 受邀邮箱 {inviteInfo.inviteeEmail}</span>
-              <span>邀请人 {inviteInfo.inviterDisplayName}</span>
+              <span>{inviteInfo.role} · {inviteInfo.inviteeEmail}</span>
             </div>
           ) : (
             <div className={styles.infoCard}>
-              <strong>邀请链接</strong>
-              <span>{inviteLoading ? '正在读取邀请信息...' : '优先从邀请链接直接进入；如果链接缺失，再手动粘贴邀请令牌。'}</span>
+              <span>{inviteLoading ? '正在读取邀请...' : '请通过邀请链接进入或手动输入令牌'}</span>
             </div>
           )}
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.formHeader}>
-            <p className={styles.formEyebrow}>接受邀请</p>
-            <h2 className={styles.formTitle}>完成账号并进入工作区</h2>
-            <p className={styles.formDescription}>
-              {isExistingAccountMode
-                ? '如果你已有同邮箱账号，请填写原用户名和密码；接受成功后会直接进入对应工作区。'
-                : '首次加入会创建登录账号并直接建立真实 session。'}
-            </p>
+            <h2 className={styles.formTitle}>完成注册</h2>
           </div>
           <div className={styles.modeSwitch}>
             <button
@@ -146,7 +138,7 @@ const AcceptInvitePage = () => {
             className={styles.textButton}
             onClick={() => setManualTokenOpen((current) => !current)}
           >
-            {manualTokenOpen ? '收起邀请令牌输入' : '更换邀请链接或手动输入令牌'}
+            {manualTokenOpen ? '收起' : '手动输入令牌'}
           </button>
           {manualTokenOpen || !inviteLoaded ? (
             <div className={styles.advancedPanel}>
@@ -162,7 +154,7 @@ const AcceptInvitePage = () => {
                         setInviteInfo(null)
                       }
                     }}
-                    placeholder="请粘贴邀请令牌"
+                    placeholder="粘贴邀请令牌"
                     required
                   />
                   <button
@@ -171,11 +163,10 @@ const AcceptInvitePage = () => {
                     onClick={() => loadInvite()}
                     disabled={inviteLoading || !token.trim()}
                   >
-                    {inviteLoading ? '读取中...' : '读取邀请'}
+                    {inviteLoading ? '读取中...' : '验证'}
                   </button>
                 </div>
               </label>
-              <p className={styles.fieldHint}>系统会先校验邀请是否仍然有效，再继续填写账号信息。</p>
             </div>
           ) : null}
           <div className={styles.splitFields}>
@@ -211,7 +202,7 @@ const AcceptInvitePage = () => {
             />
           </label>
           {inviteLoaded ? (
-            <p className={styles.fieldHint}>邀请邮箱已固定。如需改成其他邮箱，请让管理员重新发送邀请。</p>
+            <p className={styles.fieldHint}>邮箱已锁定为邀请指定地址</p>
           ) : null}
           <label className={styles.field}>
             <span>密码</span>

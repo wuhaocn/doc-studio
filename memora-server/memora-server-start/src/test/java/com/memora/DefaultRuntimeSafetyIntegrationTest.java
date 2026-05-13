@@ -45,4 +45,12 @@ class DefaultRuntimeSafetyIntegrationTest {
         assertEquals(0L, userCount == null ? -1L : userCount);
         assertEquals(0L, tenantCount == null ? -1L : tenantCount);
     }
+
+    @Test
+    void shouldReturnHttp404ForMissingStaticResourceRequest() throws Exception {
+        mockMvc.perform(get("/services/config"))
+            .andExpect(status().isNotFound())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("资源不存在"));
+    }
 }

@@ -66,32 +66,16 @@ const RegisterOwnerPage = () => {
     <div className={styles.page}>
       <section className={styles.panel}>
         <div className={styles.hero}>
-          <p className={styles.eyebrow}>创建工作区</p>
-          <h1 className={styles.title}>先开一个团队空间，再开始沉淀知识</h1>
+          <p className={styles.eyebrow}>Memora</p>
+          <h1 className={styles.title}>创建工作区</h1>
           <p className={styles.description}>
-            注册完成后会直接进入工作台。你会成为当前工作区管理员，后续再邀请成员加入即可。
+            注册后直接进入工作台，你将成为工作区管理员。
           </p>
-          <div className={styles.heroChecklist}>
-            <div className={styles.heroChecklistItem}>
-              <strong>一步进入</strong>
-              <span>创建完成后直接建立会话，不需要再单独登录一次。</span>
-            </div>
-            <div className={styles.heroChecklistItem}>
-              <strong>管理员身份</strong>
-              <span>当前注册者会自动成为工作区管理员。</span>
-            </div>
-            <div className={styles.heroChecklistItem}>
-              <strong>后续扩展</strong>
-              <span>成员通过邀请加入，知识库和文档在进入后继续创建。</span>
-            </div>
-          </div>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
           <div className={styles.formHeader}>
-            <p className={styles.formEyebrow}>注册工作区</p>
-            <h2 className={styles.formTitle}>创建 Owner 账号</h2>
-            <p className={styles.formDescription}>先填写工作区名称和你的账号信息；自定义工作区地址属于可选项。</p>
+            <h2 className={styles.formTitle}>注册</h2>
           </div>
           <label className={styles.field}>
             <span>工作区名称</span>
@@ -158,10 +142,9 @@ const RegisterOwnerPage = () => {
                 <input
                   value={form.tenantSlug}
                   onChange={(event) => setForm((current) => ({ ...current, tenantSlug: event.target.value }))}
-                  placeholder="不填则按名称自动生成"
+                  placeholder="不填则自动生成"
                 />
               </label>
-              <p className={styles.fieldHint}>仅当你希望工作区使用固定访问地址时再填写，例如 north-quality-center。</p>
             </div>
           ) : null}
           {errorMessage && <div className={styles.error}>{errorMessage}</div>}

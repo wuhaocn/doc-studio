@@ -35,17 +35,21 @@
 
 .actions {
   margin-top: 22px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .primaryButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: var(--button-padding-lg);
-  border-radius: var(--button-radius-lg);
+  padding: var(--button-padding-md);
+  border-radius: var(--button-radius-md);
   background: var(--button-primary-bg);
   color: var(--button-primary-text);
   font-weight: 700;
+  font-size: 13px;
   transition: background-color 120ms ease, transform 120ms ease;
 }
 
@@ -56,4 +60,57 @@
 .primaryButton:active {
   background: var(--button-primary-bg-active);
   transform: translateY(1px);
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--button-padding-md);
+  border-radius: var(--button-radius-md);
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
+  border: 1px solid var(--color-border);
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.secondaryButton:hover {
+  background: var(--button-secondary-bg-hover);
+}
+
+.searchForm {
+  display: flex;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.searchInput {
+  flex: 1;
+  min-height: 38px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--field-border);
+  background: var(--field-bg);
+  color: var(--color-text);
+  font-size: 13px;
+}
+
+.searchInput:focus {
+  border-color: var(--field-border-focus);
+  box-shadow: var(--field-ring-focus);
+}
+
+.searchButton {
+  padding: 0 14px;
+  min-height: 38px;
+  border-radius: 10px;
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.searchButton:hover {
+  background: var(--button-primary-bg-hover);
 }

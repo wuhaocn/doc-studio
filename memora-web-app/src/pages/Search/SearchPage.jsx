@@ -148,17 +148,16 @@ const SearchPage = () => {
   }
 
   if (status === SEARCH_STATUS.LOADING) {
-    return <div className={styles.state}>正在搜索工作区内容...</div>
+    return <div className={styles.state}>搜索中...</div>
   }
 
   if (status === SEARCH_STATUS.ERROR) {
     return (
       <PageState
-        eyebrow="搜索失败"
-        title="统一搜索暂时不可用"
-        description={errorMessage || '请稍后重试，或先返回工作台继续浏览知识库。'}
-        primaryAction={{ label: '重新搜索', onClick: () => setReloadVersion((current) => current + 1) }}
-        secondaryAction={{ label: '返回工作台', onClick: () => navigate('/') }}
+        title=”搜索暂时不可用”
+        description={errorMessage || '请稍后重试'}
+        primaryAction={{ label: '重试', onClick: () => setReloadVersion((current) => current + 1) }}
+        secondaryAction={{ label: '返回', onClick: () => navigate('/') }}
       />
     )
   }
@@ -166,9 +165,8 @@ const SearchPage = () => {
   if (status === SEARCH_STATUS.EMPTY) {
     return (
       <PageState
-        eyebrow="没有命中"
-        title={`没有找到“${deferredKeyword}”`}
-        description="可以尝试缩短关键词、换用正文里的自然语言，或者先回到知识库继续浏览。"
+        title={`没有找到”${deferredKeyword}”`}
+        description=”尝试其他关键词”
         primaryAction={{ label: '返回工作台', onClick: () => navigate('/') }}
       />
     )
@@ -178,19 +176,15 @@ const SearchPage = () => {
     <div className={styles.page}>
       <section className={styles.hero}>
         <div>
-          <p className={styles.eyebrow}>统一搜索</p>
-          <h1 className={styles.title}>在当前工作区里找文档</h1>
-          <p className={styles.description}>
-            已按知识库边界过滤，只返回当前会话在工作区内可访问的结果。
-          </p>
+          <h1 className={styles.title}>搜索结果</h1>
         </div>
         <form className={styles.searchForm} onSubmit={handleSubmit}>
           <input
             value={keyword}
             onChange={(event) => setKeyword(event.target.value)}
-            placeholder="搜索标题或正文，例如：交接、升级、巡检"
+            placeholder=”搜索标题或正文”
           />
-          <button type="submit">更新搜索</button>
+          <button type=”submit”>搜索</button>
         </form>
       </section>
 

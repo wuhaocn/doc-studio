@@ -459,7 +459,7 @@ const Home = () => {
                 ) : (
                   <div className={styles.emptyState}>
                     <strong>还没有知识库</strong>
-                    <p>先创建一个知识库，再开始整理文档。</p>
+                    <p>创建知识库开始整理文档</p>
                   </div>
                 )}
               </div>
@@ -506,7 +506,7 @@ const Home = () => {
               ) : (
                 <div className={styles.emptyState}>
                   <strong>还没有最近编辑</strong>
-                  <p>进入知识库后开始写第一篇文档。</p>
+                  <p>进入知识库开始写文档</p>
                 </div>
               )}
             </div>
@@ -516,8 +516,8 @@ const Home = () => {
             <section className={styles.auditPanel}>
               <div className={styles.stageHeader}>
                 <div>
-                  <div className={styles.eyebrow}>治理与追踪</div>
-                  <h2 className={styles.stageTitle}>最近治理记录</h2>
+                  <div className={styles.eyebrow}>审计</div>
+                  <h2 className={styles.stageTitle}>最近记录</h2>
                 </div>
                 <div className={styles.auditHeaderActions}>
                   <span className={styles.stageMeta}>{recentAuditEvents.length} 条</span>
@@ -587,8 +587,8 @@ const Home = () => {
                 events={recentAuditEvents}
                 loading={auditLoading}
                 errorMessage={auditError}
-                emptyTitle="当前工作区还没有关键治理记录"
-                emptyDescription="登录、邀请、知识库变更、受控分享和 Open API 写操作会显示在这里。"
+                emptyTitle="暂无审计记录"
+                emptyDescription="关键操作会记录在这里"
                 showKnowledgeBaseName
               />
             </section>
@@ -611,15 +611,15 @@ const Home = () => {
 
       <TrashListModal
         open={knowledgeBaseTrashOpen}
-        eyebrow="知识库回收站"
+        eyebrow="回收站"
         title={dashboard.workspace.name}
-        description="这里保留当前工作区已删除的知识库。恢复后会重新回到知识库列表，并继续沿用原有权限边界。"
+        description="已删除的知识库，恢复后回到列表。"
         items={deletedKnowledgeBases}
         loading={knowledgeBaseTrashLoading}
         errorMessage={knowledgeBaseTrashError}
         restoringItemId={restoringKnowledgeBaseId}
-        emptyTitle="当前工作区回收站为空"
-        emptyDescription="删除后的知识库会暂存到这里，便于继续恢复文档主流程。"
+        emptyTitle="回收站为空"
+        emptyDescription="删除的知识库会出现在这里"
         onClose={() => {
           setKnowledgeBaseTrashError('')
           setKnowledgeBaseTrashOpen(false)

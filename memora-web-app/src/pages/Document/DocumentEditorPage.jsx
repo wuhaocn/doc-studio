@@ -5,7 +5,6 @@ import { useConfirm } from '../../components/Feedback/ConfirmDialog'
 import { useToast } from '../../components/Feedback/Toast'
 import { EditorSkeleton } from '../../components/Feedback/Skeleton'
 import PageState from '../../components/Feedback/PageState'
-import Header from '../../components/Layout/Header'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import DocumentVersionDiff from '../../components/Document/DocumentVersionDiff'
@@ -15,7 +14,7 @@ import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { buildLineDiff } from '../../utils/documentDiff'
 import { summarizePlainText } from '../../utils/documentContent'
-import { removeDraft } from '../../utils/editorDraft'
+import { removeDraft, getDraft } from '../../utils/editorDraft'
 import styles from './DocumentEditorPage.module.css'
 
 const DocumentRichEditor = lazy(() => import('../../components/Document/DocumentRichEditor'))
@@ -46,6 +45,7 @@ const DocumentEditorPage = () => {
   const [saving, setSaving] = useState(false)
   const [rollingBackVersionId, setRollingBackVersionId] = useState(null)
   const [comparingVersionId, setComparingVersionId] = useState(null)
+  const [draftContent, setDraftContent] = useState(null)
   const dirtyRef = useRef(false)
   useDocumentTitle(document ? `编辑 ${document.title}` : '文档编辑')
 
@@ -138,6 +138,30 @@ const DocumentEditorPage = () => {
       loadVersions()
     }
   }, [loadVersions, pageStatus])
+
+  useEffect(() => {
+    const checkDraft = async () => {
+      if (pageStatus !== PAGE_STATUS.READY || !document) return
+
+      const draft = getDraft(documentId)
+      if (!draft || !draft.content) return
+
+      const shouldRestore = await confirm({
+        title: '检测到未保存的草稿',
+        message: `上次编辑时间：${new Date(draft.savedAt).toLocaleString()}。是否恢复草稿内容？`,
+        confirmText: '恢复草稿',
+        cancelText: '放弃草稿',
+      })
+
+      if (shouldRestore) {
+        setDraftContent(draft.content)
+      } else {
+        removeDraft(documentId)
+      }
+    }
+
+    checkDraft()
+  }, [pageStatus, document, documentId, confirm])
 
   const comparingVersion = useMemo(() => {
     return versions.find((version) => version.id === comparingVersionId) || null
@@ -242,24 +266,21 @@ const DocumentEditorPage = () => {
 
   return (
     <div className={styles.page}>
-      <Header onToggleSidebar={() => {}} showMenuButton={false} />
       <div className={`${styles.pageShell} ${versionsOpen ? styles.pageShellWide : ''}`}>
         <section className={`${styles.workspace} ${versionsOpen ? styles.workspaceWithDrawer : ''}`}>
           <div className={styles.editorPanel}>
             <header className={styles.topbar}>
-              <div className={styles.topbarMain}>
-                <button type="button" className={styles.backButton} onClick={backToKnowledgeBase}>
-                  返回知识库
+              <div className={styles.topbarLeft}>
+                <button type="button" className={styles.backButton} onClick={backToKnowledgeBase} aria-label="返回知识库">
+                  ←
                 </button>
                 <div className={styles.documentIdentity}>
-                  <div className={styles.eyebrow}>文档编辑</div>
                   <h1 className={styles.title}>{document.title}</h1>
-                  <div className={styles.meta}>
-                    <span className={styles.metaPill}>v{document.versionNo}</span>
-                    <span className={styles.metaPill}>{saving ? '保存中…' : '可编辑'}</span>
-                    <span className={styles.metaPill}>{knowledgeBaseAccess?.currentRole || '未知角色'}</span>
-                    <span className={styles.metaPill}>最近更新 {dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
-                  </div>
+                  <span className={styles.metaInline}>
+                    {saving ? '保存中…' : `v${document.versionNo}`}
+                    <span className={styles.metaSep}>·</span>
+                    {dayjs(document.updatedAt).format('MM-DD HH:mm')}
+                  </span>
                 </div>
               </div>
               <div className={styles.topbarActions}>
@@ -268,14 +289,14 @@ const DocumentEditorPage = () => {
                   className={styles.secondaryButton}
                   onClick={() => navigate(`/docs/${document.id}`)}
                 >
-                  阅读文档
+                  阅读
                 </button>
                 <button
                   type="button"
                   className={styles.secondaryButton}
                   onClick={() => setReadLinkOpen(true)}
                 >
-                  复制阅读链接
+                  链接
                 </button>
                 {knowledgeBaseAccess?.canManage ? (
                   <button
@@ -283,7 +304,7 @@ const DocumentEditorPage = () => {
                     className={styles.secondaryButton}
                     onClick={() => setShareDrawerOpen(true)}
                   >
-                    受控分享
+                    分享
                   </button>
                 ) : null}
                 <button
@@ -291,7 +312,7 @@ const DocumentEditorPage = () => {
                   className={styles.ghostButton}
                   onClick={() => setVersionsOpen(true)}
                 >
-                  查看版本
+                  版本
                 </button>
               </div>
             </header>
@@ -300,7 +321,7 @@ const DocumentEditorPage = () => {
               <DocumentRichEditor
                 focusMode
                 documentId={documentId}
-                initialContent={document.content || document.contentText || ''}
+                initialContent={draftContent || document.content || document.contentText || ''}
                 placeholder="开始编写文档正文..."
                 saving={saving}
                 onCancel={backToKnowledgeBase}

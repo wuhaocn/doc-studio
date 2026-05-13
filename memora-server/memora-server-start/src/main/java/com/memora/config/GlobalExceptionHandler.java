@@ -4,10 +4,13 @@ import com.memora.common.exception.BusinessException;
 import com.memora.common.result.Result;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.UUID;
 
@@ -57,12 +60,27 @@ public class GlobalExceptionHandler {
         log.warn("数据约束冲突: {}", rootMessage);
         return Result.error(409, resolveConflictMessage(rootMessage));
     }
-    
+
+    /**
+     * 处理静态资源未找到异常（404）
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<Result<Void>> handleNoResourceFoundException(NoResourceFoundException e) {
+        log.debug("静态资源未找到: {}", e.getResourcePath());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+            .body(Result.error(404, "资源不存在"));
+    }
+
     /**
      * 处理其他异常
      */
     @ExceptionHandler(Exception.class)
-    public Result<Void> handleException(Exception e) {
+    public Object handleException(Exception e) {
+        if (e instanceof NoResourceFoundException noResourceFoundException) {
+            log.debug("静态资源未找到: {}", noResourceFoundException.getResourcePath());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Result.error(404, "资源不存在"));
+        }
         String requestId = UUID.randomUUID().toString().replace("-", "").substring(0, 12);
         log.error("系统异常 requestId={}", requestId, e);
         return Result.error(500, "系统异常，请稍后重试（requestId: " + requestId + "）");

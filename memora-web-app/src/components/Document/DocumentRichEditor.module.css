@@ -95,7 +95,7 @@
 
 .editorBody {
   background: linear-gradient(180deg, #fafbfd 0%, #f6f7f9 100%);
-  padding: 20px 18px 26px;
+  padding: 14px 16px 26px;
 }
 
 .editorCanvas {
@@ -105,11 +105,11 @@
 
 .editorPaper {
   min-height: 680px;
-  padding: 48px 64px 68px;
+  padding: 32px 48px 48px;
   border: 1px solid rgba(15, 23, 42, 0.06);
-  border-radius: 18px;
+  border-radius: 14px;
   background: #ffffff;
-  box-shadow: 0 20px 42px rgba(15, 23, 42, 0.045);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.04);
 }
 
 .editorPaper :global(.ProseMirror) {
