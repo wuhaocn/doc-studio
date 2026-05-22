@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
-import { useLocation, useNavigate, useParams } from 'react-router-dom'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../contexts/AuthContext'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { prefetchEditor, prefetchReader } from '../../router/prefetch'
@@ -164,6 +164,18 @@ const KnowledgeBaseDetail = () => {
 
   useDocumentTitle(knowledgeBase?.name ? `${knowledgeBase.name}` : '知识库')
   const currentRoleLabel = ROLE_LABELS[knowledgeBase?.currentRole] || knowledgeBase?.currentRole || '未知角色'
+  const folderCount = documents.filter((item) => item.docType === 'FOLDER').length
+  const documentCount = documents.filter((item) => item.docType === 'DOC').length
+  const knowledgeBaseSiteUrl = knowledgeBase.siteUrl
+    || (knowledgeBase.siteEnabled && knowledgeBase.siteSlug ? `/site/${knowledgeBase.siteSlug}` : '')
+  const selectedContextLabel = selectedDocument
+    ? selectedDocument.docType === 'DOC' ? '当前文档' : '当前目录'
+    : '知识库视图'
+  const selectedContextHint = !selectedDocument
+    ? '从左侧文档树继续选择一个目录或文档。'
+    : selectedDocument.docType === 'DOC'
+      ? `${selectedDocument.title}${selectedDocument.publishStatus === 'PUBLISHED' ? '，已正式发布。' : '，尚未正式发布。'}`
+      : `${selectedDocument.title}，包含 ${selectedFolderDocumentCount} 篇文档和 ${selectedFolderDirectoryCount} 个目录。`
 
   useEffect(() => {
     if (pageStatus === 'ready') {
@@ -302,85 +314,109 @@ const KnowledgeBaseDetail = () => {
         />
 
         <div className={styles.workspaceMain}>
-          <header className={styles.pageHeader}>
-            <div className={styles.pageHeaderMain}>
-              <h1 className={styles.title}>{knowledgeBase.name}</h1>
-              <div className={styles.pageHeaderMeta}>
-                <span className={styles.metaPill}>{documents.length} 个节点</span>
-                <span className={styles.metaPill}>{currentRoleLabel}</span>
-                {knowledgeBase.permissionRestricted ? <span className={styles.metaPill}>独立权限</span> : null}
+          <header className={styles.hero}>
+            <div className={styles.heroMain}>
+              <div className={styles.breadcrumb}>
+                <Link to="/">工作台</Link>
+                <span>/</span>
+                <span>知识库</span>
+              </div>
+              <div className={styles.heroTitleRow}>
+                <h1 className={styles.title}>{knowledgeBase.name}</h1>
+                <span className={focusMode ? styles.modeBadgeActive : styles.modeBadge}>
+                  {focusMode ? '专注模式' : selectedContextLabel}
+                </span>
               </div>
               {knowledgeBaseInfoVisible && compactKnowledgeBaseDescription ? (
-                <p className={styles.pageHeaderDescription}>
-                  {compactKnowledgeBaseDescription}
-                </p>
+                <p className={styles.heroDescription}>{compactKnowledgeBaseDescription}</p>
               ) : null}
+              <p className={styles.heroHint}>{selectedContextHint}</p>
+              <div className={styles.heroMeta}>
+                <span className={styles.metaPill}>{documents.length} 个节点</span>
+                <span className={styles.metaPill}>{documentCount} 篇文档</span>
+                <span className={styles.metaPill}>{folderCount} 个目录</span>
+                <span className={styles.metaPill}>{currentRoleLabel}</span>
+                {knowledgeBase.permissionRestricted ? <span className={styles.metaPill}>独立权限</span> : null}
+                {knowledgeBase.siteEnabled ? <span className={styles.metaPill}>已开放站点</span> : null}
+              </div>
             </div>
-            <div className={styles.pageHeaderActions}>
-              {canWriteKnowledgeBase ? (
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={() => openCreateDocumentModal('DOC')}
-                >
-                  新建文档
-                </button>
-              ) : null}
-              <details className={styles.moreActions}>
-                <summary className={styles.secondaryButton}>更多操作</summary>
-                <div className={styles.moreActionsMenu}>
-                  <button
-                    type="button"
+            <div className={styles.heroActions}>
+              <div className={styles.heroActionGrid}>
+                {knowledgeBaseSiteUrl ? (
+                  <a
                     className={styles.secondaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={() => openCreateDocumentModal('FOLDER')}
+                    href={knowledgeBaseSiteUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
-                    新建目录
-                  </button>
+                    打开站点
+                  </a>
+                ) : null}
+                {canWriteKnowledgeBase ? (
                   <button
                     type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
+                    className={styles.primaryButton}
+                    onClick={() => openCreateDocumentModal('DOC')}
                   >
-                    {knowledgeBaseInfoVisible ? '收起说明' : '知识库说明'}
+                    新建文档
                   </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={!canManageKnowledgeBase}
-                    onClick={() => {
-                      setModalError('')
-                      setEditing(true)
-                    }}
-                  >
-                    知识库设置
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={!canManageKnowledgeBase}
-                    onClick={openPermissionModal}
-                  >
-                    访问权限
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={openDocumentTrash}
-                  >
-                    文档回收站
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.dangerButton}
-                    disabled={!canManageKnowledgeBase}
-                    onClick={handleDeleteKnowledgeBase}
-                  >
-                    删除知识库
-                  </button>
-                </div>
-              </details>
+                ) : null}
+                <details className={styles.moreActions}>
+                  <summary className={styles.secondaryButton}>更多操作</summary>
+                  <div className={styles.moreActionsMenu}>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={!canWriteKnowledgeBase}
+                      onClick={() => openCreateDocumentModal('FOLDER')}
+                    >
+                      新建目录
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
+                    >
+                      {knowledgeBaseInfoVisible ? '收起说明' : '显示说明'}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={!canManageKnowledgeBase}
+                      onClick={() => {
+                        setModalError('')
+                        setEditing(true)
+                      }}
+                    >
+                      知识库设置
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={!canManageKnowledgeBase}
+                      onClick={openPermissionModal}
+                    >
+                      访问权限
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={!canWriteKnowledgeBase}
+                      onClick={openDocumentTrash}
+                    >
+                      文档回收站
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.dangerButton}
+                      disabled={!canManageKnowledgeBase}
+                      onClick={handleDeleteKnowledgeBase}
+                    >
+                      删除知识库
+                    </button>
+                  </div>
+                </details>
+              </div>
             </div>
           </header>
 

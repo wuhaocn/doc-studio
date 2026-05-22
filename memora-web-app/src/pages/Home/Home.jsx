@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { useNavigate } from 'react-router-dom'
+import DocumentEntryCard from '../../components/Document/DocumentEntryCard'
 import PageState from '../../components/Feedback/PageState'
 import { useToast } from '../../components/Feedback/Toast'
 import { DashboardSkeleton } from '../../components/Feedback/Skeleton'
@@ -102,19 +103,21 @@ const Home = () => {
   const knowledgeBases = dashboard.knowledgeBases || []
   const recentDocuments = dashboard.recentDocuments || []
   const knowledgeBaseMap = new Map(knowledgeBases.map((item) => [item.id, item]))
+  const latestRecentDocument = recentDocuments[0] || null
+  const latestKnowledgeBase = knowledgeBases[0] || null
   const summaryCards = [
     {
       label: '最近编辑',
       value: recentDocuments.length,
-      hint: recentDocuments[0]
-        ? `最后更新 ${dayjs(recentDocuments[0].updatedAt).format('MM-DD HH:mm')}`
+      hint: latestRecentDocument
+        ? `最后更新 ${dayjs(latestRecentDocument.updatedAt).format('MM-DD HH:mm')}`
         : '从知识库开始写第一篇文档',
     },
     {
       label: '知识库',
       value: knowledgeBases.length,
-      hint: knowledgeBases[0]
-        ? `最近入口：${knowledgeBases[0].name}`
+      hint: latestKnowledgeBase
+        ? `最近入口：${latestKnowledgeBase.name}`
         : '当前工作区还没有知识库',
     },
   ]
@@ -164,27 +167,36 @@ const Home = () => {
               {recentDocuments.length > 0 ? (
                 recentDocuments.map((document, index) => {
                   const knowledgeBase = knowledgeBaseMap.get(document.knowledgeBaseId)
+                  const documentSummary = document.summary?.trim() || '从这里继续补正文、版本和公开内容。'
 
                   return (
-                    <article
+                    <DocumentEntryCard
                       key={document.id}
-                      className={`${styles.documentItem} ${index === 0 ? styles.documentItemActive : ''}`}
-                      onClick={() => navigate(`/docs/${document.id}/edit`)}
-                    >
-                      <div className={styles.documentMark} aria-hidden="true" />
-                      <div className={`${styles.itemBody} ${styles.documentBody}`}>
-                        <div className={styles.documentTopline}>
-                          <div className={styles.itemTitle}>{document.title}</div>
-                          <span className={styles.documentAction}>继续编辑</span>
+                      className={`${styles.documentCard} ${index === 0 ? styles.documentCardActive : ''}`}
+                      eyebrow={knowledgeBase?.name || `知识库 #${document.knowledgeBaseId}`}
+                      title={document.title}
+                      summary={documentSummary}
+                      badges={index === 0 ? [{ key: 'recent', label: '继续工作', tone: 'primary' }] : []}
+                      details={<div className={styles.cardMeta}>最近更新 {dayjs(document.updatedAt).format('MM-DD HH:mm')}</div>}
+                      actions={(
+                        <div className={styles.cardActions}>
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={() => navigate(`/docs/${document.id}`)}
+                          >
+                            阅读
+                          </button>
+                          <button
+                            type="button"
+                            className={styles.primaryButton}
+                            onClick={() => navigate(`/docs/${document.id}/edit`)}
+                          >
+                            继续编辑
+                          </button>
                         </div>
-                        <div className={styles.itemMeta}>
-                          <span>{knowledgeBase?.name || `知识库 #${document.knowledgeBaseId}`}</span>
-                          <span className={styles.metaDivider} aria-hidden="true" />
-                          <span>{dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
-                        </div>
-                      </div>
-                      <div className={styles.itemTail} aria-hidden="true">›</div>
-                    </article>
+                      )}
+                    />
                   )
                 })
               ) : (
@@ -207,20 +219,16 @@ const Home = () => {
               <div className={styles.knowledgeList}>
                 {knowledgeBases.length > 0 ? (
                   knowledgeBases.map((knowledgeBase) => (
-                    <article
+                    <DocumentEntryCard
                       key={knowledgeBase.id}
-                      className={styles.knowledgeItem}
-                      onClick={() => navigate(`/kb/${knowledgeBase.id}`)}
-                    >
-                      <div className={styles.knowledgeMark} aria-hidden="true" />
-                      <div className={`${styles.itemBody} ${styles.knowledgeBody}`}>
-                        <div className={styles.itemTitle}>{knowledgeBase.name}</div>
-                        <div className={styles.itemMeta}>
-                          <span>{knowledgeBase.documentCount} 篇文档</span>
-                        </div>
-                      </div>
-                      <div className={styles.itemTail} aria-hidden="true">›</div>
-                    </article>
+                      className={styles.knowledgeCard}
+                      to={`/kb/${knowledgeBase.id}`}
+                      eyebrow="知识库"
+                      title={knowledgeBase.name}
+                      summary={knowledgeBase.description?.trim() || '继续整理目录、正文和对外发布入口。'}
+                      badges={knowledgeBase.id === latestKnowledgeBase?.id ? [{ key: 'latest', label: '最近入口', tone: 'primary' }] : []}
+                      details={<div className={styles.cardMeta}>{knowledgeBase.documentCount || 0} 篇文档</div>}
+                    />
                   ))
                 ) : (
                   <div className={styles.emptyState}>

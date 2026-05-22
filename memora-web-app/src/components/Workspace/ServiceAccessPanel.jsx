@@ -420,7 +420,7 @@ const ServiceAccessPanel = ({
         <div>
           <p className={styles.eyebrow}>开放接入</p>
           <h2 className={styles.title}>机器接入凭证</h2>
-          <p className={styles.description}>集中管理机器主体、可访问知识库和访问密钥，进入页面即可查看仍可展示的当前密钥。</p>
+          <p className={styles.description}>统一管理机器主体和访问密钥；仍可再次展示的当前密钥会直接显示在卡片里。</p>
         </div>
         <div className={styles.headerTools}>
           <div className={styles.headerStats}>
@@ -756,7 +756,7 @@ const ServiceAccessPanel = ({
           <div className={styles.formSectionHeader}>
             <div>
               <strong>新建机器主体</strong>
-              <span>创建主体并直接拿到首把可用密钥。</span>
+              <span>创建后会直接拿到首把可用密钥。</span>
             </div>
           </div>
 

@@ -95,7 +95,7 @@ const PublicSitePage = () => {
     <div className={styles.page}>
       <header className={styles.hero}>
         <div className={styles.heroMain}>
-          <p className={styles.eyebrow}>Memora Public Site</p>
+          <p className={styles.eyebrow}>公开站点</p>
           <h1 className={styles.title}>{site.siteTitle}</h1>
           {site.siteDescription ? <p className={styles.description}>{site.siteDescription}</p> : null}
           <div className={styles.meta}>
@@ -152,8 +152,8 @@ const PublicSitePage = () => {
           ) : (
             <section className={styles.homePanel}>
               <div className={styles.homeCard}>
-                <h2>已发布内容</h2>
-                <p>这里展示当前知识库对外开放的正式文档入口。选择左侧任一条目即可直接阅读。</p>
+                <h2>已发布文档</h2>
+                <p>这里展示当前知识库已经正式公开的内容入口。选择任一条目即可直接阅读。</p>
               </div>
               <div className={styles.cardGrid}>
                 {navigation.length > 0 ? navigation.map((item) => (

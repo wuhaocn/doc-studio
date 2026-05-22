@@ -36,15 +36,15 @@ const CaptureSavePage = () => {
       <div className={styles.shell}>
         <header className={styles.hero}>
           <p className={styles.eyebrow}>网页保存</p>
-          <h1 className={styles.title}>保存当前页面到 Memora</h1>
+          <h1 className={styles.title}>把当前内容保存到 Memora</h1>
           <p className={styles.description}>
-            这是浏览器书签脚本、对话框插件和轻量外部工具使用的保存入口。外部工具既可以只带标题与选中文本进来，也可以直接携带预生成的 Markdown / HTML 草稿，再通过一把具备写入权限的访问密钥保存到指定知识库。
+            这个入口可以接住网页剪藏和外部草稿。把当前页面、选中文本或预生成的 Markdown / HTML 带进来后，直接保存到指定知识库即可。
           </p>
           <div className={styles.metaRow}>
             <span className={styles.metaPill}>知识库 #{initialValues.knowledgeBaseId || '-'}</span>
-            <span className={styles.metaPill}>{initialValues.parentId > 0 ? `父目录 #${initialValues.parentId}` : '根目录'}</span>
-            <span className={styles.metaPill}>{dialogDraft ? '已携带草稿' : '浏览器捕获模式'}</span>
-            <span className={styles.metaPill}>{initialValues.format}</span>
+            <span className={styles.metaPill}>{initialValues.parentId > 0 ? `目录 #${initialValues.parentId}` : '根目录'}</span>
+            <span className={styles.metaPill}>{dialogDraft ? '草稿已带入' : '网页捕获'}</span>
+            <span className={styles.metaPill}>{initialValues.format === 'HTML' ? 'HTML 正文' : 'Markdown 正文'}</span>
           </div>
         </header>
 
@@ -55,7 +55,7 @@ const CaptureSavePage = () => {
         />
 
         <div className={styles.footerNote}>
-          如果还没有机器接入凭证，先到 <Link to="/workspace/manage/access">工作区管理 / 开放接入</Link> 创建机器主体和访问密钥。
+          还没有可写密钥时，先到 <Link to="/workspace/manage/access">工作区管理 / 开放接入</Link> 创建主体和密钥。
         </div>
       </div>
     </div>

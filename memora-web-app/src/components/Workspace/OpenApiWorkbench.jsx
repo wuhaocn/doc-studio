@@ -366,18 +366,18 @@ const OpenApiWorkbench = ({
     <section className={`${styles.panel} ${workspaceMode ? '' : styles.panelStandalone}`}>
       <div className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>{workspaceMode ? '导入验证工具' : '保存到 Memora'}</p>
-          <h2 className={styles.title}>{workspaceMode ? '先验证保存与读取闭环' : '把当前内容保存为文档草稿'}</h2>
+          <p className={styles.eyebrow}>{workspaceMode ? '接入调试' : '保存到 Memora'}</p>
+          <h2 className={styles.title}>{workspaceMode ? '先跑通一次保存和读取' : '把当前内容保存进知识库'}</h2>
           <p className={styles.description}>
             {workspaceMode
-              ? '先用单文档把 Markdown / HTML 的保存、回读和打开链路跑通，再扩展到批量同步或对话框插件。'
-              : '这个页面可由浏览器书签脚本或外部工具打开。临时粘贴一把具备写入权限的访问密钥后，即可把当前内容保存到指定知识库。'}
+              ? '先拿一篇文档验证保存、回读和打开阅读页，确认无误后再接浏览器、脚本或对话框。'
+              : '这个入口会把当前页面或外部草稿带进 Memora。粘贴一把可写密钥后，就能直接保存到指定知识库。'}
           </p>
         </div>
         <div className={styles.headerPills}>
-          <span className={styles.metaPill}>保存或更新</span>
-          <span className={styles.metaPill}>来源标识</span>
-          <span className={styles.metaPill}>Markdown / HTML</span>
+          <span className={styles.metaPill}>{workspaceMode ? '单篇验证' : '当前草稿'}</span>
+          <span className={styles.metaPill}>{workspaceMode ? '按标识回读' : '指定知识库'}</span>
+          <span className={styles.metaPill}>{workspaceMode ? '打开阅读页' : 'Markdown / HTML'}</span>
         </div>
       </div>
 
@@ -385,12 +385,12 @@ const OpenApiWorkbench = ({
         <div className={styles.editorCard}>
           <div className={styles.cardHeader}>
             <strong>保存参数</strong>
-            <span>使用访问密钥</span>
+            <span>当前页内临时使用</span>
           </div>
 
           <div className={styles.formGrid}>
             <label className={styles.field}>
-              <span>临时访问密钥</span>
+              <span>访问密钥</span>
               <input
                 type="password"
                 autoComplete="off"
@@ -402,7 +402,7 @@ const OpenApiWorkbench = ({
 
             {hasManagedKnowledgeBases ? (
               <label className={styles.field}>
-                <span>目标知识库</span>
+                <span>知识库</span>
                 <select
                   value={form.knowledgeBaseId}
                   onChange={(event) => setForm((current) => ({ ...current, knowledgeBaseId: Number(event.target.value) }))}
@@ -414,7 +414,7 @@ const OpenApiWorkbench = ({
               </label>
             ) : (
               <label className={styles.field}>
-                <span>目标知识库编号</span>
+                <span>知识库编号</span>
                 <input
                   type="number"
                   min="1"
@@ -429,7 +429,7 @@ const OpenApiWorkbench = ({
           <div className={styles.formGrid}>
             {hasManagedKnowledgeBases ? (
               <label className={styles.field}>
-                <span>父目录</span>
+                <span>保存目录</span>
                 <select
                   value={form.parentId}
                   onChange={(event) => setForm((current) => ({ ...current, parentId: Number(event.target.value) }))}
@@ -441,7 +441,7 @@ const OpenApiWorkbench = ({
               </label>
             ) : (
               <label className={styles.field}>
-                <span>父目录编号</span>
+                <span>目录编号</span>
                 <input
                   type="number"
                   min="0"
@@ -453,7 +453,7 @@ const OpenApiWorkbench = ({
             )}
 
             <label className={styles.field}>
-              <span>格式</span>
+              <span>正文格式</span>
               <select
                 value={form.format}
                 onChange={(event) => setForm((current) => ({ ...current, format: event.target.value }))}
@@ -482,7 +482,7 @@ const OpenApiWorkbench = ({
 
           <div className={styles.formGrid}>
             <label className={styles.field}>
-              <span>来源标识</span>
+              <span>文档标识</span>
               <input
                 value={form.sourceExternalId}
                 onChange={(event) => setForm((current) => ({ ...current, sourceExternalId: event.target.value }))}
@@ -490,7 +490,7 @@ const OpenApiWorkbench = ({
               />
             </label>
             <label className={styles.field}>
-              <span>来源版本</span>
+              <span>上游版本</span>
               <input
                 value={form.sourceRevision}
                 onChange={(event) => setForm((current) => ({ ...current, sourceRevision: event.target.value }))}
@@ -501,10 +501,10 @@ const OpenApiWorkbench = ({
 
           <div className={styles.inlineActions}>
             <button type="button" className={styles.secondaryButton} onClick={handleRegenerateIdentity}>
-              重新生成来源标识
+              重置标识
             </button>
             <span className={styles.inlineHint}>
-              {folderLoading ? '正在加载父目录选项...' : '来源标识负责定位文档，来源版本负责避免覆盖更新。'}
+              {folderLoading ? '正在加载目录选项...' : '文档标识用于定位同一篇文档，上游版本用于避免覆盖。'}
             </span>
           </div>
 
@@ -538,7 +538,7 @@ const OpenApiWorkbench = ({
                 disabled={reading || !form.apiKey.trim() || !payload.sourceExternalId}
                 onClick={() => void loadBySource(consumeView)}
               >
-                {reading ? '读取中...' : '按来源读取'}
+                {reading ? '读取中...' : '读取当前文档'}
               </button>
             </div>
 
@@ -553,7 +553,7 @@ const OpenApiWorkbench = ({
           </div>
 
           <div className={styles.subtleText}>
-            访问密钥只保存在当前页面内存中。这个入口只负责生成或更新草稿，正式公开仍通过文档发布和公开站点完成。
+            访问密钥只保存在当前页面内存中。这里先完成保存和读取验证，正式公开仍通过发布或公开站点完成。
           </div>
         </div>
 
@@ -570,7 +570,7 @@ const OpenApiWorkbench = ({
                 variant="compact"
               />
             ) : (
-              <div className={styles.emptyState}>当前正文为空，执行保存后会生成空白文档。</div>
+              <div className={styles.emptyState}>当前正文为空，保存后会生成空白文档。</div>
             )}
           </section>
 

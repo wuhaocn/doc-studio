@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import DocumentEntryCard from '../Document/DocumentEntryCard'
 import DocumentRenderedContent from '../Document/DocumentRenderedContent'
 
 const KnowledgeBaseDocumentPanel = ({
@@ -229,22 +230,40 @@ const KnowledgeBaseDocumentPanel = ({
                 </div>
                 <p className={styles.folderStageText}>目录本身不写正文，继续新建文档或目录就可以。</p>
                 <div className={styles.folderStageActions}>
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={() => openCreateDocumentModal('DOC')}
-                  >
-                    新建文档
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={() => openCreateDocumentModal('FOLDER')}
-                  >
-                    新建目录
-                  </button>
+                  <DocumentEntryCard
+                    className={styles.folderActionCard}
+                    eyebrow="正文入口"
+                    title="新建文档"
+                    summary="在当前目录下开始写一篇正文，继续沉淀内容。"
+                    details={<div className={styles.folderActionMeta}>保存后会直接进入独立编辑页。</div>}
+                    actions={(
+                      <button
+                        type="button"
+                        className={styles.primaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={() => openCreateDocumentModal('DOC')}
+                      >
+                        新建文档
+                      </button>
+                    )}
+                  />
+                  <DocumentEntryCard
+                    className={styles.folderActionCard}
+                    eyebrow="结构入口"
+                    title="新建目录"
+                    summary="继续整理结构，把后续文档收进更清晰的层级。"
+                    details={<div className={styles.folderActionMeta}>适合先搭目录，再逐步补正文。</div>}
+                    actions={(
+                      <button
+                        type="button"
+                        className={styles.secondaryButton}
+                        disabled={!canWriteKnowledgeBase}
+                        onClick={() => openCreateDocumentModal('FOLDER')}
+                      >
+                        新建目录
+                      </button>
+                    )}
+                  />
                 </div>
               </section>
             ) : shouldRenderRichPreview ? (
