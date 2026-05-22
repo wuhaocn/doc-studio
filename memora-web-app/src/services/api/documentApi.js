@@ -10,9 +10,9 @@ export const documentApi = {
   },
 
   searchDocuments: async (keyword, options = {}) => {
-    const { page = 1, size = 50 } = options
+    const { page = 1, size = 50, knowledgeBaseId } = options
     return httpClient.get('/api/v1/documents', {
-      params: { page, size, keyword },
+      params: { page, size, keyword, knowledgeBaseId },
     })
   },
 
@@ -39,6 +39,14 @@ export const documentApi = {
 
   updateDocument: async (id, data) => {
     return httpClient.put(`/api/v1/documents/${id}`, data)
+  },
+
+  publishDocument: async (id, data = {}) => {
+    return httpClient.put(`/api/v1/documents/${id}/publish`, data)
+  },
+
+  unpublishDocument: async (id) => {
+    return httpClient.delete(`/api/v1/documents/${id}/publish`)
   },
 
   deleteDocument: async (id) => {

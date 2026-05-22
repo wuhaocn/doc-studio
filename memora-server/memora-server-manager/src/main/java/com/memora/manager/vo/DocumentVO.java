@@ -44,6 +44,24 @@ public class DocumentVO {
     
     private Integer sortOrder;
 
+    private String publishStatus;
+
+    private String publicSlug;
+
+    private LocalDateTime publishedAt;
+
+    private String renderedHtml;
+
+    private String renderChecksum;
+
+    private Boolean published;
+
+    private String publicUrl;
+
+    private String sourceExternalId;
+
+    private String sourceRevision;
+
     private LocalDateTime createdAt;
     
     private LocalDateTime updatedAt;

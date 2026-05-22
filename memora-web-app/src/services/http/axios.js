@@ -1,7 +1,9 @@
 import axios from 'axios'
 import { clearCurrentUser, getCurrentUser, hydrateCurrentUser } from '../../utils/user'
+import { getRuntimeWebClientHeaders } from '../runtime/runtimeConfig'
 
 export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080'
+const runtimeWebClientHeaders = getRuntimeWebClientHeaders()
 
 const hasLocalSession = () => {
   const currentUser = getCurrentUser()
@@ -15,7 +17,7 @@ const httpClient = axios.create({
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'X-Memora-Client': 'memora-web-app',
+    ...runtimeWebClientHeaders,
   },
 })
 
@@ -25,7 +27,7 @@ const refreshClient = axios.create({
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-    'X-Memora-Client': 'memora-web-app',
+    ...runtimeWebClientHeaders,
   },
 })
 

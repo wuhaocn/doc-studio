@@ -33,6 +33,7 @@ public class ApiKeyAccessService {
     public static final int API_KEY_STATUS_DISABLED = 0;
     public static final int API_KEY_STATUS_ACTIVE = 1;
     public static final int API_KEY_STATUS_REVOKED = 2;
+    public static final int SERVICE_ACCOUNT_STATUS_DISABLED = 0;
     public static final int SERVICE_ACCOUNT_STATUS_ACTIVE = 1;
     public static final int KEY_PREFIX_LENGTH = 18;
 
@@ -66,7 +67,7 @@ public class ApiKeyAccessService {
             apiKey.setSecretHash(passwordCodec.hash(rawKey));
         }
 
-        ServiceAccount serviceAccount = requireActiveServiceAccount(apiKey);
+        ServiceAccount serviceAccount = requireActiveServiceAccount(apiKey, actionType);
         if (apiKey.getStatus() == null || apiKey.getStatus() == API_KEY_STATUS_DISABLED) {
             recordFailure(apiKey, serviceAccount, actionType, "当前 API key 已禁用");
             throw new BusinessException(403, "当前 API key 已禁用");
@@ -191,11 +192,14 @@ public class ApiKeyAccessService {
         return apiKeyMapper.selectOne(queryWrapper);
     }
 
-    private ServiceAccount requireActiveServiceAccount(ApiKey apiKey) {
+    private ServiceAccount requireActiveServiceAccount(ApiKey apiKey, String actionType) {
         ServiceAccount serviceAccount = serviceAccountMapper.selectById(apiKey.getServiceAccountId());
-        if (serviceAccount == null || !Objects.equals(serviceAccount.getTenantId(), apiKey.getTenantId())
-            || serviceAccount.getStatus() == null || serviceAccount.getStatus() != SERVICE_ACCOUNT_STATUS_ACTIVE) {
+        if (serviceAccount == null || !Objects.equals(serviceAccount.getTenantId(), apiKey.getTenantId())) {
             throw new BusinessException(403, "当前 API key 对应的机器主体不可用");
+        }
+        if (serviceAccount.getStatus() == null || serviceAccount.getStatus() != SERVICE_ACCOUNT_STATUS_ACTIVE) {
+            recordFailure(apiKey, serviceAccount, actionType, "当前 API key 对应的机器主体已停用");
+            throw new BusinessException(403, "当前 API key 对应的机器主体已停用");
         }
         return serviceAccount;
     }

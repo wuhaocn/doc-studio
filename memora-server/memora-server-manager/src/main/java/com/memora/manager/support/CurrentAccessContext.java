@@ -57,6 +57,11 @@ public class CurrentAccessContext {
         return requireAccessTokenPayload().sessionToken();
     }
 
+    public Long getCurrentSessionIdOrNull() {
+        AccessTokenPayload payload = resolveAccessTokenPayload();
+        return payload == null ? null : payload.sessionId();
+    }
+
     private AccessTokenPayload requireAccessTokenPayload() {
         AccessTokenPayload tokenPayload = resolveAccessTokenPayload();
         if (tokenPayload == null) {
@@ -121,7 +126,7 @@ public class CurrentAccessContext {
         if (session == null) {
             return null;
         }
-        return new AccessTokenPayload(session.getTenantId(), session.getUserId(), token, true);
+        return new AccessTokenPayload(session.getTenantId(), session.getUserId(), session.getId(), token, true);
     }
 
     private UserSession findActiveSessionByStoredToken(String storedToken) {
@@ -140,12 +145,12 @@ public class CurrentAccessContext {
         }
 
         try {
-            return new AccessTokenPayload(Long.parseLong(parts[0]), Long.parseLong(parts[1]), token, false);
+            return new AccessTokenPayload(Long.parseLong(parts[0]), Long.parseLong(parts[1]), null, token, false);
         } catch (NumberFormatException ex) {
             return null;
         }
     }
 
-    private record AccessTokenPayload(Long tenantId, Long userId, String accessToken, boolean sessionToken) {
+    private record AccessTokenPayload(Long tenantId, Long userId, Long sessionId, String accessToken, boolean sessionToken) {
     }
 }

@@ -1,0 +1,289 @@
+.panel {
+  border-radius: 24px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: linear-gradient(180deg, rgba(250, 252, 255, 0.98), rgba(255, 255, 255, 0.98));
+  box-shadow: 0 22px 60px rgba(15, 23, 42, 0.08);
+  padding: 24px;
+}
+
+.panelStandalone {
+  padding: 26px;
+}
+
+.header,
+.cardHeader,
+.resultTopline,
+.actionRow,
+.inlineActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #245bdb;
+}
+
+.title {
+  margin-top: 6px;
+  color: #111827;
+  font-size: clamp(24px, 2.7vw, 34px);
+  line-height: 1.08;
+}
+
+.description,
+.cardDescription,
+.subtleText,
+.inlineHint,
+.resultMeta span {
+  color: #66707c;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.description {
+  margin-top: 10px;
+  max-width: 760px;
+}
+
+.headerPills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.metaPill,
+.statusChip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.metaPill {
+  background: rgba(31, 111, 255, 0.08);
+  color: #245bdb;
+}
+
+.statusChip {
+  background: rgba(15, 23, 42, 0.06);
+  color: #4b5563;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.95fr);
+  gap: 18px;
+  margin-top: 20px;
+}
+
+.editorCard,
+.previewCard,
+.resultCard,
+.snippetCard {
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  padding: 18px;
+}
+
+.previewColumn {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.field span {
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.field input,
+.field select,
+.field textarea,
+.consumeControl select {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+}
+
+.contentInput {
+  min-height: 260px;
+  resize: vertical;
+  font-family: 'SFMono-Regular', ui-monospace, 'Menlo', monospace;
+  line-height: 1.65;
+}
+
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.primaryButton {
+  background: #1f6fff;
+  color: #ffffff;
+}
+
+.secondaryButton {
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  color: #4b5563;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.inlineActions {
+  margin-top: 14px;
+}
+
+.actionRow {
+  margin-top: 18px;
+  align-items: center;
+}
+
+.consumeControl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.message {
+  margin-top: 16px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.messageError {
+  background: rgba(254, 242, 242, 0.98);
+  color: #b91c1c;
+}
+
+.messageSuccess {
+  background: rgba(236, 253, 245, 0.98);
+  color: #047857;
+}
+
+.previewContent,
+.remotePreview {
+  margin-top: 14px;
+}
+
+.emptyState {
+  margin-top: 14px;
+  padding: 16px;
+  border-radius: 14px;
+  background: #f6f8fb;
+  color: #66707c;
+  line-height: 1.7;
+}
+
+.resultBlock + .resultBlock {
+  margin-top: 14px;
+}
+
+.resultMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 8px;
+}
+
+.resultSummary {
+  margin-top: 10px;
+  color: #374151;
+  line-height: 1.7;
+}
+
+.linkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.codeBlock {
+  margin-top: 14px;
+  max-height: 280px;
+  overflow: auto;
+  border-radius: 14px;
+  padding: 14px;
+  background: #0f172a;
+  color: #dbeafe;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.snippetGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+}
+
+@media (max-width: 1100px) {
+  .workspace,
+  .snippetGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .panel,
+  .panelStandalone {
+    padding: 18px;
+    border-radius: 20px;
+  }
+
+  .header,
+  .cardHeader,
+  .resultTopline,
+  .actionRow,
+  .inlineActions {
+    flex-direction: column;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

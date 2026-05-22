@@ -49,14 +49,22 @@ CREATE TABLE IF NOT EXISTS user_session (
   user_id BIGINT NOT NULL,
   tenant_id BIGINT NOT NULL,
   access_token VARCHAR(255) NOT NULL,
+  client_type VARCHAR(60),
+  user_agent VARCHAR(255),
+  ip_address VARCHAR(64),
   status TINYINT DEFAULT 1,
   expires_at TIMESTAMP NOT NULL,
   last_active_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  revoked_at TIMESTAMP NULL
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS uk_user_session_access_token ON user_session(access_token);
 CREATE INDEX IF NOT EXISTS idx_user_session_user_tenant ON user_session(user_id, tenant_id);
+ALTER TABLE user_session ADD COLUMN IF NOT EXISTS client_type VARCHAR(60);
+ALTER TABLE user_session ADD COLUMN IF NOT EXISTS user_agent VARCHAR(255);
+ALTER TABLE user_session ADD COLUMN IF NOT EXISTS ip_address VARCHAR(64);
+ALTER TABLE user_session ADD COLUMN IF NOT EXISTS revoked_at TIMESTAMP NULL;
 
 CREATE TABLE IF NOT EXISTS tenant_invite (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,
@@ -93,6 +101,10 @@ CREATE TABLE IF NOT EXISTS knowledge_base (
   document_count INT DEFAULT 0,
   view_count INT DEFAULT 0,
   sort_order INT DEFAULT 0,
+  site_enabled TINYINT DEFAULT 0,
+  site_slug VARCHAR(120),
+  site_title VARCHAR(120),
+  site_description VARCHAR(500),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP NULL,
@@ -105,6 +117,11 @@ CREATE INDEX IF NOT EXISTS idx_kb_tenant_id ON knowledge_base(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_kb_user_id ON knowledge_base(user_id);
 CREATE INDEX IF NOT EXISTS idx_kb_status ON knowledge_base(status);
 CREATE INDEX IF NOT EXISTS idx_kb_created_at ON knowledge_base(created_at);
+ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS site_enabled TINYINT DEFAULT 0;
+ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS site_slug VARCHAR(120);
+ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS site_title VARCHAR(120);
+ALTER TABLE knowledge_base ADD COLUMN IF NOT EXISTS site_description VARCHAR(500);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_kb_site_slug ON knowledge_base(site_slug);
 
 -- 知识库成员权限表
 CREATE TABLE IF NOT EXISTS knowledge_base_member (
@@ -131,7 +148,7 @@ CREATE TABLE IF NOT EXISTS document (
   title VARCHAR(200) NOT NULL,
   slug VARCHAR(160) NOT NULL,
   doc_type VARCHAR(30) DEFAULT 'DOC',
-  format VARCHAR(30) DEFAULT 'MARKDOWN',
+  format VARCHAR(30),
   content CLOB,
   content_text CLOB,
   summary VARCHAR(500),
@@ -144,6 +161,13 @@ CREATE TABLE IF NOT EXISTS document (
   status TINYINT DEFAULT 1,
   view_count INT DEFAULT 0,
   sort_order INT DEFAULT 0,
+  publish_status VARCHAR(30) DEFAULT 'DRAFT',
+  public_slug VARCHAR(160),
+  published_at TIMESTAMP NULL,
+  rendered_html CLOB,
+  render_checksum VARCHAR(128),
+  source_external_id VARCHAR(160),
+  source_revision VARCHAR(160),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   deleted_at TIMESTAMP NULL,
@@ -158,6 +182,16 @@ CREATE INDEX IF NOT EXISTS idx_doc_tenant_id ON document(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_doc_user_id ON document(user_id);
 CREATE INDEX IF NOT EXISTS idx_doc_parent_id ON document(parent_id);
 CREATE INDEX IF NOT EXISTS idx_doc_created_at ON document(created_at);
+ALTER TABLE document ADD COLUMN IF NOT EXISTS publish_status VARCHAR(30) DEFAULT 'DRAFT';
+ALTER TABLE document ADD COLUMN IF NOT EXISTS public_slug VARCHAR(160);
+ALTER TABLE document ADD COLUMN IF NOT EXISTS published_at TIMESTAMP NULL;
+ALTER TABLE document ADD COLUMN IF NOT EXISTS rendered_html CLOB;
+ALTER TABLE document ADD COLUMN IF NOT EXISTS render_checksum VARCHAR(128);
+ALTER TABLE document ADD COLUMN IF NOT EXISTS source_external_id VARCHAR(160);
+ALTER TABLE document ADD COLUMN IF NOT EXISTS source_revision VARCHAR(160);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_doc_kb_public_slug ON document(knowledge_base_id, public_slug);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_doc_kb_source_external_id ON document(knowledge_base_id, source_external_id);
+CREATE INDEX IF NOT EXISTS idx_doc_publish_status ON document(publish_status, published_at);
 
 -- 文档版本表
 CREATE TABLE IF NOT EXISTS document_version (
@@ -165,7 +199,7 @@ CREATE TABLE IF NOT EXISTS document_version (
   document_id BIGINT NOT NULL,
   version INT NOT NULL,
   title VARCHAR(200) NOT NULL,
-  format VARCHAR(30) DEFAULT 'MARKDOWN',
+  format VARCHAR(30),
   content CLOB,
   content_text CLOB,
   user_id BIGINT NOT NULL,
@@ -278,6 +312,7 @@ CREATE TABLE IF NOT EXISTS api_key (
   name VARCHAR(120) NOT NULL,
   key_prefix VARCHAR(40) NOT NULL,
   secret_hash VARCHAR(255) NOT NULL,
+  secret_ciphertext VARCHAR(1024),
   status TINYINT DEFAULT 1,
   expires_at TIMESTAMP NOT NULL,
   last_used_at TIMESTAMP NULL,
@@ -293,6 +328,7 @@ CREATE TABLE IF NOT EXISTS api_key (
 
 CREATE INDEX IF NOT EXISTS idx_api_key_service_account ON api_key(service_account_id, created_at);
 CREATE UNIQUE INDEX IF NOT EXISTS uk_api_key_prefix ON api_key(key_prefix);
+ALTER TABLE api_key ADD COLUMN IF NOT EXISTS secret_ciphertext VARCHAR(1024);
 
 CREATE TABLE IF NOT EXISTS api_key_scope (
   id BIGINT AUTO_INCREMENT PRIMARY KEY,

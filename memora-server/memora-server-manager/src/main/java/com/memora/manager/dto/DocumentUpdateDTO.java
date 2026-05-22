@@ -19,8 +19,6 @@ public class DocumentUpdateDTO {
     private String format;
     
     private String content;
-    
-    private String contentText;
 
     @Size(max = 500, message = "摘要长度不能超过500个字符")
     private String summary;

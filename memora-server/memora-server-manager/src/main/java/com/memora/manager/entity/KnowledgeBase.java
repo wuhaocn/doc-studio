@@ -34,6 +34,14 @@ public class KnowledgeBase {
     private Integer viewCount;
     
     private Integer sortOrder;
+
+    private Integer siteEnabled;
+
+    private String siteSlug;
+
+    private String siteTitle;
+
+    private String siteDescription;
     
     private LocalDateTime createdAt;
     

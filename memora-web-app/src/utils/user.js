@@ -1,5 +1,10 @@
 const STORAGE_KEY = 'memora-auth-session'
 export const AUTH_SESSION_CHANGED_EVENT = 'memora:auth-session-changed'
+export const AUTH_SESSION_BROADCAST_STORAGE_KEY = 'memora-auth-session-broadcast'
+const AUTH_SESSION_BROADCAST_ACTIONS = {
+  SYNC: 'SYNC',
+  CLEAR: 'CLEAR',
+}
 const primaryStorage = () => window.sessionStorage
 const legacyStorage = () => window.localStorage
 
@@ -71,21 +76,53 @@ const readStoredUser = () => {
   }
 }
 
-const persistUser = (user) => {
+const dispatchSessionChanged = (detail) => {
+  window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT, { detail }))
+}
+
+const writeStoredUser = (user) => {
   if (!user) {
     return null
   }
 
-  const nextValue = JSON.stringify(user)
+  const normalizedUser = normalizeStoredUser(user)
+  if (!normalizedUser) {
+    return null
+  }
+
+  const nextValue = JSON.stringify(normalizedUser)
   const currentValue = primaryStorage().getItem(STORAGE_KEY)
   if (currentValue === nextValue) {
-    return user
+    return normalizedUser
   }
 
   primaryStorage().setItem(STORAGE_KEY, nextValue)
   legacyStorage().removeItem(STORAGE_KEY)
-  window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT, { detail: user }))
-  return user
+  return normalizedUser
+}
+
+const broadcastSessionChange = (action, user = null) => {
+  legacyStorage().setItem(AUTH_SESSION_BROADCAST_STORAGE_KEY, JSON.stringify({
+    action,
+    user,
+    emittedAt: Date.now(),
+  }))
+  legacyStorage().removeItem(AUTH_SESSION_BROADCAST_STORAGE_KEY)
+}
+
+const persistUser = (user, options = {}) => {
+  const normalizedUser = writeStoredUser(user)
+  if (!normalizedUser) {
+    return null
+  }
+
+  if (options.broadcast !== false) {
+    broadcastSessionChange(AUTH_SESSION_BROADCAST_ACTIONS.SYNC, normalizedUser)
+  }
+  if (options.dispatch !== false) {
+    dispatchSessionChanged(normalizedUser)
+  }
+  return normalizedUser
 }
 
 export const hydrateCurrentUser = (session) => {
@@ -97,10 +134,49 @@ export const hydrateCurrentUser = (session) => {
   return persistUser(sessionUser)
 }
 
-export const clearCurrentUser = () => {
+export const clearCurrentUser = (options = {}) => {
   primaryStorage().removeItem(STORAGE_KEY)
   legacyStorage().removeItem(STORAGE_KEY)
-  window.dispatchEvent(new CustomEvent(AUTH_SESSION_CHANGED_EVENT))
+  if (options.broadcast !== false) {
+    broadcastSessionChange(AUTH_SESSION_BROADCAST_ACTIONS.CLEAR)
+  }
+  if (options.dispatch !== false) {
+    dispatchSessionChanged(null)
+  }
+}
+
+export const parseAuthSessionBroadcastStorageEvent = (event) => {
+  if (event?.key !== AUTH_SESSION_BROADCAST_STORAGE_KEY || !event?.newValue) {
+    return null
+  }
+
+  try {
+    const payload = JSON.parse(event.newValue)
+    if (!payload?.action || !Object.values(AUTH_SESSION_BROADCAST_ACTIONS).includes(payload.action)) {
+      return null
+    }
+    return payload
+  } catch (error) {
+    console.error('解析跨标签页会话广播失败', error)
+    return null
+  }
+}
+
+export const applyAuthSessionBroadcastPayload = (payload) => {
+  if (!payload?.action) {
+    return getCurrentUser()
+  }
+
+  if (payload.action === AUTH_SESSION_BROADCAST_ACTIONS.CLEAR) {
+    clearCurrentUser({ broadcast: false })
+    return null
+  }
+
+  if (payload.action === AUTH_SESSION_BROADCAST_ACTIONS.SYNC) {
+    return persistUser(payload.user, { broadcast: false })
+  }
+
+  return getCurrentUser()
 }
 
 export const isLoggedIn = () => {

@@ -33,7 +33,7 @@ public class DocumentVersion {
     private String format;
     
     /**
-     * 文档内容
+     * 原始正文内容，实际解释方式由 format 决定
      */
     private String content;
     

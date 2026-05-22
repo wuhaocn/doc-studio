@@ -13,3 +13,8 @@ spring:
 memora:
   auth:
     allow-demo-token: true
+  api-key:
+    secret-encryption-key: memora-test-api-key-secret
+  audit:
+    retention-scheduler:
+      enabled: false

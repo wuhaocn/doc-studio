@@ -13,6 +13,8 @@ import com.memora.manager.mapper.KnowledgeBaseMapper;
 import com.memora.manager.support.AuditLogCommand;
 import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
+import com.memora.manager.support.DocumentContentSupport;
+import com.memora.manager.support.DocumentRenderSupport;
 import com.memora.manager.support.OpaqueTokenCodec;
 import com.memora.manager.support.OpaqueTokenGenerator;
 import com.memora.manager.support.PasswordCodec;
@@ -305,15 +307,28 @@ public class DocumentShareService {
 
     private PublicShareDocumentVO convertToPublicDocumentVO(ShareContext context) {
         PublicShareDocumentVO vo = new PublicShareDocumentVO();
+        DocumentContentSupport.NormalizedStoredDocument normalized = DocumentContentSupport.normalizeStoredDocument(
+            context.document().getDocType(),
+            context.document().getFormat(),
+            context.document().getContent(),
+            context.document().getContentText(),
+            context.document().getSummary()
+        );
         vo.setShareId(context.shareLink().getId());
         vo.setDocumentId(context.document().getId());
         vo.setKnowledgeBaseId(context.document().getKnowledgeBaseId());
         vo.setKnowledgeBaseName(context.knowledgeBase().getName());
         vo.setTitle(context.document().getTitle());
-        vo.setFormat(context.document().getFormat());
+        vo.setFormat(normalized.format());
         vo.setContent(context.document().getContent());
-        vo.setContentText(context.document().getContentText());
-        vo.setSummary(context.document().getSummary());
+        vo.setContentText(normalized.contentText());
+        vo.setSummary(normalized.summary());
+        vo.setRenderedHtml(DocumentRenderSupport.resolveStoredRenderedHtml(
+            normalized.docType(),
+            normalized.format(),
+            normalized.content(),
+            context.document().getRenderedHtml()
+        ));
         vo.setVersionNo(context.document().getVersionNo());
         vo.setUpdatedAt(context.document().getUpdatedAt());
         vo.setExpiresAt(context.shareLink().getExpiresAt());

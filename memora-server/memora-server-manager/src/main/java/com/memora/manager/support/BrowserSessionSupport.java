@@ -10,6 +10,8 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.Locale;
+
 @Component
 public class BrowserSessionSupport {
     public static final String CLIENT_HEADER = "X-Memora-Client";
@@ -57,6 +59,21 @@ public class BrowserSessionSupport {
         return null;
     }
 
+    public String resolveClientType(HttpServletRequest request) {
+        if (request == null) {
+            return AuditLogConstants.SOURCE_DIRECT_API;
+        }
+
+        String headerValue = request.getHeader(CLIENT_HEADER);
+        if (StringUtils.hasText(headerValue)) {
+            return normalizeClientType(headerValue);
+        }
+        if (hasSessionCookie(request)) {
+            return "BROWSER_SESSION";
+        }
+        return AuditLogConstants.SOURCE_DIRECT_API;
+    }
+
     public void writeSessionCookie(HttpServletResponse response, String accessToken) {
         if (response == null || !StringUtils.hasText(accessToken)) {
             return;
@@ -79,12 +96,32 @@ public class BrowserSessionSupport {
         return session;
     }
 
+    public String getSameSite() {
+        return StringUtils.hasText(sameSite) ? sameSite : "Lax";
+    }
+
+    public boolean isSecure() {
+        return secure;
+    }
+
+    public long getCookieMaxAgeSeconds() {
+        return cookieMaxAgeSeconds;
+    }
+
+    private String normalizeClientType(String value) {
+        return value.trim()
+            .replaceAll("[^A-Za-z0-9]+", "_")
+            .replaceAll("_+", "_")
+            .replaceAll("^_|_$", "")
+            .toUpperCase(Locale.ROOT);
+    }
+
     private ResponseCookie buildCookie(String value, long maxAgeSeconds) {
         return ResponseCookie.from(cookieName, value)
             .path(StringUtils.hasText(cookiePath) ? cookiePath : "/")
             .httpOnly(true)
             .secure(secure)
-            .sameSite(StringUtils.hasText(sameSite) ? sameSite : "Lax")
+            .sameSite(getSameSite())
             .maxAge(maxAgeSeconds)
             .build();
     }

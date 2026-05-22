@@ -5,6 +5,7 @@ import com.memora.common.result.Result;
 import com.memora.manager.dto.DocumentBatchDeleteDTO;
 import com.memora.manager.dto.DocumentBatchMoveDTO;
 import com.memora.manager.dto.DocumentCreateDTO;
+import com.memora.manager.dto.DocumentPublishUpdateDTO;
 import com.memora.manager.dto.DocumentSortDTO;
 import com.memora.manager.dto.DocumentUpdateDTO;
 import com.memora.manager.entity.DocumentVersion;
@@ -31,6 +32,16 @@ public class DocumentController {
     @PutMapping("/{id}")
     public Result<DocumentVO> update(@PathVariable Long id, @Valid @RequestBody DocumentUpdateDTO dto) {
         return Result.success(documentService.update(id, dto));
+    }
+
+    @PutMapping("/{id}/publish")
+    public Result<DocumentVO> publish(@PathVariable Long id, @RequestBody(required = false) DocumentPublishUpdateDTO dto) {
+        return Result.success(documentService.publish(id, dto));
+    }
+
+    @DeleteMapping("/{id}/publish")
+    public Result<DocumentVO> unpublish(@PathVariable Long id) {
+        return Result.success(documentService.unpublish(id));
     }
 
     @DeleteMapping("/{id}")

@@ -61,6 +61,15 @@ public class AuditLogService {
     @Value("${memora.audit.export-max-size:1000}")
     private Integer exportMaxSize;
 
+    @Value("${memora.audit.retention-scheduler.enabled:true}")
+    private Boolean retentionSchedulerEnabled;
+
+    @Value("${memora.audit.retention-scheduler.cron:0 15 2 * * *}")
+    private String retentionSchedulerCron;
+
+    @Value("${memora.audit.retention-scheduler.zone:Asia/Shanghai}")
+    private String retentionSchedulerZone;
+
     private final AuditLogMapper auditLogMapper;
     private final AuditLogArchiveMapper auditLogArchiveMapper;
     private final TenantMemberMapper tenantMemberMapper;
@@ -112,6 +121,9 @@ public class AuditLogService {
         summary.setConfiguredRetentionDays(resolveRetentionDaysValue());
         summary.setArchiveBatchSize(resolveArchiveBatchSize());
         summary.setExportMaxSize(resolveExportMaxSize());
+        summary.setAutomationEnabled(Boolean.TRUE.equals(retentionSchedulerEnabled));
+        summary.setAutomationCron(retentionSchedulerCron);
+        summary.setAutomationZone(retentionSchedulerZone);
         summary.setActiveCount(activeCount);
         summary.setArchivedCount(archivedCount);
         summary.setTotalCount(activeCount + archivedCount);
@@ -178,6 +190,21 @@ public class AuditLogService {
         return header + rows.stream()
             .map(this::toCsvRow)
             .collect(Collectors.joining("\n"));
+    }
+
+    @Transactional
+    public long runSystemRetentionBatch(List<Long> tenantIds) {
+        if (tenantIds == null || tenantIds.isEmpty()) {
+            return 0L;
+        }
+
+        long archivedCount = 0L;
+        LocalDateTime archiveBeforeCreatedAt = resolveArchiveBeforeCreatedAt();
+        int batchSize = resolveArchiveBatchSize();
+        for (Long tenantId : tenantIds.stream().filter(Objects::nonNull).distinct().toList()) {
+            archivedCount += archiveTenantLogs(tenantId, archiveBeforeCreatedAt, batchSize, true);
+        }
+        return archivedCount;
     }
 
     private void record(AuditLogCommand command, String resultType) {
@@ -273,8 +300,10 @@ public class AuditLogService {
             queryWrapper.eq(AuditLog::getKnowledgeBaseId, knowledgeBaseId);
         }
         if (StringUtils.hasText(normalizedObjectType)) {
-            queryWrapper.eq(AuditLog::getObjectType, normalizedObjectType)
-                .eq(AuditLog::getObjectId, objectId);
+            queryWrapper.eq(AuditLog::getObjectType, normalizedObjectType);
+            if (objectId != null) {
+                queryWrapper.eq(AuditLog::getObjectId, objectId);
+            }
         }
         if (StringUtils.hasText(normalizedResultType)) {
             queryWrapper.eq(AuditLog::getResultType, normalizedResultType);
@@ -289,8 +318,10 @@ public class AuditLogService {
             queryWrapper.eq(AuditLogArchive::getKnowledgeBaseId, auditQuery.knowledgeBaseId());
         }
         if (StringUtils.hasText(auditQuery.normalizedObjectType())) {
-            queryWrapper.eq(AuditLogArchive::getObjectType, auditQuery.normalizedObjectType())
-                .eq(AuditLogArchive::getObjectId, auditQuery.objectId());
+            queryWrapper.eq(AuditLogArchive::getObjectType, auditQuery.normalizedObjectType());
+            if (auditQuery.objectId() != null) {
+                queryWrapper.eq(AuditLogArchive::getObjectId, auditQuery.objectId());
+            }
         }
         String normalizedResultType = StringUtils.hasText(resultType) ? resultType : auditQuery.normalizedResultType();
         if (StringUtils.hasText(normalizedResultType)) {
@@ -310,9 +341,6 @@ public class AuditLogService {
         String normalized = objectType.trim().toUpperCase(Locale.ROOT);
         if (!AuditLogConstants.QUERYABLE_OBJECT_TYPES.contains(normalized)) {
             throw new BusinessException(400, "当前 objectType 不支持审计查询");
-        }
-        if (objectId == null) {
-            throw new BusinessException(400, "按对象查询时必须提供 objectId");
         }
         return normalized;
     }
@@ -503,6 +531,49 @@ public class AuditLogService {
             .orderByAsc(AuditLog::getId)
             .last("LIMIT " + limit);
         return auditLogMapper.selectList(queryWrapper);
+    }
+
+    private long archiveTenantLogs(Long tenantId, LocalDateTime archiveBeforeCreatedAt, int batchSize, boolean recordAuditEntry) {
+        LambdaQueryWrapper<AuditLog> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(AuditLog::getTenantId, tenantId)
+            .lt(AuditLog::getCreatedAt, archiveBeforeCreatedAt)
+            .orderByAsc(AuditLog::getCreatedAt)
+            .orderByAsc(AuditLog::getId)
+            .last("LIMIT " + batchSize);
+        List<AuditLog> pendingRecords = auditLogMapper.selectList(queryWrapper);
+        if (pendingRecords.isEmpty()) {
+            return 0L;
+        }
+
+        LocalDateTime archivedAt = LocalDateTime.now();
+        for (AuditLog auditLog : pendingRecords) {
+            auditLogArchiveMapper.insert(copyToArchive(auditLog, archivedAt));
+        }
+        auditLogMapper.deleteBatchIds(pendingRecords.stream().map(AuditLog::getId).toList());
+
+        if (recordAuditEntry) {
+            recordSystemRetentionAudit(tenantId, archiveBeforeCreatedAt, pendingRecords.size());
+        }
+        return pendingRecords.size();
+    }
+
+    private void recordSystemRetentionAudit(Long tenantId, LocalDateTime archiveBeforeCreatedAt, int archivedCount) {
+        if (archivedCount <= 0) {
+            return;
+        }
+        recordSuccess(AuditLogCommand.builder()
+            .tenantId(tenantId)
+            .actorType(AuditLogConstants.ACTOR_SYSTEM)
+            .actorDisplayName("自动归档任务")
+            .objectType(AuditLogConstants.OBJECT_TENANT)
+            .objectId(tenantId)
+            .objectTitle("租户审计治理")
+            .actionType(AuditLogConstants.ACTION_APPLY_AUDIT_RETENTION)
+            .detail("自动归档过期审计记录 " + archivedCount + " 条，截止 " + archiveBeforeCreatedAt)
+            .sourceType(AuditLogConstants.SOURCE_SYSTEM_JOB)
+            .requestMethod("SCHEDULED")
+            .requestPath("/internal/audit-retention")
+            .build());
     }
 
     private LocalDateTime getActiveBoundaryCreatedAt(AuditQuery auditQuery, boolean earliest) {

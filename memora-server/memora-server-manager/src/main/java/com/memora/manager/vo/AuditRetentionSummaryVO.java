@@ -12,6 +12,12 @@ public class AuditRetentionSummaryVO {
 
     private Integer exportMaxSize;
 
+    private Boolean automationEnabled;
+
+    private String automationCron;
+
+    private String automationZone;
+
     private Long totalCount;
 
     private Long activeCount;

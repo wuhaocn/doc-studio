@@ -30,6 +30,16 @@ public class KnowledgeBaseVO {
     
     private Integer sortOrder;
 
+    private Boolean siteEnabled;
+
+    private String siteSlug;
+
+    private String siteTitle;
+
+    private String siteDescription;
+
+    private String siteUrl;
+
     private String currentRole;
 
     private Boolean canWrite;

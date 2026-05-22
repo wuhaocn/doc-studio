@@ -74,11 +74,9 @@ const KnowledgeBaseFormModal = ({
       <div className={styles.modal}>
         <div className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>知识库工作区</p>
+            <p className={styles.eyebrow}>知识库</p>
             <h2 className={styles.title}>{mode === 'create' ? '新建知识库' : '知识库设置'}</h2>
-            <p className={styles.description}>
-              {mode === 'create' ? '先填写名称，创建后直接进入知识库继续新建文档。' : '调整名称和说明，保持知识库边界清晰。'}
-            </p>
+            <p className={styles.description}>{mode === 'create' ? '创建后直接进入知识库。' : '调整名称和说明。'}</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose}>
             关闭

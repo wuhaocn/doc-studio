@@ -6,7 +6,14 @@ const EMPTY_FORM = {
   title: '',
   summary: '',
   parentId: 0,
+  format: 'RICH_TEXT',
 }
+
+const FORMAT_OPTIONS = [
+  { value: 'RICH_TEXT', label: '富文本编辑器' },
+  { value: 'MARKDOWN', label: 'Markdown 源码' },
+  { value: 'HTML', label: 'HTML 源码' },
+]
 
 const DocumentActionModal = ({
   open,
@@ -34,6 +41,7 @@ const DocumentActionModal = ({
       title: initialValues?.title || '',
       summary: initialValues?.summary || '',
       parentId: initialValues?.parentId ?? 0,
+      format: initialValues?.format || 'RICH_TEXT',
     })
     setAdvancedOpen(mode === 'edit')
   }, [initialValues, mode, open])
@@ -47,7 +55,7 @@ const DocumentActionModal = ({
   const showAdvancedSettings = mode === 'edit' || advancedOpen
   const createHint = docType === 'FOLDER'
     ? '先输入目录名称，创建后再整理结构。'
-    : '先输入文档标题，创建后会直接进入编辑页。'
+    : '先输入文档标题并选择正文格式，创建后会直接进入对应编辑器。'
 
   const handleChange = (key, value) => {
     if (localError) {
@@ -72,6 +80,7 @@ const DocumentActionModal = ({
       title: form.title.trim(),
       parentId: Number(form.parentId || 0),
       summary: form.summary.trim() || undefined,
+      format: docType === 'DOC' ? form.format : undefined,
     })
   }
 
@@ -103,6 +112,23 @@ const DocumentActionModal = ({
               required
             />
           </label>
+
+          {docType === 'DOC' ? (
+            <label className={styles.field}>
+              <span>正文格式</span>
+              <select
+                value={form.format}
+                onChange={(event) => handleChange('format', event.target.value)}
+                disabled={mode !== 'create'}
+              >
+                {FORMAT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
 
           {(mode === 'create' || docType === 'DOC') && (
             <button

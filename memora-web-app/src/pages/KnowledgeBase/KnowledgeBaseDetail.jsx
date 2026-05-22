@@ -84,9 +84,14 @@ const KnowledgeBaseDetail = () => {
     treePanelCollapsed,
     setTreePanelCollapsed,
     focusMode,
-    scrolled,
     knowledgeBaseInfoVisible,
     setKnowledgeBaseInfoVisible,
+    siteSubmitting,
+    siteError,
+    setSiteError,
+    documentPublishingSubmitting,
+    documentPublishingError,
+    setDocumentPublishingError,
     readLinkOpen,
     setReadLinkOpen,
     permissionModalOpen,
@@ -126,6 +131,9 @@ const KnowledgeBaseDetail = () => {
     selectedFolderDirectoryCount,
     loadData,
     handleSaveKnowledgeBase,
+    handleSaveSiteSettings,
+    handlePublishDocument,
+    handleUnpublishDocument,
     openPermissionModal,
     handleSubmitPermissions,
     openDocumentTrash,
@@ -155,6 +163,7 @@ const KnowledgeBaseDetail = () => {
   } = controller
 
   useDocumentTitle(knowledgeBase?.name ? `${knowledgeBase.name}` : '知识库')
+  const currentRoleLabel = ROLE_LABELS[knowledgeBase?.currentRole] || knowledgeBase?.currentRole || '未知角色'
 
   useEffect(() => {
     if (pageStatus === 'ready') {
@@ -237,113 +246,207 @@ const KnowledgeBaseDetail = () => {
   }
 
   return (
-    <div className={`${styles.page} ${scrolled ? styles.pageScrolled : ''}`}>
-      <KnowledgeBaseTreePanel
-        styles={styles}
-        knowledgeBase={knowledgeBase}
-        roleLabels={ROLE_LABELS}
-        compactKnowledgeBaseDescription={compactKnowledgeBaseDescription}
-        knowledgeBaseInfoVisible={knowledgeBaseInfoVisible}
-        setKnowledgeBaseInfoVisible={setKnowledgeBaseInfoVisible}
-        canWriteKnowledgeBase={canWriteKnowledgeBase}
-        canManageKnowledgeBase={canManageKnowledgeBase}
-        setModalError={setModalError}
-        setEditing={setEditing}
-        openPermissionModal={openPermissionModal}
-        openDocumentTrash={openDocumentTrash}
-        handleDeleteKnowledgeBase={handleDeleteKnowledgeBase}
-        focusMode={focusMode}
-        treePanelCollapsed={treePanelCollapsed}
-        scrolled={scrolled}
-        treePanelStatusText={treePanelStatusText}
-        search={search}
-        setSearch={setSearch}
-        hasFolderNodes={hasFolderNodes}
-        batchMode={batchMode}
-        hasActiveSearch={hasActiveSearch}
-        treeHintText={treeHintText}
-        selectedDocumentIds={selectedDocumentIds}
-        batchDeleting={batchDeleting}
-        handleBatchDelete={handleBatchDelete}
-        clearBatchSelection={clearBatchSelection}
-        setBatchMoveError={setBatchMoveError}
-        setBatchMoveOpen={setBatchMoveOpen}
-        documents={documents}
-        visibleDocuments={visibleDocuments}
-        selectedDocument={selectedDocument}
-        selectedDocumentIdSet={selectedDocumentIdSet}
-        draggingDocumentId={draggingDocumentId}
-        dragOverDocumentId={dragOverDocumentId}
-        dragOverPosition={dragOverPosition}
-        dragSortEnabled={dragSortEnabled}
-        handleToggleBatchMode={handleToggleBatchMode}
-        setTreePanelCollapsed={setTreePanelCollapsed}
-        openCreateDocumentModal={openCreateDocumentModal}
-        expandAllFolders={expandAllFolders}
-        collapseToTopLevelFolders={collapseToTopLevelFolders}
-        handleTreeItemKeyDown={handleTreeItemKeyDown}
-        handleDragStart={handleDragStart}
-        handleDragOver={handleDragOver}
-        handleDrop={handleDrop}
-        clearDragState={clearDragState}
-        toggleDocumentSelection={toggleDocumentSelection}
-        setSelectedDocumentId={setSelectedDocumentId}
-        toggleFolderExpanded={toggleFolderExpanded}
-        expandedFolderIdSet={expandedFolderIdSet}
-      />
-
+    <div className={styles.page}>
       <section
         className={[
-          styles.contentGrid,
-          focusMode ? styles.contentGridFocus : '',
-          !focusMode && treePanelCollapsed ? styles.contentGridNoLeft : '',
+          styles.workspaceLayout,
+          focusMode ? styles.workspaceLayoutSingle : '',
+          !focusMode && treePanelCollapsed ? styles.workspaceLayoutSingle : '',
         ]
           .filter(Boolean)
           .join(' ')}
       >
-        <KnowledgeBaseDocumentPanel
+        <KnowledgeBaseTreePanel
           styles={styles}
+          canWriteKnowledgeBase={canWriteKnowledgeBase}
           focusMode={focusMode}
           treePanelCollapsed={treePanelCollapsed}
-          setTreePanelCollapsed={setTreePanelCollapsed}
+          treePanelStatusText={treePanelStatusText}
+          search={search}
+          setSearch={setSearch}
+          hasFolderNodes={hasFolderNodes}
+          batchMode={batchMode}
+          hasActiveSearch={hasActiveSearch}
+          treeHintText={treeHintText}
+          selectedDocumentIds={selectedDocumentIds}
+          batchDeleting={batchDeleting}
+          handleBatchDelete={handleBatchDelete}
+          clearBatchSelection={clearBatchSelection}
+          setBatchMoveError={setBatchMoveError}
+          setBatchMoveOpen={setBatchMoveOpen}
           documents={documents}
+          visibleDocuments={visibleDocuments}
           selectedDocument={selectedDocument}
-          canWriteKnowledgeBase={canWriteKnowledgeBase}
-          canManageKnowledgeBase={canManageKnowledgeBase}
-          handleOpenEditorPage={handleOpenEditorPage}
-          setReadLinkOpen={setReadLinkOpen}
-          setShareDrawerOpen={setShareDrawerOpen}
+          selectedDocumentIdSet={selectedDocumentIdSet}
+          draggingDocumentId={draggingDocumentId}
+          dragOverDocumentId={dragOverDocumentId}
+          dragOverPosition={dragOverPosition}
+          dragSortEnabled={dragSortEnabled}
+          handleToggleBatchMode={handleToggleBatchMode}
+          setTreePanelCollapsed={setTreePanelCollapsed}
           openCreateDocumentModal={openCreateDocumentModal}
           openEditDocumentModal={openEditDocumentModal}
-          navigate={navigate}
-          handleToggleFocusMode={handleToggleFocusMode}
-          canMoveUp={canMoveUp}
-          dragSorting={dragSorting}
-          handleReorderDocument={handleReorderDocument}
-          canMoveDown={canMoveDown}
           handleDeleteDocument={handleDeleteDocument}
-          selectedFolderDocumentCount={selectedFolderDocumentCount}
-          selectedFolderDirectoryCount={selectedFolderDirectoryCount}
-          shouldRenderRichPreview={shouldRenderRichPreview}
-          safeSelectedDocumentContent={safeSelectedDocumentContent}
+          handleOpenEditorPage={handleOpenEditorPage}
+          expandAllFolders={expandAllFolders}
+          collapseToTopLevelFolders={collapseToTopLevelFolders}
+          handleTreeItemKeyDown={handleTreeItemKeyDown}
+          handleDragStart={handleDragStart}
+          handleDragOver={handleDragOver}
+          handleDrop={handleDrop}
+          clearDragState={clearDragState}
+          toggleDocumentSelection={toggleDocumentSelection}
+          setSelectedDocumentId={setSelectedDocumentId}
+          toggleFolderExpanded={toggleFolderExpanded}
+          expandedFolderIdSet={expandedFolderIdSet}
         />
-        {!focusMode && (
-          <KnowledgeBaseContextPanel
-            styles={styles}
-            knowledgeBase={knowledgeBase}
-            documents={documents}
-            selectedDocument={selectedDocument}
-            canWriteKnowledgeBase={canWriteKnowledgeBase}
-            canManageKnowledgeBase={canManageKnowledgeBase}
-            roleLabels={ROLE_LABELS}
-            knowledgeBaseAuditEvents={knowledgeBaseAuditEvents}
-            knowledgeBaseAuditLoading={knowledgeBaseAuditLoading}
-            knowledgeBaseAuditError={knowledgeBaseAuditError}
-            documentAuditEvents={documentAuditEvents}
-            documentAuditLoading={documentAuditLoading}
-            documentAuditError={documentAuditError}
-          />
-        )}
+
+        <div className={styles.workspaceMain}>
+          <header className={styles.pageHeader}>
+            <div className={styles.pageHeaderMain}>
+              <h1 className={styles.title}>{knowledgeBase.name}</h1>
+              <div className={styles.pageHeaderMeta}>
+                <span className={styles.metaPill}>{documents.length} 个节点</span>
+                <span className={styles.metaPill}>{currentRoleLabel}</span>
+                {knowledgeBase.permissionRestricted ? <span className={styles.metaPill}>独立权限</span> : null}
+              </div>
+              {knowledgeBaseInfoVisible && compactKnowledgeBaseDescription ? (
+                <p className={styles.pageHeaderDescription}>
+                  {compactKnowledgeBaseDescription}
+                </p>
+              ) : null}
+            </div>
+            <div className={styles.pageHeaderActions}>
+              {canWriteKnowledgeBase ? (
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  onClick={() => openCreateDocumentModal('DOC')}
+                >
+                  新建文档
+                </button>
+              ) : null}
+              <details className={styles.moreActions}>
+                <summary className={styles.secondaryButton}>更多操作</summary>
+                <div className={styles.moreActionsMenu}>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={!canWriteKnowledgeBase}
+                    onClick={() => openCreateDocumentModal('FOLDER')}
+                  >
+                    新建目录
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
+                  >
+                    {knowledgeBaseInfoVisible ? '收起说明' : '知识库说明'}
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={!canManageKnowledgeBase}
+                    onClick={() => {
+                      setModalError('')
+                      setEditing(true)
+                    }}
+                  >
+                    知识库设置
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={!canManageKnowledgeBase}
+                    onClick={openPermissionModal}
+                  >
+                    访问权限
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    disabled={!canWriteKnowledgeBase}
+                    onClick={openDocumentTrash}
+                  >
+                    文档回收站
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.dangerButton}
+                    disabled={!canManageKnowledgeBase}
+                    onClick={handleDeleteKnowledgeBase}
+                  >
+                    删除知识库
+                  </button>
+                </div>
+              </details>
+            </div>
+          </header>
+
+          <section
+            className={[
+              styles.contentGrid,
+              focusMode ? styles.contentGridFocus : '',
+            ]
+              .filter(Boolean)
+              .join(' ')}
+          >
+            <KnowledgeBaseDocumentPanel
+              styles={styles}
+              focusMode={focusMode}
+              treePanelCollapsed={treePanelCollapsed}
+              setTreePanelCollapsed={setTreePanelCollapsed}
+              documents={documents}
+              selectedDocument={selectedDocument}
+              canWriteKnowledgeBase={canWriteKnowledgeBase}
+              canManageKnowledgeBase={canManageKnowledgeBase}
+              handleOpenEditorPage={handleOpenEditorPage}
+              setReadLinkOpen={setReadLinkOpen}
+              setShareDrawerOpen={setShareDrawerOpen}
+              openCreateDocumentModal={openCreateDocumentModal}
+              openEditDocumentModal={openEditDocumentModal}
+              navigate={navigate}
+              handleToggleFocusMode={handleToggleFocusMode}
+              canMoveUp={canMoveUp}
+              dragSorting={dragSorting}
+              handleReorderDocument={handleReorderDocument}
+              canMoveDown={canMoveDown}
+              handleDeleteDocument={handleDeleteDocument}
+              selectedFolderDocumentCount={selectedFolderDocumentCount}
+              selectedFolderDirectoryCount={selectedFolderDirectoryCount}
+              shouldRenderRichPreview={shouldRenderRichPreview}
+              safeSelectedDocumentContent={safeSelectedDocumentContent}
+              knowledgeBase={knowledgeBase}
+            />
+            {!focusMode && (
+              <KnowledgeBaseContextPanel
+                styles={styles}
+                knowledgeBase={knowledgeBase}
+                documents={documents}
+                selectedDocument={selectedDocument}
+                canWriteKnowledgeBase={canWriteKnowledgeBase}
+                canManageKnowledgeBase={canManageKnowledgeBase}
+                roleLabels={ROLE_LABELS}
+                knowledgeBaseAuditEvents={knowledgeBaseAuditEvents}
+                knowledgeBaseAuditLoading={knowledgeBaseAuditLoading}
+                knowledgeBaseAuditError={knowledgeBaseAuditError}
+                documentAuditEvents={documentAuditEvents}
+                documentAuditLoading={documentAuditLoading}
+                documentAuditError={documentAuditError}
+                siteSubmitting={siteSubmitting}
+                siteError={siteError}
+                setSiteError={setSiteError}
+                onSaveSiteSettings={handleSaveSiteSettings}
+                documentPublishingSubmitting={documentPublishingSubmitting}
+                documentPublishingError={documentPublishingError}
+                setDocumentPublishingError={setDocumentPublishingError}
+                onPublishDocument={handlePublishDocument}
+                onUnpublishDocument={handleUnpublishDocument}
+              />
+            )}
+          </section>
+        </div>
       </section>
 
       <KnowledgeBaseFormModal
@@ -416,13 +519,13 @@ const KnowledgeBaseDetail = () => {
         open={documentTrashOpen}
         eyebrow="文档回收站"
         title={knowledgeBase.name}
-        description="这里保留当前知识库已删除的文档和目录。恢复时仍会校验父级目录和知识库状态。"
+        description="已删除的文档和目录"
         items={deletedDocuments}
         loading={documentTrashLoading}
         errorMessage={documentTrashError}
         restoringItemId={restoringDocumentId}
         emptyTitle="当前知识库回收站为空"
-        emptyDescription="删除后的文档或目录会暂存到这里，便于继续恢复主链路。"
+        emptyDescription="暂无已删除内容"
         onClose={() => {
           setDocumentTrashError('')
           setDocumentTrashOpen(false)

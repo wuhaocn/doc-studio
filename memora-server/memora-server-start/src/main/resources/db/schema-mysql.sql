@@ -49,14 +49,22 @@ CREATE TABLE IF NOT EXISTS `user_session` (
   `user_id` BIGINT NOT NULL,
   `tenant_id` BIGINT NOT NULL,
   `access_token` VARCHAR(255) NOT NULL,
+  `client_type` VARCHAR(60) DEFAULT NULL,
+  `user_agent` VARCHAR(255) DEFAULT NULL,
+  `ip_address` VARCHAR(64) DEFAULT NULL,
   `status` TINYINT DEFAULT 1,
   `expires_at` DATETIME NOT NULL,
   `last_active_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `revoked_at` DATETIME DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户会话表';
 
 CREATE UNIQUE INDEX `uk_user_session_access_token` ON `user_session` (`access_token`);
 CREATE INDEX `idx_user_session_user_tenant` ON `user_session` (`user_id`, `tenant_id`);
+ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `client_type` VARCHAR(60) DEFAULT NULL;
+ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `user_agent` VARCHAR(255) DEFAULT NULL;
+ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `ip_address` VARCHAR(64) DEFAULT NULL;
+ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `revoked_at` DATETIME DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `tenant_invite` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -92,6 +100,10 @@ CREATE TABLE IF NOT EXISTS `knowledge_base` (
   `document_count` INT DEFAULT 0,
   `view_count` INT DEFAULT 0,
   `sort_order` INT DEFAULT 0,
+  `site_enabled` TINYINT DEFAULT 0,
+  `site_slug` VARCHAR(120) DEFAULT NULL,
+  `site_title` VARCHAR(120) DEFAULT NULL,
+  `site_description` VARCHAR(500) DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `deleted_at` DATETIME DEFAULT NULL,
@@ -104,6 +116,11 @@ CREATE INDEX `idx_kb_tenant_id` ON `knowledge_base` (`tenant_id`);
 CREATE INDEX `idx_kb_user_id` ON `knowledge_base` (`user_id`);
 CREATE INDEX `idx_kb_status` ON `knowledge_base` (`status`);
 CREATE INDEX `idx_kb_created_at` ON `knowledge_base` (`created_at`);
+ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_enabled` TINYINT DEFAULT 0;
+ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_slug` VARCHAR(120) DEFAULT NULL;
+ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_title` VARCHAR(120) DEFAULT NULL;
+ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_description` VARCHAR(500) DEFAULT NULL;
+CREATE UNIQUE INDEX `uk_kb_site_slug` ON `knowledge_base` (`site_slug`);
 
 CREATE TABLE IF NOT EXISTS `knowledge_base_member` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -128,7 +145,7 @@ CREATE TABLE IF NOT EXISTS `document` (
   `title` VARCHAR(200) NOT NULL,
   `slug` VARCHAR(160) NOT NULL,
   `doc_type` VARCHAR(30) DEFAULT 'DOC',
-  `format` VARCHAR(30) DEFAULT 'MARKDOWN',
+  `format` VARCHAR(30),
   `content` LONGTEXT,
   `content_text` LONGTEXT,
   `summary` VARCHAR(500),
@@ -141,6 +158,13 @@ CREATE TABLE IF NOT EXISTS `document` (
   `status` TINYINT DEFAULT 1,
   `view_count` INT DEFAULT 0,
   `sort_order` INT DEFAULT 0,
+  `publish_status` VARCHAR(30) DEFAULT 'DRAFT',
+  `public_slug` VARCHAR(160) DEFAULT NULL,
+  `published_at` DATETIME DEFAULT NULL,
+  `rendered_html` LONGTEXT,
+  `render_checksum` VARCHAR(128) DEFAULT NULL,
+  `source_external_id` VARCHAR(160) DEFAULT NULL,
+  `source_revision` VARCHAR(160) DEFAULT NULL,
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
   `deleted_at` DATETIME DEFAULT NULL,
@@ -155,13 +179,23 @@ CREATE INDEX `idx_doc_tenant_id` ON `document` (`tenant_id`);
 CREATE INDEX `idx_doc_user_id` ON `document` (`user_id`);
 CREATE INDEX `idx_doc_parent_id` ON `document` (`parent_id`);
 CREATE INDEX `idx_doc_created_at` ON `document` (`created_at`);
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `publish_status` VARCHAR(30) DEFAULT 'DRAFT';
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `public_slug` VARCHAR(160) DEFAULT NULL;
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `published_at` DATETIME DEFAULT NULL;
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `rendered_html` LONGTEXT;
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `render_checksum` VARCHAR(128) DEFAULT NULL;
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `source_external_id` VARCHAR(160) DEFAULT NULL;
+ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `source_revision` VARCHAR(160) DEFAULT NULL;
+CREATE UNIQUE INDEX `uk_doc_kb_public_slug` ON `document` (`knowledge_base_id`, `public_slug`);
+CREATE UNIQUE INDEX `uk_doc_kb_source_external_id` ON `document` (`knowledge_base_id`, `source_external_id`);
+CREATE INDEX `idx_doc_publish_status` ON `document` (`publish_status`, `published_at`);
 
 CREATE TABLE IF NOT EXISTS `document_version` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
   `document_id` BIGINT NOT NULL,
   `version` INT NOT NULL,
   `title` VARCHAR(200) NOT NULL,
-  `format` VARCHAR(30) DEFAULT 'MARKDOWN',
+  `format` VARCHAR(30),
   `content` LONGTEXT,
   `content_text` LONGTEXT,
   `user_id` BIGINT NOT NULL,
@@ -274,6 +308,7 @@ CREATE TABLE IF NOT EXISTS `api_key` (
   `name` VARCHAR(120) NOT NULL,
   `key_prefix` VARCHAR(40) NOT NULL,
   `secret_hash` VARCHAR(255) NOT NULL,
+  `secret_ciphertext` VARCHAR(1024) DEFAULT NULL,
   `status` TINYINT DEFAULT 1,
   `expires_at` DATETIME NOT NULL,
   `last_used_at` DATETIME DEFAULT NULL,
@@ -289,6 +324,7 @@ CREATE TABLE IF NOT EXISTS `api_key` (
 
 CREATE INDEX `idx_api_key_service_account` ON `api_key` (`service_account_id`, `created_at`);
 CREATE UNIQUE INDEX `uk_api_key_prefix` ON `api_key` (`key_prefix`);
+ALTER TABLE `api_key` ADD COLUMN IF NOT EXISTS `secret_ciphertext` VARCHAR(1024) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `api_key_scope` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,

@@ -1,4 +1,5 @@
 import dayjs from 'dayjs'
+import DocumentRenderedContent from '../Document/DocumentRenderedContent'
 
 const KnowledgeBaseDocumentPanel = ({
   styles,
@@ -25,7 +26,11 @@ const KnowledgeBaseDocumentPanel = ({
   selectedFolderDirectoryCount,
   shouldRenderRichPreview,
   safeSelectedDocumentContent,
+  knowledgeBase,
 }) => {
+  const selectedDocumentPublicUrl = selectedDocument?.publicUrl
+    || (knowledgeBase?.siteUrl && selectedDocument?.publicSlug ? `${knowledgeBase.siteUrl}/${selectedDocument.publicSlug}` : '')
+
   return (
     <div className={`${styles.documentColumn} ${focusMode ? styles.documentColumnFocus : ''}`}>
       {!focusMode && treePanelCollapsed && (
@@ -86,13 +91,14 @@ const KnowledgeBaseDocumentPanel = ({
                   <div className={styles.documentSubline}>
                     <span>v{selectedDocument.versionNo}</span>
                     {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
+                    {selectedDocument.publishStatus === 'PUBLISHED' ? <span>已发布</span> : null}
                   </div>
                 </>
               ) : (
                 <>
                   <div className={styles.documentEyebrow}>目录</div>
                   <div className={styles.documentSubline}>
-                    <span>继续在这里整理内容</span>
+                    <span>目录内容</span>
                     {selectedDocument.updatedAt && <span>{dayjs(selectedDocument.updatedAt).format('MM-DD HH:mm')}</span>}
                   </div>
                 </>
@@ -100,55 +106,63 @@ const KnowledgeBaseDocumentPanel = ({
             </div>
             <div className={styles.documentToolbar}>
               {selectedDocument.docType === 'DOC' ? (
-                <>
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={handleOpenEditorPage}
-                  >
-                    继续编辑
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    onClick={() => setReadLinkOpen(true)}
-                  >
-                    复制阅读链接
-                  </button>
-                  {canManageKnowledgeBase ? (
-                    <button
-                      type="button"
-                      className={styles.secondaryButton}
-                      onClick={() => setShareDrawerOpen(true)}
-                    >
-                      受控分享
-                    </button>
-                  ) : null}
-                </>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={!canWriteKnowledgeBase}
+                  onClick={handleOpenEditorPage}
+                >
+                  继续编辑
+                </button>
               ) : (
-                <>
-                  <button
-                    type="button"
-                    className={styles.primaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={() => openCreateDocumentModal('DOC')}
-                  >
-                    新建文档
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.secondaryButton}
-                    disabled={!canWriteKnowledgeBase}
-                    onClick={() => openCreateDocumentModal('FOLDER')}
-                  >
-                    新建目录
-                  </button>
-                </>
+                <button
+                  type="button"
+                  className={styles.primaryButton}
+                  disabled={!canWriteKnowledgeBase}
+                  onClick={() => openCreateDocumentModal('DOC')}
+                >
+                  新建文档
+                </button>
               )}
               <details className={styles.inlineMoreActions}>
-                <summary className={styles.toolButton}>更多</summary>
+                <summary className={styles.toolButton}>更多操作</summary>
                 <div className={styles.inlineMoreActionsMenu}>
+                  {selectedDocument.docType === 'DOC' ? (
+                    <>
+                      <button
+                        type="button"
+                        className={styles.toolButton}
+                        onClick={() => navigate(`/docs/${selectedDocument.id}`)}
+                      >
+                        阅读文档
+                      </button>
+                      {selectedDocumentPublicUrl ? (
+                        <button
+                          type="button"
+                          className={styles.toolButton}
+                          onClick={() => window.open(selectedDocumentPublicUrl, '_blank', 'noopener,noreferrer')}
+                        >
+                          打开公开页
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        className={styles.toolButton}
+                        onClick={() => setReadLinkOpen(true)}
+                      >
+                        复制阅读链接
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.toolButton}
+                      disabled={!canWriteKnowledgeBase}
+                      onClick={() => openCreateDocumentModal('FOLDER')}
+                    >
+                      新建目录
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={styles.toolButton}
@@ -157,15 +171,15 @@ const KnowledgeBaseDocumentPanel = ({
                   >
                     整理节点
                   </button>
-                  {selectedDocument.docType === 'DOC' && (
+                  {selectedDocument.docType === 'DOC' && canManageKnowledgeBase ? (
                     <button
                       type="button"
                       className={styles.toolButton}
-                      onClick={() => navigate(`/docs/${selectedDocument.id}`)}
+                      onClick={() => setShareDrawerOpen(true)}
                     >
-                      阅读文档
+                      受控分享
                     </button>
-                  )}
+                  ) : null}
                   {selectedDocument.docType === 'DOC' && (
                     <button type="button" className={styles.toolButton} onClick={handleToggleFocusMode}>
                       {focusMode ? '退出专注' : '专注模式'}
@@ -246,9 +260,10 @@ const KnowledgeBaseDocumentPanel = ({
                       <p className={styles.documentSummary}>{selectedDocument.summary}</p>
                     ) : null}
                   </div>
-                  <div
+                  <DocumentRenderedContent
                     className={styles.richPreviewContent}
-                    dangerouslySetInnerHTML={{ __html: safeSelectedDocumentContent }}
+                    html={safeSelectedDocumentContent}
+                    variant="article"
                   />
                 </div>
               </article>

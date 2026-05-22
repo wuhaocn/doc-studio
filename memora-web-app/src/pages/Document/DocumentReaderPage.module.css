@@ -229,60 +229,6 @@
   white-space: pre-wrap;
 }
 
-.richPreviewContent :global(h1) {
-  margin: 0 0 18px;
-  font-size: 34px;
-  line-height: 1.12;
-  letter-spacing: -0.03em;
-  color: #1f2329;
-}
-
-.richPreviewContent :global(h2) {
-  margin: 24px 0 14px;
-  font-size: 24px;
-  line-height: 1.24;
-  color: #1f2329;
-}
-
-.richPreviewContent :global(p) {
-  margin: 0 0 14px;
-}
-
-.richPreviewContent :global(ul),
-.richPreviewContent :global(ol) {
-  margin: 0 0 14px;
-  padding-left: 24px;
-}
-
-.richPreviewContent :global(blockquote) {
-  margin: 14px 0;
-  padding: 12px 16px;
-  border-left: 4px solid #3370ff;
-  border-radius: 0 14px 14px 0;
-  background: rgba(51, 112, 255, 0.08);
-  color: #5f6672;
-}
-
-.richPreviewContent :global(pre) {
-  margin: 14px 0;
-  padding: 16px 18px;
-  border-radius: 16px;
-  background: var(--color-code-bg);
-  color: var(--color-code-text);
-  overflow-x: auto;
-}
-
-.richPreviewContent :global(code) {
-  padding: 2px 6px;
-  border-radius: 8px;
-  background: rgba(51, 112, 255, 0.08);
-}
-
-.richPreviewContent :global(img) {
-  max-width: 100%;
-  border-radius: 16px;
-}
-
 @media (max-width: 860px) {
   .page {
     padding: 14px;

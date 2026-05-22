@@ -150,25 +150,6 @@
 .richContent,
 .plainContent {
   margin-top: 24px;
-  color: #1f2937;
-  font-size: 15px;
-  line-height: 1.9;
-}
-
-.richContent :global(h1),
-.richContent :global(h2),
-.richContent :global(h3) {
-  margin: 1.2em 0 0.5em;
-  color: #111827;
-}
-
-.richContent :global(p) {
-  margin: 0.8em 0;
-}
-
-.richContent :global(ul),
-.richContent :global(ol) {
-  padding-left: 1.4em;
 }
 
 @media (max-width: 768px) {

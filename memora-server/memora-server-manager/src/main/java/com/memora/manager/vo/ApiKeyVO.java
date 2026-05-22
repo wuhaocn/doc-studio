@@ -17,6 +17,10 @@ public class ApiKeyVO {
 
     private String keyPrefix;
 
+    private Boolean secretRevealAvailable;
+
+    private String plainTextKey;
+
     private Integer status;
 
     private Boolean expired;
@@ -29,7 +33,5 @@ public class ApiKeyVO {
 
     private LocalDateTime createdAt;
 
-    private List<Long> knowledgeBaseIds;
-
-    private List<String> accessModes;
+    private List<ApiKeyScopeVO> scopes;
 }

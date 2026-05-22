@@ -43,32 +43,19 @@ const DocumentReadLinkDrawer = ({
       <div className={styles.drawer}>
         <div className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>复制阅读链接</p>
             <h2 className={styles.title}>{title}</h2>
-            <p className={styles.description}>复制当前文档阅读页链接，实际访问权限仍按当前登录会话判定。</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose}>
             关闭
           </button>
         </div>
 
-        <div className={styles.summaryBlock}>
-          <div className={styles.summaryItem}>
-            <span className={styles.summaryLabel}>访问方式</span>
-            <strong>按当前登录态判定</strong>
-          </div>
-          <div className={styles.summaryItem}>
-            <span className={styles.summaryLabel}>打开页面</span>
-            <strong>文档阅读页</strong>
-          </div>
-        </div>
-
         <div className={styles.section}>
-          <div className={styles.label}>复制阅读链接</div>
+          <div className={styles.label}>阅读链接</div>
           <div className={styles.linkRow}>
             <input readOnly value={documentLink} className={styles.linkInput} />
             <button type="button" className={styles.primaryButton} onClick={handleCopyLink}>
-              {copied ? '已复制' : '复制阅读链接'}
+              {copied ? '已复制' : '复制'}
             </button>
           </div>
         </div>

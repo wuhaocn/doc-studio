@@ -1,33 +1,58 @@
-.overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 70;
-  padding: 20px;
-  overflow-y: auto;
-  background: rgba(15, 23, 42, 0.3);
-  backdrop-filter: blur(8px);
-}
-
-.modal {
-  width: min(980px, 100%);
-  margin: 0 auto;
+.panel {
   border-radius: 24px;
   background: #ffffff;
   border: 1px solid rgba(15, 23, 42, 0.06);
-  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.16);
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.1);
   padding: 24px;
 }
 
 .header,
 .listHeader,
-.issuedKeyHeader,
 .accountHeader,
 .keyTopline,
-.footer {
+.footer,
+.inlineFormFooter {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.headerStats {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerTools {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.headerStat {
+  min-width: 120px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(247, 249, 252, 0.96);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+}
+
+.headerStat strong {
+  display: block;
+  color: #111827;
+  font-size: 22px;
+  line-height: 1.1;
+}
+
+.headerStat span {
+  display: block;
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.6;
 }
 
 .eyebrow {
@@ -50,9 +75,9 @@
   color: #5f6672;
   font-size: 13px;
   line-height: 1.7;
+  max-width: 760px;
 }
 
-.closeButton,
 .primaryButton,
 .secondaryButton,
 .dangerButton {
@@ -66,7 +91,6 @@
   font-weight: 600;
 }
 
-.closeButton,
 .secondaryButton {
   border: 1px solid rgba(15, 23, 42, 0.08);
   background: #ffffff;
@@ -84,12 +108,25 @@
   color: #b91c1c;
 }
 
-.form {
+.primaryButton:disabled,
+.secondaryButton:disabled,
+.dangerButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.form,
+.inlineForm {
   margin-top: 20px;
   padding: 20px;
   border-radius: 18px;
   background: linear-gradient(180deg, #fbfcfe 0%, #f6f9fc 100%);
   border: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.inlineForm {
+  margin-top: 16px;
+  background: #ffffff;
 }
 
 .formGrid {
@@ -113,7 +150,8 @@
 
 .field input,
 .field select,
-.field textarea {
+.field textarea,
+.scopeModeRow select {
   width: 100%;
   border-radius: 12px;
   border: 1px solid rgba(15, 23, 42, 0.1);
@@ -121,6 +159,17 @@
   background: #ffffff;
   color: #111827;
   font-size: 13px;
+}
+
+.inlineMetric {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #111827;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .scopeGrid {
@@ -131,8 +180,8 @@
 
 .scopeItem {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
   padding: 12px;
   border-radius: 14px;
   border: 1px solid rgba(15, 23, 42, 0.08);
@@ -144,7 +193,13 @@
   background: rgba(31, 111, 255, 0.04);
 }
 
-.scopeItem input {
+.scopeTopline {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.scopeTopline input {
   margin-top: 2px;
 }
 
@@ -159,11 +214,22 @@
 .scopeMeta span,
 .accountMeta span,
 .keyMeta span,
-.accountBadge,
-.listHeader span {
+.listHeader span,
+.subtleText,
+.accountStateNote {
   color: #6b7280;
   font-size: 11px;
-  line-height: 1.6;
+  line-height: 1.7;
+}
+
+.scopeModeRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.scopeModeRow span {
+  min-width: 40px;
 }
 
 .message {
@@ -184,42 +250,41 @@
   color: #047857;
 }
 
-.issuedKeyCard {
-  margin-top: 16px;
-  padding: 14px;
-  border-radius: 16px;
-  background: #fff7ed;
-  border: 1px solid rgba(245, 158, 11, 0.18);
-}
-
-.issuedKeyCard textarea {
-  width: 100%;
-  margin-top: 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(15, 23, 42, 0.08);
-  padding: 10px 12px;
-  color: #111827;
-  background: #ffffff;
-  font-size: 12px;
-}
-
-.issuedKeyMeta,
 .accountMeta,
-.keyMeta {
+.keyMeta,
+.accountActions,
+.keyActions,
+.accountTitleRow,
+.scopeSummaryList {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 12px;
-  margin-top: 8px;
 }
 
-.note {
-  color: #5f6672;
-  font-size: 12px;
-  line-height: 1.7;
+.accountTitleRow {
+  align-items: center;
 }
 
 .listSection {
   margin-top: 22px;
+}
+
+.createSection {
+  margin-top: 22px;
+}
+
+.formSectionHeader strong {
+  display: block;
+  color: #111827;
+  font-size: 15px;
+}
+
+.formSectionHeader span {
+  display: block;
+  margin-top: 6px;
+  color: #6b7280;
+  font-size: 12px;
+  line-height: 1.7;
 }
 
 .accountList {
@@ -237,10 +302,32 @@
   background: #f9fafb;
 }
 
-.accountBadge {
-  padding: 6px 10px;
+.accountStateNote {
+  margin-top: 8px;
+}
+
+.accountDescription {
+  margin-top: 8px;
+  color: #374151;
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 10px;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.04);
+  background: rgba(5, 150, 105, 0.1);
+  color: #047857;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.statusBadgeMuted {
+  background: rgba(15, 23, 42, 0.06);
+  color: #6b7280;
 }
 
 .keyList {
@@ -257,10 +344,16 @@
   border: 1px solid rgba(15, 23, 42, 0.06);
 }
 
-.keyActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+.scopeSummaryItem {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.04);
+  color: #374151;
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .scopeMeta {
@@ -271,20 +364,66 @@
   margin-top: 10px;
 }
 
+.secretCard {
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #fff7ed;
+  border: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.secretCardHeader,
+.secretActions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.secretCardHeader strong {
+  display: block;
+  color: #111827;
+  font-size: 12px;
+}
+
+.secretCardHeader span,
+.secretHint {
+  color: #9a6700;
+  font-size: 11px;
+  line-height: 1.7;
+}
+
+.secretCard textarea {
+  width: 100%;
+  margin-top: 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  padding: 10px 12px;
+  color: #111827;
+  background: #ffffff;
+  font-size: 12px;
+}
+
+.secretActions {
+  margin-top: 12px;
+}
+
+.secretHint {
+  margin-top: 12px;
+}
+
 .emptyState {
   color: #5f6672;
   font-size: 12px;
   line-height: 1.7;
 }
 
-@media (max-width: 820px) {
-  .overlay {
-    padding: 0;
-  }
+.emptyStateActions {
+  margin-top: 14px;
+}
 
-  .modal {
-    border-radius: 0;
-    min-height: 100vh;
+@media (max-width: 900px) {
+  .panel {
     padding: 18px 16px 22px;
   }
 
@@ -294,7 +433,9 @@
   }
 
   .header,
+  .headerTools,
   .footer,
+  .inlineFormFooter,
   .accountHeader,
   .keyTopline,
   .scopeMeta {

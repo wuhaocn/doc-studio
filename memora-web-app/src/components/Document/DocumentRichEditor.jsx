@@ -4,7 +4,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Image from '@tiptap/extension-image'
 import DiagramExtension from '../../extensions/DiagramExtension'
-import { sanitizeRichHtml, toEditorHtml } from '../../utils/documentContent'
+import { DOCUMENT_FORMATS, normalizeRichTextEditorContent, sanitizeDocumentHtml } from '../../utils/documentContent'
 import { saveDraft } from '../../utils/editorDraft'
 import styles from './DocumentRichEditor.module.css'
 
@@ -32,7 +32,7 @@ const DocumentRichEditor = ({
       }),
       DiagramExtension,
     ],
-    content: toEditorHtml(initialContent),
+    content: normalizeRichTextEditorContent(initialContent),
     onUpdate: () => {
       if (!dirtyRef.current) {
         dirtyRef.current = true
@@ -45,7 +45,7 @@ const DocumentRichEditor = ({
     if (!editor || initialContent === lastContentRef.current) {
       return
     }
-    editor.commands.setContent(toEditorHtml(initialContent))
+    editor.commands.setContent(normalizeRichTextEditorContent(initialContent))
     lastContentRef.current = initialContent
   }, [editor, initialContent])
 
@@ -53,7 +53,7 @@ const DocumentRichEditor = ({
     if (!editor || !documentId) return
     const timer = setInterval(() => {
       if (dirtyRef.current) {
-        saveDraft(documentId, sanitizeRichHtml(editor.getHTML()))
+        saveDraft(documentId, sanitizeDocumentHtml(editor.getHTML()))
       }
     }, AUTOSAVE_INTERVAL)
     return () => clearInterval(timer)
@@ -89,8 +89,8 @@ const DocumentRichEditor = ({
       return
     }
     await onSave({
-      content: sanitizeRichHtml(editor.getHTML()),
-      contentText: editor.getText(),
+      format: DOCUMENT_FORMATS.RICH_TEXT,
+      content: sanitizeDocumentHtml(editor.getHTML()),
     })
     dirtyRef.current = false
     onDirtyChange?.(false)

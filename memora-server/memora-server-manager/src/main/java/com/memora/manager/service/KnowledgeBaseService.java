@@ -6,6 +6,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.memora.common.exception.BusinessException;
 import com.memora.manager.dto.KnowledgeBaseCreateDTO;
+import com.memora.manager.dto.KnowledgeBaseSiteUpdateDTO;
 import com.memora.manager.entity.Document;
 import com.memora.manager.dto.KnowledgeBaseUpdateDTO;
 import com.memora.manager.entity.KnowledgeBase;
@@ -35,6 +36,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, KnowledgeBase> {
+    private static final int SITE_DISABLED = 0;
+    private static final int SITE_ENABLED = 1;
+
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final DocumentMapper documentMapper;
     private final TenantMapper tenantMapper;
@@ -57,6 +61,7 @@ public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, Knowl
         knowledgeBase.setDocumentCount(0);
         knowledgeBase.setViewCount(0);
         knowledgeBase.setSortOrder(0);
+        knowledgeBase.setSiteEnabled(SITE_DISABLED);
         knowledgeBase.setCreatedAt(LocalDateTime.now());
         knowledgeBase.setUpdatedAt(LocalDateTime.now());
 
@@ -85,6 +90,8 @@ public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, Knowl
         String oldSlug = knowledgeBase.getSlug();
         String oldDescription = knowledgeBase.getDescription();
         String oldCover = knowledgeBase.getCover();
+        String oldSiteTitle = knowledgeBase.getSiteTitle();
+        String oldSiteDescription = knowledgeBase.getSiteDescription();
         if (StringUtils.hasText(dto.getName())) {
             knowledgeBase.setName(dto.getName());
             if (!StringUtils.hasText(dto.getSlug())) {
@@ -99,6 +106,12 @@ public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, Knowl
         }
         if (dto.getCover() != null) {
             knowledgeBase.setCover(dto.getCover());
+        }
+        if (!StringUtils.hasText(oldSiteTitle) || Objects.equals(oldSiteTitle, oldName)) {
+            knowledgeBase.setSiteTitle(knowledgeBase.getName());
+        }
+        if (!StringUtils.hasText(oldSiteDescription) || Objects.equals(oldSiteDescription, oldDescription)) {
+            knowledgeBase.setSiteDescription(knowledgeBase.getDescription());
         }
 
         knowledgeBase.setUpdatedAt(LocalDateTime.now());
@@ -129,6 +142,55 @@ public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, Knowl
                 .detail("更新知识库字段：" + String.join("、", changedFields))
                 .build());
         }
+        return convertToVO(knowledgeBase);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public KnowledgeBaseVO updateSiteSettings(Long id, KnowledgeBaseSiteUpdateDTO dto) {
+        KnowledgeBase knowledgeBase = getAccessibleEntity(id);
+        String actorRole = tenantAccessService.requireKnowledgeBaseManageAccess(knowledgeBase);
+        Integer nextSiteEnabled = Boolean.TRUE.equals(dto.getSiteEnabled()) ? SITE_ENABLED : SITE_DISABLED;
+        String nextSiteSlug = resolveKnowledgeBaseSiteSlug(knowledgeBase, dto.getSiteSlug(), nextSiteEnabled == SITE_ENABLED);
+        String nextSiteTitle = StringUtils.hasText(dto.getSiteTitle()) ? dto.getSiteTitle().trim() : knowledgeBase.getName();
+        String nextSiteDescription = dto.getSiteDescription() == null
+            ? knowledgeBase.getDescription()
+            : dto.getSiteDescription().trim();
+
+        List<String> changedFields = new ArrayList<>();
+        if (!Objects.equals(knowledgeBase.getSiteEnabled(), nextSiteEnabled)) {
+            knowledgeBase.setSiteEnabled(nextSiteEnabled);
+            changedFields.add(nextSiteEnabled == SITE_ENABLED ? "启用站点" : "停用站点");
+        }
+        if (!Objects.equals(knowledgeBase.getSiteSlug(), nextSiteSlug)) {
+            knowledgeBase.setSiteSlug(nextSiteSlug);
+            changedFields.add("站点标识");
+        }
+        if (!Objects.equals(knowledgeBase.getSiteTitle(), nextSiteTitle)) {
+            knowledgeBase.setSiteTitle(nextSiteTitle);
+            changedFields.add("站点标题");
+        }
+        if (!Objects.equals(knowledgeBase.getSiteDescription(), nextSiteDescription)) {
+            knowledgeBase.setSiteDescription(nextSiteDescription);
+            changedFields.add("站点描述");
+        }
+        if (changedFields.isEmpty()) {
+            return convertToVO(knowledgeBase);
+        }
+
+        knowledgeBase.setUpdatedAt(LocalDateTime.now());
+        this.updateById(knowledgeBase);
+        auditLogService.recordSuccess(AuditLogCommand.builder()
+            .tenantId(knowledgeBase.getTenantId())
+            .knowledgeBaseId(knowledgeBase.getId())
+            .knowledgeBaseName(knowledgeBase.getName())
+            .actorUserId(currentAccessContext.getCurrentUserId())
+            .actorRole(actorRole)
+            .objectType(AuditLogConstants.OBJECT_KNOWLEDGE_BASE)
+            .objectId(knowledgeBase.getId())
+            .objectTitle(knowledgeBase.getName())
+            .actionType(AuditLogConstants.ACTION_UPDATE_KNOWLEDGE_BASE_SITE)
+            .detail("更新公开站点配置：" + String.join("、", changedFields))
+            .build());
         return convertToVO(knowledgeBase);
     }
 
@@ -307,6 +369,23 @@ public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, Knowl
         return StringUtils.hasText(slug) ? SlugUtils.toSlug(slug) : SlugUtils.toSlug(name);
     }
 
+    private String resolveKnowledgeBaseSiteSlug(KnowledgeBase knowledgeBase, String siteSlug, boolean siteEnabled) {
+        if (!siteEnabled && !StringUtils.hasText(siteSlug)) {
+            return knowledgeBase.getSiteSlug();
+        }
+        String candidate = StringUtils.hasText(siteSlug)
+            ? SlugUtils.toSlug(siteSlug)
+            : SlugUtils.toSlug(knowledgeBase.getSlug());
+        LambdaQueryWrapper<KnowledgeBase> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(KnowledgeBase::getSiteSlug, candidate)
+            .ne(KnowledgeBase::getId, knowledgeBase.getId())
+            .last("LIMIT 1");
+        if (knowledgeBaseMapper.selectOne(queryWrapper) != null) {
+            throw new BusinessException(400, "公开站点标识已被其他知识库占用");
+        }
+        return candidate;
+    }
+
     private long countActiveDocumentsByKnowledgeBaseId(Long knowledgeBaseId) {
         LambdaQueryWrapper<Document> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Document::getKnowledgeBaseId, knowledgeBaseId)
@@ -322,6 +401,12 @@ public class KnowledgeBaseService extends ServiceImpl<KnowledgeBaseMapper, Knowl
     private KnowledgeBaseVO convertToVO(KnowledgeBase knowledgeBase, boolean includePermissionContext) {
         KnowledgeBaseVO vo = new KnowledgeBaseVO();
         BeanUtils.copyProperties(knowledgeBase, vo);
+        vo.setSiteEnabled(knowledgeBase.getSiteEnabled() != null && knowledgeBase.getSiteEnabled() == SITE_ENABLED);
+        vo.setSiteTitle(StringUtils.hasText(knowledgeBase.getSiteTitle()) ? knowledgeBase.getSiteTitle() : knowledgeBase.getName());
+        vo.setSiteDescription(knowledgeBase.getSiteDescription() != null ? knowledgeBase.getSiteDescription() : knowledgeBase.getDescription());
+        vo.setSiteUrl(Boolean.TRUE.equals(vo.getSiteEnabled()) && StringUtils.hasText(knowledgeBase.getSiteSlug())
+            ? "/site/" + knowledgeBase.getSiteSlug()
+            : null);
         if (includePermissionContext) {
             String currentRole = tenantAccessService.getKnowledgeBaseRole(knowledgeBase);
             vo.setCurrentRole(currentRole);

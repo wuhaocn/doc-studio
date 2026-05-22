@@ -213,9 +213,7 @@ const KnowledgeBasePermissionModal = ({
       <div className={styles.modal}>
         <div className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>权限设置</p>
-            <h2 className={styles.title}>知识库权限配置</h2>
-            <p className={styles.description}>只在需要时限制独立成员名单，其余情况默认继承租户权限。</p>
+            <h2 className={styles.title}>权限配置</h2>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose}>
             关闭

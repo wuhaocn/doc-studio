@@ -1,6 +1,7 @@
 package com.memora.manager.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -9,6 +10,7 @@ import com.memora.common.result.Result;
 import com.memora.manager.dto.DocumentBatchDeleteDTO;
 import com.memora.manager.dto.DocumentBatchMoveDTO;
 import com.memora.manager.dto.DocumentCreateDTO;
+import com.memora.manager.dto.DocumentPublishUpdateDTO;
 import com.memora.manager.dto.DocumentSortDTO;
 import com.memora.manager.dto.DocumentUpdateDTO;
 import com.memora.manager.entity.Document;
@@ -20,6 +22,10 @@ import com.memora.manager.mapper.KnowledgeBaseMapper;
 import com.memora.manager.support.AuditLogCommand;
 import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.CurrentAccessContext;
+import com.memora.manager.support.DocumentContentSupport;
+import com.memora.manager.support.DocumentFormat;
+import com.memora.manager.support.DocumentRenderSupport;
+import com.memora.manager.support.DocumentSearchSupport;
 import com.memora.manager.support.SlugUtils;
 import com.memora.manager.support.TenantAccessService;
 import com.memora.manager.vo.DocumentVO;
@@ -36,6 +42,7 @@ import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -44,6 +51,10 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
+    private static final int SEARCH_SCAN_LIMIT = 300;
+    private static final String PUBLISH_STATUS_DRAFT = "DRAFT";
+    private static final String PUBLISH_STATUS_PUBLISHED = "PUBLISHED";
+
     private final DocumentMapper documentMapper;
     private final KnowledgeBaseMapper knowledgeBaseMapper;
     private final DocumentVersionMapper documentVersionMapper;
@@ -56,21 +67,30 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
         KnowledgeBase knowledgeBase = getActiveKnowledgeBase(dto.getKnowledgeBaseId());
         String actorRole = tenantAccessService.requireKnowledgeBaseWriteAccess(knowledgeBase);
         Document parent = resolveParent(dto.getParentId(), knowledgeBase.getId());
+        String normalizedDocType = DocumentContentSupport.normalizeDocType(dto.getDocType(), "DOC");
+        DocumentContentSupport.NormalizedDocumentContent normalizedContent =
+            DocumentContentSupport.normalizeDocument(normalizedDocType, dto.getFormat(), dto.getContent());
+        String normalizedTitle = dto.getTitle().trim();
 
         Document document = new Document();
         BeanUtils.copyProperties(dto, document);
         document.setTenantId(knowledgeBase.getTenantId());
         document.setUserId(currentAccessContext.getCurrentUserId());
-        document.setDocType(StringUtils.hasText(dto.getDocType()) ? dto.getDocType() : "DOC");
-        document.setFormat(StringUtils.hasText(dto.getFormat()) ? dto.getFormat() : "MARKDOWN");
-        document.setSlug(resolveDocumentSlug(dto.getTitle(), dto.getSlug()));
+        document.setTitle(normalizedTitle);
+        document.setDocType(normalizedDocType);
+        document.setFormat(normalizedContent.format());
+        document.setContent(normalizedContent.content());
+        document.setContentText(normalizedContent.contentText());
+        applyRenderedArtifact(document, normalizedContent);
+        document.setSlug(resolveDocumentSlug(normalizedTitle, dto.getSlug()));
         document.setParentId(parent == null ? 0L : parent.getId());
         document.setPath(buildPath(parent, document.getSlug()));
         document.setDepth(parent == null ? 0 : parent.getDepth() + 1);
         document.setVersionNo(1);
-        document.setSummary(resolveSummary(dto.getSummary(), dto.getContentText(), dto.getContent()));
+        document.setSummary(DocumentContentSupport.resolveSummary(dto.getSummary(), null, normalizedContent.contentText(), true));
         document.setStatus(1);
         document.setViewCount(0);
+        document.setPublishStatus(PUBLISH_STATUS_DRAFT);
         document.setSortOrder(dto.getSortOrder() == null
             ? resolveNextSortOrder(knowledgeBase.getId(), parent == null ? 0L : parent.getId(), null)
             : dto.getSortOrder());
@@ -119,31 +139,45 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
         Long nextParentId = parent == null ? 0L : parent.getId();
 
         if (StringUtils.hasText(dto.getTitle())) {
-            document.setTitle(dto.getTitle());
+            document.setTitle(dto.getTitle().trim());
             if (!StringUtils.hasText(dto.getSlug())) {
-                document.setSlug(resolveDocumentSlug(dto.getTitle(), null));
+                document.setSlug(resolveDocumentSlug(document.getTitle(), null));
             }
         }
         if (StringUtils.hasText(dto.getSlug())) {
             document.setSlug(resolveDocumentSlug(document.getTitle(), dto.getSlug()));
         }
         if (dto.getDocType() != null) {
-            document.setDocType(dto.getDocType());
+            document.setDocType(DocumentContentSupport.normalizeDocType(dto.getDocType(), document.getDocType()));
         }
-        if (dto.getFormat() != null) {
-            document.setFormat(dto.getFormat());
+
+        String nextDocType = document.getDocType();
+        String requestedFormat = dto.getFormat() != null ? dto.getFormat() : document.getFormat();
+        String requestedContent = dto.getContent() != null ? dto.getContent() : document.getContent();
+        String normalizedRequestedFormat = DocumentContentSupport.isFolder(nextDocType)
+            ? null
+            : DocumentFormat.resolve(requestedFormat).name();
+        boolean formatChanged = !Objects.equals(oldFormat, normalizedRequestedFormat);
+        if ("DOC".equals(nextDocType) && formatChanged && dto.getContent() == null) {
+            throw new BusinessException(400, "修改文档格式时必须同时提交对应正文内容");
         }
-        if (dto.getContent() != null) {
-            document.setContent(dto.getContent());
-        }
-        if (dto.getContentText() != null) {
-            document.setContentText(dto.getContentText());
-        }
-        if (dto.getSummary() != null) {
-            document.setSummary(dto.getSummary());
-        } else {
-            document.setSummary(resolveSummary(document.getSummary(), document.getContentText(), document.getContent()));
-        }
+
+        DocumentContentSupport.NormalizedDocumentContent normalizedContent =
+            DocumentContentSupport.normalizeDocument(nextDocType, requestedFormat, requestedContent);
+        document.setFormat(normalizedContent.format());
+        document.setContent(normalizedContent.content());
+        document.setContentText(normalizedContent.contentText());
+        applyRenderedArtifact(document, normalizedContent);
+
+        boolean contentSourceChanged = !Objects.equals(oldDocType, document.getDocType())
+            || !Objects.equals(oldFormat, document.getFormat())
+            || !Objects.equals(oldContent, document.getContent());
+        document.setSummary(DocumentContentSupport.resolveSummary(
+            dto.getSummary(),
+            document.getSummary(),
+            document.getContentText(),
+            contentSourceChanged
+        ));
         if (dto.getParentId() != null) {
             document.setParentId(nextParentId);
         }
@@ -288,10 +322,13 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
 
         createDocumentVersion(document, "回滚前快照");
         document.setTitle(version.getTitle());
-        document.setFormat(version.getFormat());
-        document.setContent(version.getContent());
-        document.setContentText(version.getContentText());
-        document.setSummary(resolveSummary(document.getSummary(), version.getContentText(), version.getContent()));
+        DocumentContentSupport.NormalizedDocumentContent normalizedContent =
+            DocumentContentSupport.normalizeDocument(document.getDocType(), version.getFormat(), version.getContent());
+        document.setFormat(normalizedContent.format());
+        document.setContent(normalizedContent.content());
+        document.setContentText(normalizedContent.contentText());
+        applyRenderedArtifact(document, normalizedContent);
+        document.setSummary(DocumentContentSupport.resolveSummary(null, null, normalizedContent.contentText(), true));
         document.setVersionNo((document.getVersionNo() == null ? 1 : document.getVersionNo()) + 1);
         document.setUpdatedAt(LocalDateTime.now());
         this.updateById(document);
@@ -306,6 +343,77 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
             .objectTitle(document.getTitle())
             .actionType(AuditLogConstants.ACTION_ROLLBACK_DOCUMENT)
             .detail("回滚到历史版本 v" + version.getVersion() + "，并生成回滚前快照")
+            .build());
+        return convertToVO(document);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentVO publish(Long id, DocumentPublishUpdateDTO dto) {
+        Document document = getActiveDocument(id);
+        if (!"DOC".equals(document.getDocType())) {
+            throw new BusinessException(400, "目录不支持正式发布");
+        }
+        KnowledgeBase knowledgeBase = getActiveKnowledgeBase(document.getKnowledgeBaseId());
+        String actorRole = tenantAccessService.requireKnowledgeBaseManageAccess(knowledgeBase);
+        String nextPublicSlug = resolvePublicSlug(
+            knowledgeBase.getId(),
+            document.getId(),
+            dto == null ? null : dto.getPublicSlug(),
+            document.getTitle()
+        );
+        boolean wasPublished = PUBLISH_STATUS_PUBLISHED.equals(document.getPublishStatus());
+        document.setPublishStatus(PUBLISH_STATUS_PUBLISHED);
+        document.setPublicSlug(nextPublicSlug);
+        document.setPublishedAt(LocalDateTime.now());
+        if (!StringUtils.hasText(document.getRenderedHtml()) && StringUtils.hasText(document.getFormat())) {
+            DocumentContentSupport.NormalizedDocumentContent normalizedContent =
+                DocumentContentSupport.normalizeDocument(document.getDocType(), document.getFormat(), document.getContent());
+            applyRenderedArtifact(document, normalizedContent);
+        }
+        document.setUpdatedAt(LocalDateTime.now());
+        this.updateById(document);
+
+        auditLogService.recordSuccess(AuditLogCommand.builder()
+            .tenantId(knowledgeBase.getTenantId())
+            .knowledgeBaseId(knowledgeBase.getId())
+            .knowledgeBaseName(knowledgeBase.getName())
+            .actorUserId(currentAccessContext.getCurrentUserId())
+            .actorRole(actorRole)
+            .objectType(AuditLogConstants.OBJECT_DOCUMENT)
+            .objectId(document.getId())
+            .objectTitle(document.getTitle())
+            .actionType(AuditLogConstants.ACTION_PUBLISH_DOCUMENT)
+            .detail((wasPublished ? "更新正式发布" : "正式发布") + "，公开标识为 " + nextPublicSlug)
+            .build());
+        return convertToVO(document);
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public DocumentVO unpublish(Long id) {
+        Document document = getActiveDocument(id);
+        if (!"DOC".equals(document.getDocType())) {
+            throw new BusinessException(400, "目录不支持取消发布");
+        }
+        KnowledgeBase knowledgeBase = getActiveKnowledgeBase(document.getKnowledgeBaseId());
+        String actorRole = tenantAccessService.requireKnowledgeBaseManageAccess(knowledgeBase);
+        if (!PUBLISH_STATUS_PUBLISHED.equals(document.getPublishStatus())) {
+            return convertToVO(document);
+        }
+        document.setPublishStatus(PUBLISH_STATUS_DRAFT);
+        document.setPublishedAt(null);
+        document.setUpdatedAt(LocalDateTime.now());
+        this.updateById(document);
+        auditLogService.recordSuccess(AuditLogCommand.builder()
+            .tenantId(knowledgeBase.getTenantId())
+            .knowledgeBaseId(knowledgeBase.getId())
+            .knowledgeBaseName(knowledgeBase.getName())
+            .actorUserId(currentAccessContext.getCurrentUserId())
+            .actorRole(actorRole)
+            .objectType(AuditLogConstants.OBJECT_DOCUMENT)
+            .objectId(document.getId())
+            .objectTitle(document.getTitle())
+            .actionType(AuditLogConstants.ACTION_UNPUBLISH_DOCUMENT)
+            .detail("取消正式发布")
             .build());
         return convertToVO(document);
     }
@@ -421,16 +529,17 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
         LambdaQueryWrapper<Document> queryWrapper = new LambdaQueryWrapper<>();
         queryWrapper.eq(Document::getStatus, 1);
         queryWrapper.eq(Document::getTenantId, currentAccessContext.getCurrentTenantId());
+        Set<Long> accessibleKnowledgeBaseIds = null;
         if (knowledgeBaseId != null) {
             KnowledgeBase knowledgeBase = getActiveKnowledgeBase(knowledgeBaseId);
             tenantAccessService.requireKnowledgeBaseReadAccess(knowledgeBase);
             queryWrapper.eq(Document::getKnowledgeBaseId, knowledgeBaseId);
         } else {
-            Set<Long> readableKnowledgeBaseIds = listReadableKnowledgeBaseIds();
-            if (readableKnowledgeBaseIds.isEmpty()) {
+            accessibleKnowledgeBaseIds = listReadableKnowledgeBaseIds();
+            if (accessibleKnowledgeBaseIds.isEmpty()) {
                 return emptyDocumentPage(page, size);
             }
-            queryWrapper.in(Document::getKnowledgeBaseId, readableKnowledgeBaseIds);
+            queryWrapper.in(Document::getKnowledgeBaseId, accessibleKnowledgeBaseIds);
         }
         if (parentId != null) {
             if (parentId != 0) {
@@ -446,19 +555,113 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
             queryWrapper.eq(Document::getUserId, userId);
         }
         if (StringUtils.hasText(keyword)) {
-            queryWrapper.eq(Document::getDocType, "DOC");
-            queryWrapper.and(wrapper -> wrapper.like(Document::getTitle, keyword).or().like(Document::getContentText, keyword));
+            return searchDocuments(page, size, keyword, knowledgeBaseId, accessibleKnowledgeBaseIds, parentId, userId);
         }
-        if (StringUtils.hasText(keyword)) {
-            queryWrapper.orderByDesc(Document::getUpdatedAt).orderByAsc(Document::getId);
-        } else {
-            queryWrapper.orderByAsc(Document::getSortOrder).orderByDesc(Document::getUpdatedAt);
-        }
+        queryWrapper.orderByAsc(Document::getSortOrder).orderByDesc(Document::getUpdatedAt);
 
         IPage<Document> result = this.page(pageParam, queryWrapper);
         IPage<DocumentVO> voPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
         voPage.setRecords(result.getRecords().stream().map(this::convertToVO).collect(Collectors.toList()));
         return voPage;
+    }
+
+    private IPage<DocumentVO> searchDocuments(
+        Integer page,
+        Integer size,
+        String keyword,
+        Long knowledgeBaseId,
+        Set<Long> accessibleKnowledgeBaseIds,
+        Long parentId,
+        Long userId
+    ) {
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeSize = size == null || size < 1 ? 20 : size;
+        QueryWrapper<Document> countQuery = buildSearchQuery(keyword, knowledgeBaseId, accessibleKnowledgeBaseIds, parentId, userId);
+        long total = documentMapper.selectCount(countQuery);
+        Page<DocumentVO> voPage = new Page<>(safePage, safeSize, total);
+        if (total <= 0) {
+            voPage.setRecords(List.of());
+            return voPage;
+        }
+
+        QueryWrapper<Document> searchQuery = buildSearchQuery(keyword, knowledgeBaseId, accessibleKnowledgeBaseIds, parentId, userId);
+        searchQuery.orderByDesc("updated_at")
+            .orderByDesc("id")
+            .last("LIMIT " + resolveSearchScanLimit(safePage, safeSize));
+        List<DocumentVO> records = documentMapper.selectList(searchQuery).stream()
+            .filter(document -> DocumentSearchSupport.matches(document, keyword))
+            .sorted(DocumentSearchSupport.relevanceComparator(keyword))
+            .skip(Math.max(0L, ((long) safePage - 1) * safeSize))
+            .limit(safeSize)
+            .map(this::convertToVO)
+            .toList();
+        voPage.setRecords(records);
+        return voPage;
+    }
+
+    private QueryWrapper<Document> buildSearchQuery(
+        String keyword,
+        Long knowledgeBaseId,
+        Set<Long> accessibleKnowledgeBaseIds,
+        Long parentId,
+        Long userId
+    ) {
+        QueryWrapper<Document> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("status", 1)
+            .eq("tenant_id", currentAccessContext.getCurrentTenantId())
+            .eq("doc_type", "DOC");
+        if (knowledgeBaseId != null) {
+            queryWrapper.eq("knowledge_base_id", knowledgeBaseId);
+        } else if (accessibleKnowledgeBaseIds != null) {
+            queryWrapper.in("knowledge_base_id", accessibleKnowledgeBaseIds);
+        }
+        if (parentId != null) {
+            queryWrapper.eq("parent_id", parentId);
+        }
+        if (userId != null) {
+            queryWrapper.eq("user_id", userId);
+        }
+
+        List<String> keywordTokens = resolveSearchQueryTokens(keyword);
+        if (!keywordTokens.isEmpty()) {
+            queryWrapper.and(root -> {
+                for (String token : keywordTokens) {
+                    root.and(tokenWrapper -> tokenWrapper.like("title", token)
+                        .or()
+                        .like("content_text", token)
+                        .or()
+                        .like("summary", token)
+                        .or()
+                        .like("path", token));
+                }
+            });
+        }
+        return queryWrapper;
+    }
+
+    private List<String> resolveSearchQueryTokens(String keyword) {
+        if (!StringUtils.hasText(keyword)) {
+            return List.of();
+        }
+        Set<String> tokens = new HashSet<>();
+        List<String> results = new ArrayList<>();
+        String fullKeyword = keyword.trim();
+        if (tokens.add(fullKeyword.toLowerCase(Locale.ROOT))) {
+            results.add(fullKeyword);
+        }
+        for (String part : fullKeyword.split("\\s+")) {
+            String normalizedPart = part.trim();
+            if (!normalizedPart.isEmpty() && tokens.add(normalizedPart.toLowerCase(Locale.ROOT))) {
+                results.add(normalizedPart);
+            }
+        }
+        return results;
+    }
+
+    private int resolveSearchScanLimit(Integer page, Integer size) {
+        int safePage = page == null || page < 1 ? 1 : page;
+        int safeSize = size == null || size < 1 ? 20 : size;
+        return Math.max(Math.min(SEARCH_SCAN_LIMIT, safePage * safeSize * 4), Math.min(SEARCH_SCAN_LIMIT, safePage * safeSize + 120));
     }
 
     public List<DocumentVO> listDeleted(Long knowledgeBaseId) {
@@ -720,6 +923,30 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
         return StringUtils.hasText(slug) ? SlugUtils.toSlug(slug) : SlugUtils.toSlug(title);
     }
 
+    private String resolvePublicSlug(Long knowledgeBaseId, Long documentId, String requestedSlug, String title) {
+        String baseSlug = StringUtils.hasText(requestedSlug) ? SlugUtils.toSlug(requestedSlug) : SlugUtils.toSlug(title);
+        String candidate = baseSlug;
+        int suffix = 2;
+        while (publicSlugExists(knowledgeBaseId, documentId, candidate)) {
+            candidate = baseSlug + "-" + suffix++;
+        }
+        return candidate;
+    }
+
+    private boolean publicSlugExists(Long knowledgeBaseId, Long documentId, String publicSlug) {
+        LambdaQueryWrapper<Document> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Document::getKnowledgeBaseId, knowledgeBaseId)
+            .eq(Document::getPublicSlug, publicSlug)
+            .ne(Document::getId, documentId)
+            .last("LIMIT 1");
+        return documentMapper.selectOne(queryWrapper) != null;
+    }
+
+    private void applyRenderedArtifact(Document document, DocumentContentSupport.NormalizedDocumentContent normalizedContent) {
+        document.setRenderedHtml(normalizedContent.renderedHtml());
+        document.setRenderChecksum(normalizedContent.renderChecksum());
+    }
+
     private String buildPath(Document parent, String slug) {
         return parent == null ? "/" + slug : parent.getPath() + "/" + slug;
     }
@@ -791,17 +1018,6 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
             changedFields.add("排序");
         }
         return changedFields;
-    }
-
-    private String resolveSummary(String summary, String contentText, String content) {
-        if (StringUtils.hasText(summary)) {
-            return summary.length() > 500 ? summary.substring(0, 500) : summary;
-        }
-        String fallback = StringUtils.hasText(contentText) ? contentText : content;
-        if (!StringUtils.hasText(fallback)) {
-            return null;
-        }
-        return fallback.length() > 180 ? fallback.substring(0, 180) : fallback;
     }
 
     private void refreshDescendantPaths(Document document, String oldPath) {
@@ -886,12 +1102,48 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
     private DocumentVO convertToVO(Document document) {
         DocumentVO vo = new DocumentVO();
         BeanUtils.copyProperties(document, vo);
+        DocumentContentSupport.NormalizedStoredDocument normalized = DocumentContentSupport.normalizeStoredDocument(
+            document.getDocType(),
+            document.getFormat(),
+            document.getContent(),
+            document.getContentText(),
+            document.getSummary()
+        );
+        vo.setDocType(normalized.docType());
+        vo.setFormat(normalized.format());
+        vo.setContentText(normalized.contentText());
+        vo.setSummary(normalized.summary());
+        vo.setRenderedHtml(DocumentRenderSupport.resolveStoredRenderedHtml(
+            normalized.docType(),
+            normalized.format(),
+            normalized.content(),
+            document.getRenderedHtml()
+        ));
+        vo.setPublished(PUBLISH_STATUS_PUBLISHED.equals(document.getPublishStatus()));
+        if (vo.getPublished() && StringUtils.hasText(document.getPublicSlug())) {
+            KnowledgeBase knowledgeBase = knowledgeBaseMapper.selectById(document.getKnowledgeBaseId());
+            if (knowledgeBase != null
+                && knowledgeBase.getSiteEnabled() != null
+                && knowledgeBase.getSiteEnabled() == 1
+                && StringUtils.hasText(knowledgeBase.getSiteSlug())) {
+                vo.setPublicUrl("/site/" + knowledgeBase.getSiteSlug() + "/" + document.getPublicSlug());
+            }
+        }
         return vo;
     }
 
     private DocumentVersionVO convertToVersionVO(DocumentVersion version) {
         DocumentVersionVO vo = new DocumentVersionVO();
         BeanUtils.copyProperties(version, vo);
+        DocumentContentSupport.NormalizedStoredDocument normalized = DocumentContentSupport.normalizeStoredDocument(
+            "DOC",
+            version.getFormat(),
+            version.getContent(),
+            version.getContentText(),
+            null
+        );
+        vo.setFormat(normalized.format());
+        vo.setContentText(normalized.contentText());
         return vo;
     }
 }

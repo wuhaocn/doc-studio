@@ -3,12 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom'
 import dayjs from 'dayjs'
 import PageState from '../../components/Feedback/PageState'
 import Header from '../../components/Layout/Header'
+import DocumentRenderedContent from '../../components/Document/DocumentRenderedContent'
 import DocumentReadLinkDrawer from '../../components/Document/DocumentReadLinkDrawer'
 import DocumentShareDrawer from '../../components/Document/DocumentShareDrawer'
 import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
-import { sanitizeRichHtml } from '../../utils/documentContent'
+import { getDocumentRenderState } from '../../utils/documentContent'
 import styles from './DocumentReaderPage.module.css'
 
 const PAGE_STATUS = {
@@ -95,7 +96,14 @@ const DocumentReaderPage = () => {
     })
   }
 
-  const safeDocumentContent = useMemo(() => sanitizeRichHtml(document?.content || ''), [document?.content])
+  const documentRenderState = useMemo(() => {
+    return getDocumentRenderState({
+      format: document?.format,
+      content: document?.content,
+      contentText: document?.contentText,
+      renderedHtml: document?.renderedHtml,
+    })
+  }, [document?.format, document?.content, document?.contentText, document?.renderedHtml])
 
   if (pageStatus === PAGE_STATUS.LOADING) {
     return <div className={styles.state}>正在加载文档...</div>
@@ -113,9 +121,11 @@ const DocumentReaderPage = () => {
     )
   }
 
-  const shouldRenderRichPreview = document.docType === 'DOC' && !!document.content
+  const shouldRenderRichPreview = document.docType === 'DOC' && documentRenderState.hasRenderedContent
   const canWriteKnowledgeBase = !!knowledgeBaseAccess?.canWrite
   const canManageKnowledgeBase = !!knowledgeBaseAccess?.canManage
+  const publicUrl = document.publicUrl
+    || (knowledgeBaseAccess?.siteUrl && document.publicSlug ? `${knowledgeBaseAccess.siteUrl}/${document.publicSlug}` : '')
 
   return (
     <div className={`${styles.page} ${scrolled ? styles.pageScrolled : ''}`}>
@@ -137,10 +147,16 @@ const DocumentReaderPage = () => {
                 <span className={styles.metaPill}>v{document.versionNo}</span>
                 <span className={styles.metaPill}>{dayjs(document.updatedAt).format('MM-DD HH:mm')}</span>
                 <span className={styles.metaPill}>{canWriteKnowledgeBase ? '可继续编辑' : '当前角色只读'}</span>
+                {document.publishStatus === 'PUBLISHED' ? <span className={styles.metaPill}>已正式发布</span> : null}
               </div>
             </div>
           </div>
           <div className={styles.documentToolbar}>
+            {publicUrl ? (
+              <button type="button" className={styles.secondaryButton} onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}>
+                打开公开页
+              </button>
+            ) : null}
             <button type="button" className={styles.secondaryButton} onClick={() => setReadLinkOpen(true)}>
               复制阅读链接
             </button>
@@ -167,7 +183,11 @@ const DocumentReaderPage = () => {
                       <h2 className={styles.paperTitle}>{document.title}</h2>
                       {document.summary ? <p className={styles.documentSummary}>{document.summary}</p> : null}
                     </div>
-                    <div className={styles.richPreviewContent} dangerouslySetInnerHTML={{ __html: safeDocumentContent }} />
+                    <DocumentRenderedContent
+                      className={styles.richPreviewContent}
+                      html={documentRenderState.html}
+                      variant="article"
+                    />
                   </div>
                 </article>
               ) : (
@@ -177,7 +197,7 @@ const DocumentReaderPage = () => {
                     {document.summary ? <p className={styles.documentSummary}>{document.summary}</p> : null}
                   </div>
                   <div className={styles.previewContent}>
-                    {document.contentText || document.content || '当前文档暂无正文。'}
+                    {documentRenderState.plainText || '当前文档暂无正文。'}
                   </div>
                 </div>
               )}

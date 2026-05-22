@@ -68,9 +68,7 @@ const RegisterOwnerPage = () => {
         <div className={styles.hero}>
           <p className={styles.eyebrow}>Memora</p>
           <h1 className={styles.title}>创建工作区</h1>
-          <p className={styles.description}>
-            注册后直接进入工作台，你将成为工作区管理员。
-          </p>
+          <p className={styles.description}>创建后直接进入工作区。</p>
         </div>
 
         <form className={styles.form} onSubmit={handleSubmit}>
@@ -133,7 +131,7 @@ const RegisterOwnerPage = () => {
             className={styles.textButton}
             onClick={() => setShowCustomSlug((current) => !current)}
           >
-            {showCustomSlug ? '收起自定义地址' : '自定义工作区地址（可选）'}
+            {showCustomSlug ? '收起工作区地址' : '自定义工作区地址'}
           </button>
           {showCustomSlug ? (
             <div className={styles.advancedPanel}>

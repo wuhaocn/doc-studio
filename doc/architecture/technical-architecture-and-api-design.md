@@ -29,6 +29,7 @@
 - 权限边界必须显式
 - 版本恢复保持非破坏式
 - Web 管理台优先于外围接入能力
+- AI 生成内容视为外部输入源，而不是系统内置推理流程
 
 ---
 
@@ -84,10 +85,13 @@ Spring Boot Monolith
 
 - 解析当前会话
 - 提供 Owner 注册、登录、登出、session 和 refresh
+- 提供当前用户活跃会话列表、移除单个会话和退出其他设备入口
 - 提供工作区切换后的新 session
 - 提供工作区邀请与接受邀请
+- 提供 Web 运行时配置 `/services/config`
 - 解析当前用户与租户上下文
-- 为后续更强认证和更完整会话治理保留清晰替换点
+- 在 `user_session` 中保留浏览器 / 接口来源、脱敏 IP、最近活跃时间与撤销时间
+- 为后续更强认证和更完整跨端会话治理保留清晰替换点
 
 关键文件：
 
@@ -132,6 +136,7 @@ Spring Boot Monolith
 - 管理目录与文档节点
 - 管理树结构与路径
 - 管理文档正文
+- 承接人工与外部 AI 生成的正文内容
 - 提供工作区统一搜索 V1 结果
 - 创建版本快照
 - 支持批量移动、批量删除、排序
@@ -170,6 +175,34 @@ Spring Boot Monolith
 - [AuditLog.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/entity/AuditLog.java)
 - [AuditLogController.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/AuditLogController.java)
 - [AuditLogService.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/service/AuditLogService.java)
+
+### 5.7 Publishing / PublicSite
+
+职责：
+
+- 把知识库作为轻量站点容器对外发布
+- 管理文档发布状态、公开 slug 与发布时间
+- 提供公开站点首页、详情页和只读消费面
+- 与受控分享分离，避免 token 分享承担正式发布语义
+
+后续演进要求：
+
+- `knowledge base` 应可开启或关闭站点发布
+- `document` 应具备 `DRAFT / REVIEW / PUBLISHED / ARCHIVED` 之类的正式状态
+- 公开消费优先读取服务端统一派生的 `renderedHtml`
+
+### 5.8 Machine Access / Ingestion
+
+职责：
+
+- 管理 Service Account 与 API key 生命周期
+- 为外部 AI、脚本和浏览器工具提供程序化写入入口
+- 在知识库边界内提供 `upsert / batch-upsert / sourceRevision / 幂等` 等可持续同步语义
+
+当前限制：
+
+- 当前 Open API 已补 `upsert / batch-upsert / sourceExternalId / sourceRevision`，来源追踪和幂等写入已正式收口
+- 浏览器 / 对话框入口已补到 Web 接入层：书签脚本与对话框草稿都先落到 `/capture/save`，再复用现有 `upsert` 与按来源回读链路；更细公开消费视图与格式协商仍未完成
 
 ---
 
@@ -224,6 +257,13 @@ Spring Boot Monolith
 - `deletedAt`
 - `deletedBy`
 
+后续发布字段：
+
+- `siteEnabled`
+- `siteSlug`
+- `siteTitle`
+- `siteDescription`
+
 ### 6.4 KnowledgeBaseMember
 
 含义：
@@ -260,12 +300,26 @@ Spring Boot Monolith
 - `summary`
 - `content`
 - `format`
+- `contentText`
+- `summary`
 - `path`
 - `depth`
 - `sortOrder`
 - `versionNo`
 - `deletedAt`
 - `deletedBy`
+
+后续发布字段：
+
+- `publishStatus`
+- `publicSlug`
+- `publishedAt`
+- `renderedHtml`
+- `renderChecksum`
+- `sourceType`
+- `sourceExternalId`
+- `sourceRevision`
+- `metadataJson`
 
 当前规则：
 
@@ -274,6 +328,11 @@ Spring Boot Monolith
 - 删除、移动、排序都必须校验树一致性
 - 软删除必须保留恢复所需元数据
 - 恢复时必须校验所属知识库和父级目录状态
+- `format` 当前已经存在于模型中，但下一阶段必须收口为正式格式语义
+- `content` 应表达该格式下的源内容，而不是模糊的“任意 HTML 缓存”
+- `contentText`、`summary` 应服务搜索、摘要和 diff，长期应从统一渲染链路派生
+- `publicSlug` 不应复用内部阅读路由语义
+- `renderedHtml` 应作为公开消费的 canonical 渲染产物，而不是临时前端结果
 
 ### 6.6 DocumentVersion
 
@@ -411,30 +470,152 @@ Spring Boot Monolith
 - 审计对象过滤必须显式提供 `objectType + objectId`
 - 失败审计、导出、手动归档与归档导出已属于当前已交付基线，但长期留存仍未上升到独立归档服务
 
-### 8.5 富文本约束
+### 8.5 内容格式与展示约束
 
+- `RICH_TEXT`、`MARKDOWN`、`HTML` 应被视为正式文档格式
 - 不可信 HTML 不能直接按生产能力渲染
-- 展示能力与安全能力必须分开表述
+- Markdown 渲染、HTML 白名单净化、富文本输出必须走统一展示链路
+- 阅读页、知识库预览、公开分享页、开放 API 不能各自定义一套格式语义
+- `HTML 文档` 与 `HTML 应用` 必须分开建模；当前基线只支持前者
+
+### 8.6 发布与公开消费约束
+
+- `受控分享` 与 `正式发布` 必须是两套不同产品模型
+- 正式发布必须使用稳定 slug，不得依赖一次性 token
+- 公开站点不得绕过知识库边界直接发布未授权内容
+- 公开消费应优先依赖服务端统一 `renderedHtml`，而不是每个前端各自渲染
+- 当前基线只支持 `HTML 文档` 发布，不支持脚本执行、iframe 宿主或应用运行时
 
 ---
 
-## 9. 演进方向
+## 9. 当前代码对应的改造点
+
+### 9.1 数据模型与服务端语义
+
+相关文件：
+
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/entity/Document.java`
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/entity/DocumentVersion.java`
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/service/DocumentService.java`
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/service/OpenApiDocumentService.java`
+
+当前实现：
+
+- `format` 已收口为 `RICH_TEXT`、`MARKDOWN`、`HTML` 三种正式格式
+- `content` 表示格式对应的源内容，不再默认解释为“任意 HTML 缓存”
+- `contentText`、`summary` 由服务端统一派生，调用方不再主导正文搜索语义
+- 版本快照会保留 `format / content / contentText`，回滚后重新校正摘要
+- 对历史数据读取已增加 `docType / format / contentText / summary` 兜底归一化，并兼容正文中误存为字面量 `\n / \r\n` 的 Markdown / HTML，避免旧数据直接破坏阅读、分享和搜索体验
+
+### 9.2 Web 创建与编辑链路
+
+相关文件：
+
+- `memora-web-app/src/components/Document/DocumentRichEditor.jsx`
+- `memora-web-app/src/pages/Document/DocumentEditorPage.jsx`
+- `memora-web-app/src/hooks/useKnowledgeBaseDetailController.js`
+
+当前实现：
+
+- 富文本编辑器显式写入 `RICH_TEXT`
+- `MARKDOWN`、`HTML` 使用独立源码编辑器与实时预览
+- 新建文档入口已显式选择格式，不再默认把所有新文档写成 `MARKDOWN`
+- 保存接口会明确携带 `format`，避免继续累积“名义 Markdown、实际 HTML”的历史数据
+
+### 9.3 Web 渲染链路
+
+相关文件：
+
+- `memora-web-app/src/utils/documentContent.js`
+- `memora-web-app/src/components/KnowledgeBase/KnowledgeBaseDocumentPanel.jsx`
+- `memora-web-app/src/pages/Document/DocumentReaderPage.jsx`
+- `memora-web-app/src/pages/Share/PublicSharePage.jsx`
+
+当前实现：
+
+- `documentContent.js` 已按 `format` 提供统一渲染与净化能力
+- 知识库预览、阅读页、公开分享页共用一条格式渲染链路
+- Markdown 已升级为正式渲染能力，不再依赖“正文猜测式兼容”
+- HTML 文档继续走安全白名单，不引入脚本执行
+
+### 9.4 开放 API 与机器接入
+
+相关文件：
+
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/OpenApiController.java`
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/dto/OpenApiDocumentCreateDTO.java`
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/dto/OpenApiDocumentUpdateDTO.java`
+- `memora-server/memora-server-manager/src/main/java/com/memora/manager/service/OpenApiDocumentService.java`
+
+当前实现：
+
+- Open API 已对输入 `format` 做显式校验
+- 机器主体支持整体启停、同主体多 key 和逐知识库 `READ / WRITE` 作用域
+- 当前 `API key` 只绑定到机器主体，不和用户登录态或个人凭证混用
+- 外部 AI 或脚本可直接创建 / 更新 / 搜索 / 删除 / 恢复 / 回滚 Markdown 与 HTML 文档
+- Open API 已提供单条 `upsert` 与 `batch-upsert`，并以 `knowledgeBaseId + sourceExternalId` 作为持续同步锚点
+- `sourceRevision` 会参与幂等和冲突判定；同 revision 默认跳过，旧 revision 返回冲突，新 revision 才会推进更新
+- Open API 已补按 `sourceExternalId` 定位文档和按 `metadata / rendered / source / plain / summary` 协商消费视图，外部工具不必自行推断应读取哪个字段
+- `contentText` 不再作为外部权威输入，而是服务端从源内容统一派生
+- 主链路与 Open API 的创建 / 更新 DTO 已移除 `contentText` 这类无效兼容字段
+- 当前仍只暴露文档源内容与元数据，不提供可执行 HTML 应用运行时
+
+### 9.5 搜索、版本与测试护栏
+
+相关文件：
+
+- `memora-web-app/src/utils/documentDiff.js`
+- `memora-server/memora-server-start/src/test/java/com/memora/OnlineDocumentApiIntegrationTest.java`
+- `memora-server/memora-server-start/src/main/resources/db/schema.sql`
+- `memora-server/memora-server-start/src/main/resources/db/schema-mysql.sql`
+
+当前实现：
+
+- 版本 diff 和搜索继续依赖统一派生的 `contentText`
+- 自动化测试已把 Markdown / HTML 的创建、读取、分享与 Open API 一致性纳入正式基线
+- schema 默认值与 seed 数据已同步到新的格式语义
+- 已补 `POST /api/v1/documents/maintenance/normalize-content` 维护接口，支持管理员先 `dryRun` 再批量修正历史数据
+- 搜索页已支持知识库范围过滤、命中高亮和结果相关度排序
+- 后端统一搜索与 Open API 搜索已补多关键词相关度排序，不再单纯按更新时间截断结果
+
+后续治理：
+
+- 如需做历史数据修正，应同时补 schema 迁移说明和回填策略
+- 可以继续增强版本 diff 的格式感知与历史渲染稳定性
+- 后续仍应引入索引化或专门搜索引擎，以支撑更大规模知识库
+
+### 9.6 发布与接入当前缺口
+
+当前还缺：
+
+- 更成熟的对话框直连保存 / 打开封装
+- 更大规模接入下的批量治理与限流策略
+
+下一步改造应遵循：
+
+1. 继续把浏览器 / 对话框入口落到现有 Open API，而不是新开平行写入通道。
+2. 公开消费继续复用 `renderedHtml`，不要再引入前端二次渲染事实源。
+3. 再补浏览器 / 对话框调用封装、导入治理和批量保护策略。
+
+---
+
+## 10. 演进方向
 
 以下能力属于后续阶段演进方向，不应被表述为当前已交付范围：
 
 优先演进顺序：
 
-1. 更完整的会话治理与跨端一致性
-2. 搜索质量、排序策略与索引化
-3. 独立归档服务与自动化保留策略
-4. 更强的版本 diff 与恢复体验
-5. 受控阅读与发布模型
-6. 更细 API key 作用域与外部文档操作边界
+1. 浏览器 / 对话框入口接入与调用封装
+2. 更细外部文档操作边界与自动化治理
+3. 更完整的跨端会话治理与管理员级策略
+4. 搜索索引化与更大规模检索质量治理
+5. 独立归档服务与更深自动化保留策略
+6. 更强的版本 diff 与恢复体验
 7. 更稳定的 Web 信息架构与交互分层
 
 ---
 
-## 10. 相关文档
+## 11. 相关文档
 
 - [在线文档系统产品需求与范围](./product-requirements-and-scope.md)
 - [在线文档系统重构设计与计划](./refactor-design-and-plan.md)

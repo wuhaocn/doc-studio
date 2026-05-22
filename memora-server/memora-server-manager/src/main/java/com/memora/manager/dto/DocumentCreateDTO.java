@@ -24,8 +24,6 @@ public class DocumentCreateDTO {
     private String format;
     
     private String content;
-    
-    private String contentText;
 
     @Size(max = 500, message = "摘要长度不能超过500个字符")
     private String summary;
@@ -34,8 +32,6 @@ public class DocumentCreateDTO {
     private Long knowledgeBaseId;
     
     private Long parentId; // 默认为0，表示根目录
-    
-    private Long userId; // 兼容旧请求体，服务端会忽略并始终使用当前会话用户
 
     private Integer sortOrder;
 }

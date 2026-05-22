@@ -6,6 +6,7 @@ public final class AuditLogConstants {
     public static final String ACTOR_USER = "USER";
     public static final String ACTOR_API_KEY = "API_KEY";
     public static final String ACTOR_SHARE_VISITOR = "SHARE_VISITOR";
+    public static final String ACTOR_SYSTEM = "SYSTEM";
 
     public static final String OBJECT_TENANT = "TENANT";
     public static final String OBJECT_USER_SESSION = "USER_SESSION";
@@ -20,11 +21,16 @@ public final class AuditLogConstants {
     public static final String ACTION_LOGIN = "LOGIN";
     public static final String ACTION_LOGOUT = "LOGOUT";
     public static final String ACTION_SWITCH_WORKSPACE = "SWITCH_WORKSPACE";
+    public static final String ACTION_REVOKE_USER_SESSION = "REVOKE_USER_SESSION";
+    public static final String ACTION_REVOKE_OTHER_USER_SESSIONS = "REVOKE_OTHER_USER_SESSIONS";
+    public static final String ACTION_REVOKE_TENANT_USER_SESSION = "REVOKE_TENANT_USER_SESSION";
+    public static final String ACTION_REVOKE_TENANT_MEMBER_SESSIONS = "REVOKE_TENANT_MEMBER_SESSIONS";
     public static final String ACTION_CREATE_INVITE = "CREATE_INVITE";
     public static final String ACTION_ACCEPT_INVITE = "ACCEPT_INVITE";
     public static final String ACTION_REVOKE_INVITE = "REVOKE_INVITE";
     public static final String ACTION_CREATE_KNOWLEDGE_BASE = "CREATE_KNOWLEDGE_BASE";
     public static final String ACTION_UPDATE_KNOWLEDGE_BASE = "UPDATE_KNOWLEDGE_BASE";
+    public static final String ACTION_UPDATE_KNOWLEDGE_BASE_SITE = "UPDATE_KNOWLEDGE_BASE_SITE";
     public static final String ACTION_DELETE_KNOWLEDGE_BASE = "DELETE_KNOWLEDGE_BASE";
     public static final String ACTION_RESTORE_KNOWLEDGE_BASE = "RESTORE_KNOWLEDGE_BASE";
     public static final String ACTION_UPDATE_KNOWLEDGE_BASE_MEMBERS = "UPDATE_KNOWLEDGE_BASE_MEMBERS";
@@ -35,22 +41,37 @@ public final class AuditLogConstants {
     public static final String ACTION_DELETE_DOCUMENT = "DELETE_DOCUMENT";
     public static final String ACTION_RESTORE_DOCUMENT = "RESTORE_DOCUMENT";
     public static final String ACTION_ROLLBACK_DOCUMENT = "ROLLBACK_DOCUMENT";
+    public static final String ACTION_PUBLISH_DOCUMENT = "PUBLISH_DOCUMENT";
+    public static final String ACTION_UNPUBLISH_DOCUMENT = "UNPUBLISH_DOCUMENT";
+    public static final String ACTION_NORMALIZE_DOCUMENT_CONTENT = "NORMALIZE_DOCUMENT_CONTENT";
     public static final String ACTION_EXPORT_AUDIT_LOG = "EXPORT_AUDIT_LOG";
     public static final String ACTION_APPLY_AUDIT_RETENTION = "APPLY_AUDIT_RETENTION";
     public static final String ACTION_CREATE_DOCUMENT_SHARE = "CREATE_DOCUMENT_SHARE";
     public static final String ACTION_REVOKE_DOCUMENT_SHARE = "REVOKE_DOCUMENT_SHARE";
     public static final String ACTION_ACCESS_DOCUMENT_SHARE = "ACCESS_DOCUMENT_SHARE";
     public static final String ACTION_CREATE_SERVICE_ACCOUNT = "CREATE_SERVICE_ACCOUNT";
+    public static final String ACTION_ENABLE_SERVICE_ACCOUNT = "ENABLE_SERVICE_ACCOUNT";
+    public static final String ACTION_DISABLE_SERVICE_ACCOUNT = "DISABLE_SERVICE_ACCOUNT";
     public static final String ACTION_CREATE_API_KEY = "CREATE_API_KEY";
+    public static final String ACTION_REVEAL_API_KEY = "REVEAL_API_KEY";
+    public static final String ACTION_UPDATE_API_KEY_SCOPE = "UPDATE_API_KEY_SCOPE";
     public static final String ACTION_DISABLE_API_KEY = "DISABLE_API_KEY";
     public static final String ACTION_REVOKE_API_KEY = "REVOKE_API_KEY";
     public static final String ACTION_ROTATE_API_KEY = "ROTATE_API_KEY";
     public static final String ACTION_OPEN_API_LIST_KNOWLEDGE_BASES = "OPEN_API_LIST_KNOWLEDGE_BASES";
     public static final String ACTION_OPEN_API_LIST_DOCUMENTS = "OPEN_API_LIST_DOCUMENTS";
+    public static final String ACTION_OPEN_API_SEARCH_DOCUMENTS = "OPEN_API_SEARCH_DOCUMENTS";
     public static final String ACTION_OPEN_API_GET_DOCUMENT = "OPEN_API_GET_DOCUMENT";
+    public static final String ACTION_OPEN_API_GET_DOCUMENT_BY_SOURCE = "OPEN_API_GET_DOCUMENT_BY_SOURCE";
     public static final String ACTION_OPEN_API_GET_DOCUMENT_VERSIONS = "OPEN_API_GET_DOCUMENT_VERSIONS";
+    public static final String ACTION_OPEN_API_CONSUME_DOCUMENT = "OPEN_API_CONSUME_DOCUMENT";
     public static final String ACTION_OPEN_API_CREATE_DOCUMENT = "OPEN_API_CREATE_DOCUMENT";
     public static final String ACTION_OPEN_API_UPDATE_DOCUMENT = "OPEN_API_UPDATE_DOCUMENT";
+    public static final String ACTION_OPEN_API_UPSERT_DOCUMENT = "OPEN_API_UPSERT_DOCUMENT";
+    public static final String ACTION_OPEN_API_BATCH_UPSERT_DOCUMENTS = "OPEN_API_BATCH_UPSERT_DOCUMENTS";
+    public static final String ACTION_OPEN_API_DELETE_DOCUMENT = "OPEN_API_DELETE_DOCUMENT";
+    public static final String ACTION_OPEN_API_RESTORE_DOCUMENT = "OPEN_API_RESTORE_DOCUMENT";
+    public static final String ACTION_OPEN_API_ROLLBACK_DOCUMENT = "OPEN_API_ROLLBACK_DOCUMENT";
 
     public static final String RESULT_SUCCESS = "SUCCESS";
     public static final String RESULT_FAILURE = "FAILURE";
@@ -62,6 +83,7 @@ public final class AuditLogConstants {
     public static final String SOURCE_DIRECT_API = "DIRECT_API";
     public static final String SOURCE_PUBLIC_SHARE = "PUBLIC_SHARE";
     public static final String SOURCE_OPEN_API = "OPEN_API";
+    public static final String SOURCE_SYSTEM_JOB = "SYSTEM_JOB";
 
     public static final Set<String> QUERYABLE_OBJECT_TYPES = Set.of(
         OBJECT_TENANT,

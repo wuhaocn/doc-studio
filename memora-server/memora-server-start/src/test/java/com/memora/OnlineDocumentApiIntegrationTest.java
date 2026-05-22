@@ -2,6 +2,7 @@ package com.memora;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.memora.manager.service.AuditLogService;
 import com.memora.manager.support.AuditLogConstants;
 import com.memora.manager.support.OpaqueTokenCodec;
 import jakarta.servlet.http.Cookie;
@@ -17,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -48,6 +50,9 @@ class OnlineDocumentApiIntegrationTest {
 
     @Autowired
     private OpaqueTokenCodec opaqueTokenCodec;
+
+    @Autowired
+    private AuditLogService auditLogService;
 
     @Test
     void shouldRejectWorkspaceDashboardWithoutBearerToken() throws Exception {
@@ -375,6 +380,145 @@ class OnlineDocumentApiIntegrationTest {
     }
 
     @Test
+    void shouldListAndRevokeOtherSessions() throws Exception {
+        String currentAccessToken = loginAndGetAccessToken("admin", "123456");
+        String otherAccessToken = loginAndGetAccessToken("admin", "123456");
+
+        String sessionsResponse = mockMvc.perform(get("/api/v1/auth/sessions")
+                .header("Authorization", "Bearer " + currentAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.length()", Matchers.greaterThanOrEqualTo(2)))
+            .andExpect(jsonPath("$.data[0].clientType").isNotEmpty())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        JsonNode sessionNodes = objectMapper.readTree(sessionsResponse).path("data");
+        long otherSessionId = 0L;
+        for (JsonNode sessionNode : sessionNodes) {
+            if (!sessionNode.path("current").asBoolean(false)) {
+                otherSessionId = sessionNode.path("id").asLong();
+                break;
+            }
+        }
+        assertTrue(otherSessionId > 0);
+
+        mockMvc.perform(post("/api/v1/auth/sessions/{sessionId}/revoke", otherSessionId)
+                .header("Authorization", "Bearer " + currentAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.revokedCount").value(1))
+            .andExpect(jsonPath("$.data.currentSessionRevoked").value(false));
+
+        mockMvc.perform(get("/api/v1/auth/session")
+                .header("Authorization", "Bearer " + otherAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(401));
+
+        String thirdAccessToken = loginAndGetAccessToken("admin", "123456");
+
+        mockMvc.perform(post("/api/v1/auth/sessions/revoke-others")
+                .header("Authorization", "Bearer " + currentAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.revokedCount").value(Matchers.greaterThanOrEqualTo(1)))
+            .andExpect(jsonPath("$.data.currentSessionRevoked").value(false));
+
+        mockMvc.perform(get("/api/v1/auth/session")
+                .header("Authorization", "Bearer " + thirdAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(401));
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", "Bearer " + currentAccessToken)
+                .param("size", "20")
+                .param("objectType", "USER_SESSION")
+                .param("resultType", "SUCCESS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItems(
+                "REVOKE_USER_SESSION",
+                "REVOKE_OTHER_USER_SESSIONS"
+            )));
+    }
+
+    @Test
+    void shouldAllowTenantManagerToGovernWorkspaceSessions() throws Exception {
+        String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+        String viewerAccessToken = loginAndGetAccessToken("viewer", "123456");
+        String reviewerAccessToken = loginAndGetAccessToken("reviewer", "123456");
+        String reviewerSecondAccessToken = loginAndGetAccessToken("reviewer", "123456");
+
+        String tenantSessionsResponse = mockMvc.perform(get("/api/v1/auth/tenant-sessions")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[*].username", Matchers.hasItems("admin", "viewer", "reviewer")))
+            .andExpect(jsonPath("$.data[*].role", Matchers.hasItems("OWNER", "VIEWER", "REVIEWER")))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        mockMvc.perform(get("/api/v1/auth/tenant-sessions")
+                .header("Authorization", "Bearer " + viewerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("当前角色无管理权限"));
+
+        JsonNode sessionNodes = objectMapper.readTree(tenantSessionsResponse).path("data");
+        long viewerSessionId = 0L;
+        for (JsonNode sessionNode : sessionNodes) {
+            if ("viewer".equals(sessionNode.path("username").asText())) {
+                viewerSessionId = sessionNode.path("id").asLong();
+                break;
+            }
+        }
+        assertTrue(viewerSessionId > 0);
+
+        mockMvc.perform(post("/api/v1/auth/tenant-sessions/{sessionId}/revoke", viewerSessionId)
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.revokedCount").value(1))
+            .andExpect(jsonPath("$.data.currentSessionRevoked").value(false));
+
+        mockMvc.perform(get("/api/v1/auth/session")
+                .header("Authorization", "Bearer " + viewerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(401));
+
+        mockMvc.perform(post("/api/v1/auth/tenant-sessions/users/{userId}/revoke", 3L)
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.revokedCount").value(Matchers.greaterThanOrEqualTo(2)))
+            .andExpect(jsonPath("$.data.currentSessionRevoked").value(false));
+
+        mockMvc.perform(get("/api/v1/auth/session")
+                .header("Authorization", "Bearer " + reviewerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(401));
+
+        mockMvc.perform(get("/api/v1/auth/session")
+                .header("Authorization", "Bearer " + reviewerSecondAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(401));
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .param("size", "20")
+                .param("objectType", "USER_SESSION")
+                .param("resultType", "SUCCESS"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItems(
+                "REVOKE_TENANT_USER_SESSION",
+                "REVOKE_TENANT_MEMBER_SESSIONS"
+            )));
+    }
+
+    @Test
     void shouldListJoinedWorkspacesAndSwitchCurrentWorkspace() throws Exception {
         String accessToken = loginAndGetAccessToken("admin", "123456");
 
@@ -451,7 +595,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 0,
                       "title": "巡检手册正文",
                       "docType": "DOC",
-                      "contentText": "巡检手册包含值班检查、升级回退和交接处理。"
+                      "format": "RICH_TEXT",
+                      "content": "<p>巡检手册包含值班检查、升级回退和交接处理。</p>"
                     }
                     """.formatted(knowledgeBaseId)))
             .andExpect(status().isOk());
@@ -464,6 +609,77 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(jsonPath("$.data.records[*].docType", Matchers.everyItem(Matchers.equalTo("DOC"))))
             .andExpect(jsonPath("$.data.records[*].title", Matchers.hasItem("巡检手册正文")))
             .andExpect(jsonPath("$.data.records[*].title", Matchers.not(Matchers.hasItem("巡检手册目录"))));
+    }
+
+    @Test
+    void shouldSortUnifiedSearchByRelevanceBeforeRecency() throws Exception {
+        String accessToken = loginAndGetAccessToken("admin", "123456");
+
+        String knowledgeBaseResponse = mockMvc.perform(post("/api/v1/knowledge-bases")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "搜索排序验证知识库",
+                      "description": "验证搜索按相关度优先"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long knowledgeBaseId = objectMapper.readTree(knowledgeBaseResponse).path("data").path("id").asLong();
+
+        String exactTitleResponse = mockMvc.perform(post("/api/v1/documents")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": %d,
+                      "parentId": 0,
+                      "title": "API key",
+                      "docType": "DOC",
+                      "format": "MARKDOWN",
+                      "content": "# API key\\n精确标题命中"
+                    }
+                    """.formatted(knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        String contentOnlyResponse = mockMvc.perform(post("/api/v1/documents")
+                .header("Authorization", "Bearer " + accessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": %d,
+                      "parentId": 0,
+                      "title": "轮换策略",
+                      "docType": "DOC",
+                      "format": "MARKDOWN",
+                      "content": "# 轮换策略\\n这里介绍 API key 的轮换和失效处理。"
+                    }
+                    """.formatted(knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long exactTitleDocumentId = objectMapper.readTree(exactTitleResponse).path("data").path("id").asLong();
+        long contentOnlyDocumentId = objectMapper.readTree(contentOnlyResponse).path("data").path("id").asLong();
+
+        jdbcTemplate.update("UPDATE document SET updated_at = ? WHERE id = ?", LocalDateTime.now().minusDays(2), exactTitleDocumentId);
+        jdbcTemplate.update("UPDATE document SET updated_at = ? WHERE id = ?", LocalDateTime.now(), contentOnlyDocumentId);
+
+        mockMvc.perform(get("/api/v1/documents")
+                .header("Authorization", "Bearer " + accessToken)
+                .param("keyword", "API key")
+                .param("knowledgeBaseId", String.valueOf(knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.records[0].title").value("API key"));
     }
 
     @Test
@@ -604,7 +820,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 0,
                       "title": "审计文档",
                       "docType": "DOC",
-                      "contentText": "版本一正文"
+                      "format": "RICH_TEXT",
+                      "content": "<p>版本一正文</p>"
                     }
                     """.formatted(knowledgeBaseId)))
             .andExpect(status().isOk())
@@ -620,8 +837,8 @@ class OnlineDocumentApiIntegrationTest {
                 .content("""
                     {
                       "title": "审计文档",
-                      "content": "# 审计文档\\n版本二正文",
-                      "contentText": "审计文档 版本二正文"
+                      "format": "MARKDOWN",
+                      "content": "# 审计文档\\n版本二正文"
                     }
                     """))
             .andExpect(status().isOk())
@@ -773,7 +990,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 0,
                       "title": "admin登录新建文档",
                       "docType": "DOC",
-                      "contentText": "首次创建正文"
+                      "format": "RICH_TEXT",
+                      "content": "<p>首次创建正文</p>"
                     }
                     """.formatted(knowledgeBaseId)))
             .andExpect(status().isOk())
@@ -791,8 +1009,8 @@ class OnlineDocumentApiIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
+                      "format": "MARKDOWN",
                       "content": "# admin登录新建文档\\n已完成正文编辑",
-                      "contentText": "admin登录新建文档 已完成正文编辑",
                       "summary": "验证 admin 登录后可编辑文档"
                     }
                     """))
@@ -850,7 +1068,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 0,
                       "title": "admin链路验证文档",
                       "docType": "DOC",
-                      "contentText": "版本一正文"
+                      "format": "RICH_TEXT",
+                      "content": "<p>版本一正文</p>"
                     }
                     """.formatted(knowledgeBaseId)))
             .andExpect(status().isOk())
@@ -867,8 +1086,8 @@ class OnlineDocumentApiIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {
+                      "format": "MARKDOWN",
                       "content": "# admin链路验证文档\\n版本二正文",
-                      "contentText": "admin链路验证文档 版本二正文",
                       "summary": "主链路编辑后摘要"
                     }
                     """))
@@ -935,7 +1154,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 1,
                       "title": "仅元数据更新文档",
                       "docType": "DOC",
-                      "contentText": "用于验证版本语义收口"
+                      "format": "RICH_TEXT",
+                      "content": "<p>用于验证版本语义收口</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -966,6 +1186,191 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void shouldNormalizeDocumentFormatContentAndRejectUnsupportedFormat() throws Exception {
+        String createResponse = mockMvc.perform(post("/api/v1/documents")
+                .header("Authorization", "Bearer demo:1:2")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "格式收口文档",
+                      "docType": "DOC",
+                      "format": "HTML",
+                      "content": "<article><h1>格式收口文档</h1><p>支持直接展示 HTML 内容。</p></article>"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.format").value("HTML"))
+            .andExpect(jsonPath("$.data.contentText").value("格式收口文档 支持直接展示 HTML 内容。"))
+            .andExpect(jsonPath("$.data.summary").value("格式收口文档 支持直接展示 HTML 内容。"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long documentId = objectMapper.readTree(createResponse).path("data").path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/documents/{id}", documentId)
+                .header("Authorization", "Bearer demo:1:2")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "format": "MARKDOWN",
+                      "content": "# 格式收口文档\\n\\n支持切换到 Markdown 正文。"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.format").value("MARKDOWN"))
+            .andExpect(jsonPath("$.data.contentText").value("格式收口文档 支持切换到 Markdown 正文。"))
+            .andExpect(jsonPath("$.data.summary").value("格式收口文档 支持切换到 Markdown 正文。"));
+
+        mockMvc.perform(post("/api/v1/documents")
+                .header("Authorization", "Bearer demo:1:2")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "非法格式文档",
+                      "docType": "DOC",
+                      "format": "PDF",
+                      "content": "不应该被接受"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("不支持的文档格式: PDF"));
+    }
+
+    @Test
+    void shouldRepairLegacyDocumentFormatDataThroughMaintenanceEndpoint() throws Exception {
+        String knowledgeBaseResponse = mockMvc.perform(post("/api/v1/knowledge-bases")
+                .header("Authorization", "Bearer demo:1:1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "历史格式治理知识库",
+                      "description": "用于验证维护接口"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long knowledgeBaseId = objectMapper.readTree(knowledgeBaseResponse).path("data").path("id").asLong();
+
+        String documentResponse = mockMvc.perform(post("/api/v1/documents")
+                .header("Authorization", "Bearer demo:1:1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": %d,
+                      "parentId": 0,
+                      "title": "历史格式治理文档",
+                      "docType": "DOC",
+                      "format": "MARKDOWN",
+                      "content": "# 历史格式治理文档\\n\\n旧格式正文"
+                    }
+                    """.formatted(knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long documentId = objectMapper.readTree(documentResponse).path("data").path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/documents/{id}", documentId)
+                .header("Authorization", "Bearer demo:1:1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "content": "# 历史格式治理文档\\n\\n第二版正文"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.versionNo").value(2));
+
+        jdbcTemplate.update("""
+            UPDATE document
+            SET doc_type = ?, format = NULL, content_text = NULL, summary = ?
+            WHERE id = ?
+            """, "doc", "   ", documentId);
+        jdbcTemplate.update("""
+            UPDATE document_version
+            SET format = NULL, content_text = NULL
+            WHERE document_id = ?
+            """, documentId);
+
+        mockMvc.perform(get("/api/v1/documents/{id}", documentId)
+                .header("Authorization", "Bearer demo:1:1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.docType").value("DOC"))
+            .andExpect(jsonPath("$.data.format").value("MARKDOWN"))
+            .andExpect(jsonPath("$.data.contentText").value("历史格式治理文档 第二版正文"))
+            .andExpect(jsonPath("$.data.summary").value("历史格式治理文档 第二版正文"));
+
+        mockMvc.perform(get("/api/v1/documents/{id}/versions", documentId)
+                .header("Authorization", "Bearer demo:1:1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[0].format").value("MARKDOWN"))
+            .andExpect(jsonPath("$.data[0].contentText").value("历史格式治理文档 旧格式正文"));
+
+        mockMvc.perform(post("/api/v1/documents/maintenance/normalize-content")
+                .header("Authorization", "Bearer demo:1:1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": %d,
+                      "dryRun": true
+                    }
+                    """.formatted(knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.dryRun").value(true))
+            .andExpect(jsonPath("$.data.updatedDocumentCount").value(1))
+            .andExpect(jsonPath("$.data.documentDocTypeUpdatedCount").value(1))
+            .andExpect(jsonPath("$.data.documentFormatUpdatedCount").value(1))
+            .andExpect(jsonPath("$.data.documentContentTextUpdatedCount").value(1))
+            .andExpect(jsonPath("$.data.documentSummaryUpdatedCount").value(1))
+            .andExpect(jsonPath("$.data.updatedVersionCount").value(1))
+            .andExpect(jsonPath("$.data.versionFormatUpdatedCount").value(1))
+            .andExpect(jsonPath("$.data.versionContentTextUpdatedCount").value(1));
+
+        assertEquals("doc", jdbcTemplate.queryForObject("SELECT doc_type FROM document WHERE id = ?", String.class, documentId));
+        assertEquals(null, jdbcTemplate.queryForObject("SELECT format FROM document WHERE id = ?", String.class, documentId));
+
+        mockMvc.perform(post("/api/v1/documents/maintenance/normalize-content")
+                .header("Authorization", "Bearer demo:1:1")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": %d,
+                      "dryRun": false
+                    }
+                    """.formatted(knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.dryRun").value(false))
+            .andExpect(jsonPath("$.data.updatedDocumentCount").value(1))
+            .andExpect(jsonPath("$.data.updatedVersionCount").value(1));
+
+        assertEquals("DOC", jdbcTemplate.queryForObject("SELECT doc_type FROM document WHERE id = ?", String.class, documentId));
+        assertEquals("MARKDOWN", jdbcTemplate.queryForObject("SELECT format FROM document WHERE id = ?", String.class, documentId));
+        assertEquals("历史格式治理文档 第二版正文", jdbcTemplate.queryForObject("SELECT content_text FROM document WHERE id = ?", String.class, documentId));
+        assertEquals("历史格式治理文档 第二版正文", jdbcTemplate.queryForObject("SELECT summary FROM document WHERE id = ?", String.class, documentId));
+        assertEquals("MARKDOWN", jdbcTemplate.queryForObject("SELECT format FROM document_version WHERE document_id = ?", String.class, documentId));
+        assertEquals("历史格式治理文档 旧格式正文", jdbcTemplate.queryForObject("SELECT content_text FROM document_version WHERE document_id = ?", String.class, documentId));
     }
 
     @Test
@@ -1089,7 +1494,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 1,
                       "title": "现场交接记录",
                       "docType": "DOC",
-                      "contentText": "用于记录交接事项"
+                      "format": "RICH_TEXT",
+                      "content": "<p>用于记录交接事项</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -1110,7 +1516,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 1,
                       "title": "忽略主体归属的文档",
                       "docType": "DOC",
-                      "contentText": "验证文档创建主体始终取当前会话",
+                      "format": "RICH_TEXT",
+                      "content": "<p>验证文档创建主体始终取当前会话</p>",
                       "userId": 4
                     }
                     """))
@@ -1133,7 +1540,8 @@ class OnlineDocumentApiIntegrationTest {
                       "title": "项目启动清单冲突测试",
                       "slug": "kickoff-checklist",
                       "docType": "DOC",
-                      "contentText": "验证文档路径唯一键冲突错误语义"
+                      "format": "RICH_TEXT",
+                      "content": "<p>验证文档路径唯一键冲突错误语义</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -1187,7 +1595,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 1,
                       "title": "待恢复文档",
                       "docType": "DOC",
-                      "contentText": "验证文档回收站与恢复"
+                      "format": "RICH_TEXT",
+                      "content": "<p>验证文档回收站与恢复</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -1255,7 +1664,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": %d,
                       "title": "待恢复子文档",
                       "docType": "DOC",
-                      "contentText": "验证恢复父级约束"
+                      "format": "RICH_TEXT",
+                      "content": "<p>验证恢复父级约束</p>"
                     }
                     """.formatted(folderId)))
             .andExpect(status().isOk())
@@ -1349,7 +1759,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": %d,
                       "title": "批量移动子文档",
                       "docType": "DOC",
-                      "contentText": "用于测试批量移动"
+                      "format": "RICH_TEXT",
+                      "content": "<p>用于测试批量移动</p>"
                     }
                     """.formatted(folderId)))
             .andExpect(status().isOk())
@@ -1417,7 +1828,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": %d,
                       "title": "批量删除子文档",
                       "docType": "DOC",
-                      "contentText": "用于测试批量删除"
+                      "format": "RICH_TEXT",
+                      "content": "<p>用于测试批量删除</p>"
                     }
                     """.formatted(folderId)))
             .andExpect(status().isOk())
@@ -1490,7 +1902,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 1,
                       "title": "只读用户新文档",
                       "docType": "DOC",
-                      "contentText": "viewer should be rejected"
+                      "format": "RICH_TEXT",
+                      "content": "<p>viewer should be rejected</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -1540,7 +1953,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 0,
                       "title": "知识库级授权文档",
                       "docType": "DOC",
-                      "contentText": "reviewer with kb editor should pass"
+                      "format": "RICH_TEXT",
+                      "content": "<p>reviewer with kb editor should pass</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -1557,7 +1971,8 @@ class OnlineDocumentApiIntegrationTest {
                       "parentId": 0,
                       "title": "知识库级只读文档",
                       "docType": "DOC",
-                      "contentText": "viewer should be rejected by kb role"
+                      "format": "RICH_TEXT",
+                      "content": "<p>viewer should be rejected by kb role</p>"
                     }
                     """))
             .andExpect(status().isOk())
@@ -1804,6 +2219,55 @@ class OnlineDocumentApiIntegrationTest {
     }
 
     @Test
+    void shouldApplyAutomaticAuditRetentionAcrossTenants() {
+        LocalDateTime expiredAt = LocalDateTime.now().minusDays(4200);
+        jdbcTemplate.update("""
+            INSERT INTO audit_log (
+              id, tenant_id, knowledge_base_id, knowledge_base_name, actor_type, actor_user_id,
+              actor_display_name, actor_role, object_type, object_id, object_title, action_type,
+              result_type, detail, source_type, request_method, request_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            9101L, 1L, null, null, "USER", 1L,
+            "管理员", "OWNER", "TENANT", 1L, "租户一旧审计", "LOGIN",
+            "SUCCESS", "租户一过期记录", "DIRECT_API", "POST", "/api/v1/auth/login", expiredAt
+        );
+        jdbcTemplate.update("""
+            INSERT INTO audit_log (
+              id, tenant_id, knowledge_base_id, knowledge_base_name, actor_type, actor_user_id,
+              actor_display_name, actor_role, object_type, object_id, object_title, action_type,
+              result_type, detail, source_type, request_method, request_path, created_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            9102L, 2L, null, null, "USER", 5L,
+            "华南管理员", "OWNER", "TENANT", 2L, "租户二旧审计", "LOGIN",
+            "SUCCESS", "租户二过期记录", "DIRECT_API", "POST", "/api/v1/auth/login", expiredAt
+        );
+
+        long archivedCount = auditLogService.runSystemRetentionBatch(List.of(1L, 2L));
+        assertEquals(2L, archivedCount);
+
+        Long activeExpiredCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM audit_log WHERE id IN (9101, 9102)",
+            Long.class
+        );
+        Long archivedExpiredCount = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM audit_log_archive WHERE id IN (9101, 9102)",
+            Long.class
+        );
+        Long automaticAuditEntries = jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM audit_log WHERE source_type = ? AND action_type = ?",
+            Long.class,
+            "SYSTEM_JOB",
+            "APPLY_AUDIT_RETENTION"
+        );
+
+        assertEquals(0L, activeExpiredCount);
+        assertEquals(2L, archivedExpiredCount);
+        assertTrue(automaticAuditEntries != null && automaticAuditEntries >= 2L);
+    }
+
+    @Test
     void shouldCreateAccessAndRevokeControlledDocumentShare() throws Exception {
         String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
 
@@ -1872,7 +2336,9 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.documentId").value(2))
-            .andExpect(jsonPath("$.data.title").value("项目启动清单"));
+            .andExpect(jsonPath("$.data.title").value("项目启动清单"))
+            .andExpect(jsonPath("$.data.format").value("MARKDOWN"))
+            .andExpect(jsonPath("$.data.contentText").value("项目启动清单 确认客户信息 确认硬件版本"));
 
         mockMvc.perform(post("/api/v1/document-shares/{shareId}/revoke", shareId)
                 .header("Authorization", "Bearer " + ownerAccessToken))
@@ -1906,8 +2372,25 @@ class OnlineDocumentApiIntegrationTest {
     }
 
     @Test
-    void shouldManageApiKeysAndOperateDocumentsThroughOpenApi() throws Exception {
+    void shouldManageServiceAccountsAndOperateDocumentsThroughExpandedOpenApi() throws Exception {
         String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+
+        String extraKnowledgeBaseResponse = mockMvc.perform(post("/api/v1/knowledge-bases")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "Open API 范围切换知识库",
+                      "description": "用于验证 API key 作用域重配"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long extraKnowledgeBaseId = objectMapper.readTree(extraKnowledgeBaseResponse).path("data").path("id").asLong();
 
         String issuedKeyResponse = mockMvc.perform(post("/api/v1/service-accounts")
                 .header("Authorization", "Bearer " + ownerAccessToken)
@@ -1918,18 +2401,21 @@ class OnlineDocumentApiIntegrationTest {
                       "description": "用于外部 ERP 系统写入文档",
                       "keyName": "生产写入 key",
                       "expiresInDays": 180,
-                      "accessMode": "WRITE",
-                      "knowledgeBaseIds": [1]
+                      "scopes": [
+                        { "knowledgeBaseId": 1, "accessMode": "WRITE" }
+                      ]
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
-            .andExpect(jsonPath("$.data.apiKey.accessModes[0]").value("WRITE"))
+            .andExpect(jsonPath("$.data.apiKey.scopes[0].knowledgeBaseId").value(1))
+            .andExpect(jsonPath("$.data.apiKey.scopes[0].accessMode").value("WRITE"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
         JsonNode issuedNode = objectMapper.readTree(issuedKeyResponse).path("data");
+        long serviceAccountId = issuedNode.path("apiKey").path("serviceAccountId").asLong();
         long apiKeyId = issuedNode.path("apiKey").path("id").asLong();
         String plainTextKey = issuedNode.path("plainTextKey").asText();
 
@@ -1938,14 +2424,73 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data[0].name").value("ERP 同步写入"))
-            .andExpect(jsonPath("$.data[0].apiKeys[0].knowledgeBaseIds[0]").value(1));
+            .andExpect(jsonPath("$.data[0].status").value(1))
+            .andExpect(jsonPath("$.data[0].apiKeys[0].scopes[0].knowledgeBaseId").value(1))
+            .andExpect(jsonPath("$.data[0].apiKeys[0].plainTextKey").value(plainTextKey));
+
+        mockMvc.perform(post("/api/v1/api-keys/{apiKeyId}/reveal", apiKeyId)
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.apiKey.id").value((int) apiKeyId))
+            .andExpect(jsonPath("$.data.plainTextKey").value(plainTextKey));
+
+        String readOnlyKeyResponse = mockMvc.perform(post("/api/v1/service-accounts/{serviceAccountId}/api-keys", serviceAccountId)
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "只读分析 key",
+                      "expiresInDays": 45,
+                      "scopes": [
+                        { "knowledgeBaseId": 1, "accessMode": "READ" }
+                      ]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.apiKey.scopes[0].accessMode").value("READ"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        JsonNode readOnlyKeyNode = objectMapper.readTree(readOnlyKeyResponse).path("data");
+        long readOnlyApiKeyId = readOnlyKeyNode.path("apiKey").path("id").asLong();
+        String readOnlyPlainTextKey = readOnlyKeyNode.path("plainTextKey").asText();
+        jdbcTemplate.update("UPDATE api_key SET secret_ciphertext = NULL WHERE id = ?", readOnlyApiKeyId);
+
+        mockMvc.perform(get("/api/v1/service-accounts")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[0].apiKeys[0].id").value((int) readOnlyApiKeyId))
+            .andExpect(jsonPath("$.data[0].apiKeys[0].secretRevealAvailable").value(false))
+            .andExpect(jsonPath("$.data[0].apiKeys[0].plainTextKey").doesNotExist())
+            .andExpect(jsonPath("$.data[0].apiKeys[1].id").value((int) apiKeyId))
+            .andExpect(jsonPath("$.data[0].apiKeys[1].plainTextKey").value(plainTextKey));
 
         mockMvc.perform(get("/api/v1/open/knowledge-bases")
-                .header("Authorization", "ApiKey " + plainTextKey))
+                .header("Authorization", "ApiKey " + readOnlyPlainTextKey))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data[*].id", Matchers.hasItem(1)))
-            .andExpect(jsonPath("$.data[*].currentRole", Matchers.hasItem("API_KEY_WRITE")));
+            .andExpect(jsonPath("$.data[*].currentRole", Matchers.hasItem("API_KEY_READ")));
+
+        mockMvc.perform(post("/api/v1/open/documents")
+                .header("Authorization", "ApiKey " + readOnlyPlainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "读 key 尝试写入",
+                      "format": "MARKDOWN",
+                      "content": "# 无法写入"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("当前 API key 无权写入该知识库"));
 
         String openDocumentResponse = mockMvc.perform(post("/api/v1/open/documents")
                 .header("Authorization", "ApiKey " + plainTextKey)
@@ -1955,17 +2500,59 @@ class OnlineDocumentApiIntegrationTest {
                       "knowledgeBaseId": 1,
                       "parentId": 1,
                       "title": "Open API 写入文档",
-                      "contentText": "Open API 第一次写入"
+                      "format": "HTML",
+                      "content": "<article><h1>Open API 写入文档</h1><p>Open API 第一次写入</p></article>",
+                      "sourceExternalId": "legacy-open-api-001",
+                      "sourceRevision": "1"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.format").value("HTML"))
+            .andExpect(jsonPath("$.data.contentText").value("Open API 写入文档 Open API 第一次写入"))
             .andExpect(jsonPath("$.data.versionNo").value(1))
+            .andExpect(jsonPath("$.data.sourceExternalId").value("legacy-open-api-001"))
+            .andExpect(jsonPath("$.data.sourceRevision").value("1"))
             .andReturn()
             .getResponse()
             .getContentAsString();
 
         long documentId = objectMapper.readTree(openDocumentResponse).path("data").path("id").asLong();
+
+        mockMvc.perform(get("/api/v1/open/documents/search")
+                .header("Authorization", "ApiKey " + readOnlyPlainTextKey)
+                .param("keyword", "Open API 写入文档")
+                .param("knowledgeBaseId", "1"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[0].id").value((int) documentId))
+            .andExpect(jsonPath("$.data[0].title").value("Open API 写入文档"));
+
+        mockMvc.perform(put("/api/v1/api-keys/{apiKeyId}/scope", readOnlyApiKeyId)
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "scopes": [
+                        { "knowledgeBaseId": %d, "accessMode": "READ" }
+                      ]
+                    }
+                    """.formatted(extraKnowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(get("/api/v1/open/knowledge-bases")
+                .header("Authorization", "ApiKey " + readOnlyPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[*].id", Matchers.hasItem((int) extraKnowledgeBaseId)))
+            .andExpect(jsonPath("$.data[*].id", Matchers.not(Matchers.hasItem(1))));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + readOnlyPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("当前 API key 无权读取该知识库"));
 
         String rotatedKeyResponse = mockMvc.perform(post("/api/v1/api-keys/{apiKeyId}/rotate", apiKeyId)
                 .header("Authorization", "Bearer " + ownerAccessToken)
@@ -1993,13 +2580,34 @@ class OnlineDocumentApiIntegrationTest {
                 .content("""
                     {
                       "expectedVersionNo": 1,
-                      "content": "# Open API 写入文档\\n第二版",
-                      "contentText": "Open API 写入文档 第二版"
+                      "format": "MARKDOWN",
+                      "content": "# Open API 写入文档\\n第二版"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.format").value("MARKDOWN"))
+            .andExpect(jsonPath("$.data.contentText").value("Open API 写入文档 第二版"))
             .andExpect(jsonPath("$.data.versionNo").value(2));
+
+        String versionsResponse = mockMvc.perform(get("/api/v1/open/documents/{documentId}/versions", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.length()").value(1))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long rollbackVersionId = objectMapper.readTree(versionsResponse).path("data").get(0).path("id").asLong();
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.id").value((int) documentId))
+            .andExpect(jsonPath("$.data.format").value("MARKDOWN"))
+            .andExpect(jsonPath("$.data.contentText").value("Open API 写入文档 第二版"));
 
         mockMvc.perform(put("/api/v1/open/documents/{documentId}", documentId)
                 .header("Authorization", "ApiKey " + rotatedPlainTextKey)
@@ -2007,12 +2615,59 @@ class OnlineDocumentApiIntegrationTest {
                 .content("""
                     {
                       "expectedVersionNo": 1,
-                      "contentText": "过期版本写入"
+                      "content": "<p>过期版本写入</p>"
                     }
                     """))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(409))
             .andExpect(jsonPath("$.message").value("文档版本已变化，请基于最新 versionNo 重试"));
+
+        mockMvc.perform(delete("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("文档不存在"));
+
+        mockMvc.perform(post("/api/v1/open/documents/{documentId}/restore", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.id").value((int) documentId))
+            .andExpect(jsonPath("$.data.status").value(1));
+
+        mockMvc.perform(post("/api/v1/open/documents/{documentId}/rollback/{versionId}", documentId, rollbackVersionId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.versionNo").value(3))
+            .andExpect(jsonPath("$.data.contentText").value("Open API 写入文档 Open API 第一次写入"));
+
+        mockMvc.perform(post("/api/v1/service-accounts/{serviceAccountId}/disable", serviceAccountId)
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("当前 API key 对应的机器主体已停用"));
+
+        mockMvc.perform(post("/api/v1/service-accounts/{serviceAccountId}/enable", serviceAccountId)
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + rotatedPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.id").value((int) documentId));
 
         mockMvc.perform(post("/api/v1/api-keys/{apiKeyId}/disable", rotatedApiKeyId)
                 .header("Authorization", "Bearer " + ownerAccessToken))
@@ -2025,18 +2680,398 @@ class OnlineDocumentApiIntegrationTest {
             .andExpect(jsonPath("$.code").value(403))
             .andExpect(jsonPath("$.message").value("当前 API key 已禁用"));
 
+        mockMvc.perform(post("/api/v1/api-keys/{apiKeyId}/revoke", readOnlyApiKeyId)
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        mockMvc.perform(get("/api/v1/open/knowledge-bases")
+                .header("Authorization", "ApiKey " + readOnlyPlainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(403))
+            .andExpect(jsonPath("$.message").value("当前 API key 已吊销"));
+
+        mockMvc.perform(get("/api/v1/service-accounts")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data[0].apiKeys[*].id", Matchers.not(Matchers.hasItem((int) readOnlyApiKeyId))))
+            .andExpect(jsonPath("$.data[0].apiKeys[*].id", Matchers.hasItem((int) rotatedApiKeyId)));
+
         mockMvc.perform(get("/api/v1/audit-logs")
                 .header("Authorization", "Bearer " + ownerAccessToken)
-                .param("objectType", "DOCUMENT")
-                .param("objectId", String.valueOf(documentId))
-                .param("size", "20"))
+                .param("size", "80"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(200))
             .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItems(
+                "CREATE_SERVICE_ACCOUNT",
+                "ENABLE_SERVICE_ACCOUNT",
+                "DISABLE_SERVICE_ACCOUNT",
+                "CREATE_API_KEY",
+                "REVEAL_API_KEY",
+                "UPDATE_API_KEY_SCOPE",
+                "ROTATE_API_KEY",
+                "OPEN_API_SEARCH_DOCUMENTS",
                 "OPEN_API_CREATE_DOCUMENT",
-                "OPEN_API_UPDATE_DOCUMENT"
+                "OPEN_API_UPDATE_DOCUMENT",
+                "OPEN_API_DELETE_DOCUMENT",
+                "OPEN_API_RESTORE_DOCUMENT",
+                "OPEN_API_ROLLBACK_DOCUMENT"
             )))
             .andExpect(jsonPath("$.data.records[*].resultType", Matchers.hasItems("SUCCESS", "FAILURE")));
+    }
+
+    @Test
+    void shouldUpsertDocumentsBySourceExternalIdAndReturnBatchResults() throws Exception {
+        String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+        String plainTextKey = issueWriteApiKey(ownerAccessToken, 1L, "Upsert 同步主体", "Upsert 写入 key");
+
+        String upsertCreateResponse = mockMvc.perform(post("/api/v1/open/documents/upsert")
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "外部同步文档",
+                      "format": "MARKDOWN",
+                      "content": "# 外部同步文档\\n第一版",
+                      "sourceExternalId": "erp-asset-001",
+                      "sourceRevision": "1"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("CREATED"))
+            .andExpect(jsonPath("$.data.document.versionNo").value(1))
+            .andExpect(jsonPath("$.data.document.sourceExternalId").value("erp-asset-001"))
+            .andExpect(jsonPath("$.data.document.sourceRevision").value("1"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long documentId = objectMapper.readTree(upsertCreateResponse).path("data").path("document").path("id").asLong();
+
+        mockMvc.perform(post("/api/v1/open/documents/upsert")
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "外部同步文档",
+                      "format": "MARKDOWN",
+                      "content": "# 外部同步文档\\n第一版",
+                      "sourceExternalId": "erp-asset-001",
+                      "sourceRevision": "1"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("SKIPPED"))
+            .andExpect(jsonPath("$.data.document.id").value((int) documentId));
+
+        mockMvc.perform(post("/api/v1/open/documents/upsert")
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "外部同步文档",
+                      "format": "MARKDOWN",
+                      "content": "# 外部同步文档\\n过期版本",
+                      "sourceExternalId": "erp-asset-001",
+                      "sourceRevision": "0"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("CONFLICTED"))
+            .andExpect(jsonPath("$.data.message").value(Matchers.containsString("sourceRevision")));
+
+        mockMvc.perform(post("/api/v1/open/documents/upsert")
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "外部同步文档",
+                      "format": "MARKDOWN",
+                      "content": "# 外部同步文档\\n第二版",
+                      "sourceExternalId": "erp-asset-001",
+                      "sourceRevision": "2"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("UPDATED"))
+            .andExpect(jsonPath("$.data.document.versionNo").value(2))
+            .andExpect(jsonPath("$.data.document.sourceRevision").value("2"));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + plainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.contentText").value("外部同步文档 第二版"))
+            .andExpect(jsonPath("$.data.sourceExternalId").value("erp-asset-001"))
+            .andExpect(jsonPath("$.data.sourceRevision").value("2"));
+
+        mockMvc.perform(post("/api/v1/open/documents/batch-upsert")
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "documents": [
+                        {
+                          "knowledgeBaseId": 1,
+                          "parentId": 1,
+                          "title": "外部同步文档",
+                          "format": "MARKDOWN",
+                          "content": "# 外部同步文档\\n第三版",
+                          "sourceExternalId": "erp-asset-001",
+                          "sourceRevision": "3"
+                        },
+                        {
+                          "knowledgeBaseId": 1,
+                          "parentId": 1,
+                          "title": "第二篇同步文档",
+                          "format": "HTML",
+                          "content": "<article><h1>第二篇同步文档</h1><p>批量新增</p></article>",
+                          "sourceExternalId": "erp-asset-002",
+                          "sourceRevision": "1"
+                        },
+                        {
+                          "knowledgeBaseId": 1,
+                          "parentId": 1,
+                          "title": "外部同步文档",
+                          "format": "MARKDOWN",
+                          "content": "# 外部同步文档\\n第三版",
+                          "sourceExternalId": "erp-asset-001",
+                          "sourceRevision": "3"
+                        },
+                        {
+                          "knowledgeBaseId": 1,
+                          "parentId": 1,
+                          "title": "外部同步文档",
+                          "format": "MARKDOWN",
+                          "content": "# 外部同步文档\\n过期第二版",
+                          "sourceExternalId": "erp-asset-001",
+                          "sourceRevision": "2"
+                        }
+                      ]
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.totalCount").value(4))
+            .andExpect(jsonPath("$.data.createdCount").value(1))
+            .andExpect(jsonPath("$.data.updatedCount").value(1))
+            .andExpect(jsonPath("$.data.skippedCount").value(1))
+            .andExpect(jsonPath("$.data.conflictedCount").value(1))
+            .andExpect(jsonPath("$.data.items[0].itemIndex").value(0))
+            .andExpect(jsonPath("$.data.items[0].status").value("UPDATED"))
+            .andExpect(jsonPath("$.data.items[1].status").value("CREATED"))
+            .andExpect(jsonPath("$.data.items[2].status").value("SKIPPED"))
+            .andExpect(jsonPath("$.data.items[3].status").value("CONFLICTED"));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}", documentId)
+                .header("Authorization", "ApiKey " + plainTextKey))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.versionNo").value(3))
+            .andExpect(jsonPath("$.data.contentText").value("外部同步文档 第三版"))
+            .andExpect(jsonPath("$.data.sourceRevision").value("3"));
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .param("size", "80"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItems(
+                "OPEN_API_UPSERT_DOCUMENT",
+                "OPEN_API_BATCH_UPSERT_DOCUMENTS"
+            )))
+            .andExpect(jsonPath("$.data.records[*].resultType", Matchers.hasItems("SUCCESS", "FAILURE")));
+    }
+
+    @Test
+    void shouldConsumeOpenApiDocumentByViewAndResolveDocumentBySource() throws Exception {
+        String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+        String plainTextKey = issueWriteApiKey(ownerAccessToken, 1L, "消费接入主体", "消费读取 key");
+
+        mockMvc.perform(put("/api/v1/knowledge-bases/1/site")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "siteEnabled": true,
+                      "siteSlug": "consume-open-site",
+                      "siteTitle": "开放消费站点",
+                      "siteDescription": "用于验证开放消费视图"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200));
+
+        String upsertResponse = mockMvc.perform(post("/api/v1/open/documents/upsert")
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "knowledgeBaseId": 1,
+                      "parentId": 1,
+                      "title": "开放消费文档",
+                      "format": "MARKDOWN",
+                      "content": "# 开放消费文档\\n这是给浏览器和对话框读取的正文。",
+                      "summary": "开放消费摘要",
+                      "sourceExternalId": "browser-clip-001",
+                      "sourceRevision": "2026-05-18T10:30:00Z"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.status").value("CREATED"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        long documentId = objectMapper.readTree(upsertResponse).path("data").path("document").path("id").asLong();
+
+        mockMvc.perform(put("/api/v1/documents/{documentId}/publish", documentId)
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "publicSlug": "consume-open-doc"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.publishStatus").value("PUBLISHED"));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}/consume", documentId)
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .param("view", "rendered"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.documentId").value((int) documentId))
+            .andExpect(jsonPath("$.data.representation").value("rendered"))
+            .andExpect(jsonPath("$.data.mimeType").value("text/html"))
+            .andExpect(jsonPath("$.data.payload").value(Matchers.containsString("<h1>开放消费文档</h1>")))
+            .andExpect(jsonPath("$.data.readerUrl").value("/docs/" + documentId))
+            .andExpect(jsonPath("$.data.publicUrl").value("/site/consume-open-site/consume-open-doc"));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}/consume", documentId)
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .param("view", "source"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.representation").value("source"))
+            .andExpect(jsonPath("$.data.mimeType").value("text/markdown"))
+            .andExpect(jsonPath("$.data.payload").value("# 开放消费文档\n这是给浏览器和对话框读取的正文。"));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}/consume", documentId)
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .param("view", "plain"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.representation").value("plain"))
+            .andExpect(jsonPath("$.data.mimeType").value("text/plain"))
+            .andExpect(jsonPath("$.data.payload").value("开放消费文档 这是给浏览器和对话框读取的正文。"));
+
+        mockMvc.perform(get("/api/v1/open/knowledge-bases/{knowledgeBaseId}/documents/by-source", 1L)
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .param("sourceExternalId", "browser-clip-001")
+                .param("view", "metadata"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.documentId").value((int) documentId))
+            .andExpect(jsonPath("$.data.sourceExternalId").value("browser-clip-001"))
+            .andExpect(jsonPath("$.data.sourceRevision").value("2026-05-18T10:30:00Z"))
+            .andExpect(jsonPath("$.data.representation").value("metadata"))
+            .andExpect(jsonPath("$.data.mimeType").value("application/json"))
+            .andExpect(jsonPath("$.data.payload").doesNotExist())
+            .andExpect(jsonPath("$.data.publicUrl").value("/site/consume-open-site/consume-open-doc"))
+            .andExpect(jsonPath("$.data.readerUrl").value("/docs/" + documentId));
+
+        mockMvc.perform(get("/api/v1/open/documents/{documentId}/consume", documentId)
+                .header("Authorization", "ApiKey " + plainTextKey)
+                .param("view", "unknown"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(400))
+            .andExpect(jsonPath("$.message").value("当前 view 仅支持 metadata / rendered / source / plain / summary"));
+
+        mockMvc.perform(get("/api/v1/audit-logs")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .param("size", "80"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.records[*].actionType", Matchers.hasItems(
+                "OPEN_API_GET_DOCUMENT_BY_SOURCE",
+                "OPEN_API_CONSUME_DOCUMENT"
+            )))
+            .andExpect(jsonPath("$.data.records[*].resultType", Matchers.hasItems("SUCCESS", "FAILURE")));
+    }
+
+    @Test
+    void shouldEnablePublicSiteAndPublishDocument() throws Exception {
+        String ownerAccessToken = loginAndGetAccessToken("admin", "123456");
+
+        mockMvc.perform(put("/api/v1/knowledge-bases/1/site")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "siteEnabled": true,
+                      "siteSlug": "east-public-site",
+                      "siteTitle": "华东公开文档",
+                      "siteDescription": "对外交付和实施文档"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.siteEnabled").value(true))
+            .andExpect(jsonPath("$.data.siteSlug").value("east-public-site"))
+            .andExpect(jsonPath("$.data.siteUrl").value("/site/east-public-site"));
+
+        mockMvc.perform(put("/api/v1/documents/2/publish")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "publicSlug": "project-kickoff-checklist"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.publishStatus").value("PUBLISHED"))
+            .andExpect(jsonPath("$.data.publicSlug").value("project-kickoff-checklist"))
+            .andExpect(jsonPath("$.data.renderedHtml", Matchers.containsString("<h1>项目启动清单</h1>")));
+
+        mockMvc.perform(get("/api/public/sites/east-public-site"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.siteTitle").value("华东公开文档"))
+            .andExpect(jsonPath("$.data.documents[*].publicSlug", Matchers.hasItem("project-kickoff-checklist")));
+
+        mockMvc.perform(get("/api/public/sites/east-public-site/project-kickoff-checklist"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.title").value("项目启动清单"))
+            .andExpect(jsonPath("$.data.renderedHtml", Matchers.containsString("<h1>项目启动清单</h1>")));
+
+        mockMvc.perform(delete("/api/v1/documents/2/publish")
+                .header("Authorization", "Bearer " + ownerAccessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.publishStatus").value("DRAFT"));
+
+        mockMvc.perform(get("/api/public/sites/east-public-site/project-kickoff-checklist"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(404))
+            .andExpect(jsonPath("$.message").value("公开文档不存在"));
     }
 
     private String loginAndGetAccessToken(String username, String password) throws Exception {
@@ -2056,6 +3091,32 @@ class OnlineDocumentApiIntegrationTest {
             .getContentAsString();
 
         return objectMapper.readTree(loginResponse).path("data").path("accessToken").asText();
+    }
+
+    private String issueWriteApiKey(String ownerAccessToken, Long knowledgeBaseId, String serviceAccountName, String keyName) throws Exception {
+        String issuedKeyResponse = mockMvc.perform(post("/api/v1/service-accounts")
+                .header("Authorization", "Bearer " + ownerAccessToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "name": "%s",
+                      "description": "用于验证 upsert 持续同步语义",
+                      "keyName": "%s",
+                      "expiresInDays": 180,
+                      "scopes": [
+                        { "knowledgeBaseId": %d, "accessMode": "WRITE" }
+                      ]
+                    }
+                    """.formatted(serviceAccountName, keyName, knowledgeBaseId)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.apiKey.scopes[0].knowledgeBaseId").value(knowledgeBaseId.intValue()))
+            .andExpect(jsonPath("$.data.apiKey.scopes[0].accessMode").value("WRITE"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        return objectMapper.readTree(issuedKeyResponse).path("data").path("plainTextKey").asText();
     }
 
     private String extractCookieValue(String setCookieHeader, String cookieName) {

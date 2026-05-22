@@ -1,22 +1,10 @@
-import { Link } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 
 const KnowledgeBaseTreePanel = ({
   styles,
-  knowledgeBase,
-  roleLabels,
-  compactKnowledgeBaseDescription,
-  knowledgeBaseInfoVisible,
-  setKnowledgeBaseInfoVisible,
   canWriteKnowledgeBase,
-  canManageKnowledgeBase,
-  setModalError,
-  setEditing,
-  openPermissionModal,
-  openDocumentTrash,
-  handleDeleteKnowledgeBase,
   focusMode,
   treePanelCollapsed,
-  scrolled,
   treePanelStatusText,
   search,
   setSearch,
@@ -41,6 +29,9 @@ const KnowledgeBaseTreePanel = ({
   handleToggleBatchMode,
   setTreePanelCollapsed,
   openCreateDocumentModal,
+  openEditDocumentModal,
+  handleDeleteDocument,
+  handleOpenEditorPage,
   expandAllFolders,
   collapseToTopLevelFolders,
   handleTreeItemKeyDown,
@@ -53,118 +44,67 @@ const KnowledgeBaseTreePanel = ({
   toggleFolderExpanded,
   expandedFolderIdSet,
 }) => {
-  const currentRoleLabel = roleLabels[knowledgeBase.currentRole] || knowledgeBase.currentRole || '未知角色'
-  const roleBoundaryMessage = !canWriteKnowledgeBase
-    ? `当前角色为${currentRoleLabel}，只能阅读和搜索当前知识库，不能新建、移动或删除节点。`
-    : canManageKnowledgeBase
-      ? `当前角色为${currentRoleLabel}，可编辑文档，并可继续管理知识库设置、成员权限和回收站。`
-      : `当前角色为${currentRoleLabel}，可编辑文档和整理目录，但不能修改知识库设置或成员权限。`
+  const [contextMenu, setContextMenu] = useState(null)
+  const contextMenuItem = useMemo(
+    () => documents.find((item) => item.id === contextMenu?.itemId) || null,
+    [contextMenu?.itemId, documents]
+  )
+
+  useEffect(() => {
+    if (!contextMenu) {
+      return undefined
+    }
+
+    const closeContextMenu = () => setContextMenu(null)
+    window.addEventListener('click', closeContextMenu)
+    window.addEventListener('blur', closeContextMenu)
+    window.addEventListener('scroll', closeContextMenu, true)
+
+    return () => {
+      window.removeEventListener('click', closeContextMenu)
+      window.removeEventListener('blur', closeContextMenu)
+      window.removeEventListener('scroll', closeContextMenu, true)
+    }
+  }, [contextMenu])
+
+  useEffect(() => {
+    if (!canWriteKnowledgeBase || batchMode || focusMode) {
+      setContextMenu(null)
+    }
+  }, [batchMode, canWriteKnowledgeBase, focusMode])
+
+  const openContextMenu = (event, item) => {
+    if (!canWriteKnowledgeBase || batchMode) {
+      return
+    }
+
+    event.preventDefault()
+    setSelectedDocumentId(item.id)
+    setContextMenu({
+      itemId: item.id,
+      x: Math.min(event.clientX, window.innerWidth - 220),
+      y: Math.min(event.clientY, window.innerHeight - 220),
+    })
+  }
+
+  const runContextAction = (action) => {
+    if (!contextMenuItem) {
+      return
+    }
+    action(contextMenuItem)
+    setContextMenu(null)
+  }
 
   return (
-    <>
-      <header className={`${styles.hero} ${scrolled ? styles.heroScrolled : ''}`}>
-        <div className={styles.heroMain}>
-          <div className={styles.breadcrumb}>
-            <Link to="/">工作台</Link>
-            <span>/</span>
-            <span>{knowledgeBase.name}</span>
-          </div>
-          <div className={styles.heroTitleRow}>
-            <h1 className={styles.title}>{knowledgeBase.name}</h1>
-          </div>
-          <div className={styles.heroMeta}>
-            <span className={styles.metaPill}>文档工作区</span>
-            <span className={styles.metaPill}>{knowledgeBase.documentCount} 个节点</span>
-            <span className={styles.metaPill}>{currentRoleLabel}</span>
-            {knowledgeBase.permissionRestricted && <span className={styles.metaPill}>独立权限</span>}
-          </div>
-          {knowledgeBaseInfoVisible && (
-            <p className={styles.heroDescription}>
-              {compactKnowledgeBaseDescription || '当前知识库用于承载文档协作和目录整理，主流程仍以继续写作和阅读为主。'}
-            </p>
-          )}
-          <div className={`${styles.heroNotice} ${!canWriteKnowledgeBase ? styles.heroNoticeReadonly : ''}`}>
-            {roleBoundaryMessage}
-          </div>
-        </div>
-        <div className={styles.heroActions}>
-          <div className={styles.heroActionGrid}>
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled={!canWriteKnowledgeBase}
-              onClick={() => openCreateDocumentModal('DOC')}
-            >
-              新建文档
-            </button>
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              disabled={!canWriteKnowledgeBase}
-              onClick={() => openCreateDocumentModal('FOLDER')}
-            >
-              新建目录
-            </button>
-            <details className={styles.moreActions}>
-              <summary className={styles.secondaryButton}>更多</summary>
-              <div className={styles.moreActionsMenu}>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
-                >
-                  {knowledgeBaseInfoVisible ? '收起说明' : '知识库说明'}
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  disabled={!canManageKnowledgeBase}
-                  onClick={() => {
-                    setModalError('')
-                    setEditing(true)
-                  }}
-                >
-                  知识库设置
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  disabled={!canManageKnowledgeBase}
-                  onClick={openPermissionModal}
-                >
-                  访问权限
-                </button>
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  disabled={!canWriteKnowledgeBase}
-                  onClick={openDocumentTrash}
-                >
-                  文档回收站
-                </button>
-                <button
-                  type="button"
-                  className={styles.dangerButton}
-                  disabled={!canManageKnowledgeBase}
-                  onClick={handleDeleteKnowledgeBase}
-                >
-                  删除知识库
-                </button>
-              </div>
-            </details>
-          </div>
-        </div>
-      </header>
-
-      <aside
-        className={[
-          styles.treePanel,
-          focusMode ? styles.focusHidden : '',
-          !focusMode && treePanelCollapsed ? styles.treePanelCollapsed : '',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-      >
+    <aside
+      className={[
+        styles.treePanel,
+        focusMode ? styles.focusHidden : '',
+        !focusMode && treePanelCollapsed ? styles.treePanelCollapsed : '',
+      ]
+        .filter(Boolean)
+        .join(' ')}
+    >
         <div className={styles.panelHeader}>
           <div>
             <h2>目录</h2>
@@ -178,42 +118,6 @@ const KnowledgeBaseTreePanel = ({
             >
               收起
             </button>
-            <button
-              type="button"
-              className={styles.primaryCompactButton}
-              disabled={!canWriteKnowledgeBase}
-              onClick={() => openCreateDocumentModal('DOC')}
-            >
-              新建文档
-            </button>
-            <details className={styles.inlineMoreActions}>
-              <summary className={styles.smallButton}>更多</summary>
-              <div className={styles.inlineMoreActionsMenu}>
-                <button
-                  type="button"
-                  className={styles.toolButton}
-                  disabled={!canWriteKnowledgeBase}
-                  onClick={() => openCreateDocumentModal('FOLDER')}
-                >
-                  新建目录
-                </button>
-                <button
-                  type="button"
-                  className={styles.toolButton}
-                  onClick={() => setKnowledgeBaseInfoVisible((current) => !current)}
-                >
-                  {knowledgeBaseInfoVisible ? '收起说明' : '知识库说明'}
-                </button>
-                <button
-                  type="button"
-                  className={styles.toolButton}
-                  disabled={!canWriteKnowledgeBase}
-                  onClick={openDocumentTrash}
-                >
-                  文档回收站
-                </button>
-              </div>
-            </details>
           </div>
         </div>
         <div className={styles.treeToolbar}>
@@ -320,7 +224,9 @@ const KnowledgeBaseTreePanel = ({
                     dragOverDocumentId === item.id
                       ? dragOverPosition === 'after'
                         ? styles.dragOverAfter
-                        : styles.dragOverBefore
+                        : dragOverPosition === 'inside'
+                          ? styles.dragOverInside
+                          : styles.dragOverBefore
                       : '',
                   ]
                     .filter(Boolean)
@@ -339,6 +245,7 @@ const KnowledgeBaseTreePanel = ({
                   onDragOver={(event) => handleDragOver(event, item)}
                   onDrop={(event) => handleDrop(event, item)}
                   onDragEnd={clearDragState}
+                  onContextMenu={(event) => openContextMenu(event, item)}
                 >
                   <div className={styles.treeMain}>
                     <span className={styles.treeIndent} style={{ width: `${item.depth * 10}px` }} aria-hidden="true" />
@@ -380,8 +287,58 @@ const KnowledgeBaseTreePanel = ({
             )}
           </div>
         </div>
+        {contextMenu && contextMenuItem ? (
+          <div
+            className={styles.contextMenu}
+            style={{
+              left: `${contextMenu.x}px`,
+              top: `${contextMenu.y}px`,
+            }}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {contextMenuItem.docType === 'FOLDER' ? (
+              <>
+                <button
+                  type="button"
+                  className={styles.contextMenuItem}
+                  onClick={() => runContextAction((item) => openCreateDocumentModal('DOC', item))}
+                >
+                  新建文档
+                </button>
+                <button
+                  type="button"
+                  className={styles.contextMenuItem}
+                  onClick={() => runContextAction((item) => openCreateDocumentModal('FOLDER', item))}
+                >
+                  新建目录
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className={styles.contextMenuItem}
+                onClick={() => runContextAction((item) => handleOpenEditorPage(item))}
+              >
+                继续编辑
+              </button>
+            )}
+            <button
+              type="button"
+              className={styles.contextMenuItem}
+              onClick={() => runContextAction((item) => openEditDocumentModal(item))}
+            >
+              重命名与移动
+            </button>
+            <button
+              type="button"
+              className={`${styles.contextMenuItem} ${styles.contextMenuItemDanger}`}
+              onClick={() => runContextAction((item) => handleDeleteDocument(item))}
+            >
+              删除
+            </button>
+          </div>
+        ) : null}
       </aside>
-    </>
   )
 }
 

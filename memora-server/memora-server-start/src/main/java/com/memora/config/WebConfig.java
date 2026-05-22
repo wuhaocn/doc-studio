@@ -29,6 +29,12 @@ public class WebConfig implements WebMvcConfigurer {
             .exposedHeaders(HttpHeaders.CONTENT_DISPOSITION)
             .allowCredentials(true)
             .maxAge(3600);
+        registry.addMapping("/services/config")
+            .allowedOrigins(resolveAllowedOrigins())
+            .allowedMethods("GET", "OPTIONS")
+            .allowedHeaders("*")
+            .allowCredentials(true)
+            .maxAge(3600);
     }
 
     private String[] resolveAllowedOrigins() {

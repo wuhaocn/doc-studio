@@ -24,7 +24,11 @@ Web 端当前提供：
 - 独立文档阅读页与编辑页
 - 版本查看、回滚、阅读链接复制与受控分享
 - 公开分享只读页
-- Service Account / API key 管理弹层
+- 工作区管理页
+- 工作区成员邀请、知识库回收站、开放接入、安全与会话、审计治理分区
+- 机器主体启停、多密钥签发、逐知识库 `READ / WRITE` 作用域编辑
+- 开放接入页：凭证治理、当前密钥直接展示、单文档保存/更新、按来源回读、`cURL / fetch / 浏览器书签脚本 / 对话框保存与打开示例片段`
+- 浏览器捕获与对话框草稿落地页 `/capture/save`
 - 知识库级权限管理
 - 状态页与只读权限反馈
 
@@ -48,6 +52,8 @@ memora-web-app/
 │   │   └── Layout/                  # 全局布局、头部、知识库侧栏
 │   ├── pages/
 │   │   ├── Home/                    # 工作台首页
+│   │   ├── WorkspaceManage/         # 工作区治理页组
+│   │   ├── Capture/                 # 浏览器捕获与对话框草稿保存页
 │   │   ├── Search/                  # 工作区统一搜索页
 │   │   ├── Document/                # 独立阅读页与编辑页
 │   │   ├── Share/                   # 公开分享只读页
@@ -68,9 +74,16 @@ memora-web-app/
 - `/login`
 - `/register`
 - `/accept-invite`
+- `/capture/save`
 - `/share/:token`
 - `/`
 - `/search`
+- `/workspace/manage`
+- `/workspace/manage/members`
+- `/workspace/manage/trash`
+- `/workspace/manage/access`
+- `/workspace/manage/security`
+- `/workspace/manage/audit`
 - `/kb/:id`
 - `/docs/:documentId`
 - `/docs/:documentId/edit`
@@ -132,9 +145,9 @@ memora-web-app/
 
 - 优先继续编辑，而不是优先管理面板
 - 采用知识工作区布局，而不是运营后台布局
-- 使用轻量上下文顶栏，而不是大 Hero
+- 使用轻量上下文顶栏，只保留当前页面语义、搜索、工作区切换和账号动作
 - 身份页优先服务“完成进入动作”，而不是同时解释整套系统模型
-- 登录页默认只暴露用户名与密码，高级字段按需展开
+- 登录页默认只保留登录动作本身，工作区地址作为可选字段直接内联展示
 - 注册页默认只收集开通工作区的必要信息，自定义工作区地址按需展开
 - 邀请接受页优先从链接读取邀请，并锁定受邀邮箱，减少无效填写
 - 三栏结构：左侧文档树、中间文档舞台、右侧上下文面板
@@ -144,24 +157,20 @@ memora-web-app/
 
 ### 工作台首页重点
 
-- 上次编辑文档快捷入口
-- 最近文档
-- 顶栏工作区切换与统一搜索
-- 轻量概览条
-- 知识库入口列表
-- 默认折叠的成员信息
-- 对管理员显示最近工作区审计记录、归档汇总与手动归档入口
-- 对管理员提供 API key 管理入口
+- 默认首屏只保留“继续编辑 + 知识库列表”
+- 顶栏只保留当前页面上下文、统一搜索、工作区切换和账号动作
+- 工作区摘要只保留当前名称、知识库数量和当前角色
+- 邀请、回收站、开放接入、安全与审计全部从顶栏“工作区管理”进入
+- 首页不再承载治理区块，避免和写作入口混层
+- 开放接入页先给“凭证治理”，导入验证工具按需展开，避免把调用说明和主体管理混在同一层
 
 ### 知识库详情页重点
 
-- 紧凑的知识库上下文栏，可展开描述
-- 左侧文档树支持展开收起与轻量批量动作
-- 中央阅读舞台突出标题与主操作
-- 文件夹节点引导下一步动作，而不是空白预览
-- 版本信息按需展开
-- 右侧上下文面板只展示知识库与当前节点信息
-- 管理角色可直接查看知识库和当前节点最近审计记录
+- 顶部只保留知识库标题、角色边界和少量主动作，不再在树面板重复堆入口
+- 左侧文档树聚焦导航、筛选和批量整理，不再承载重复的新建按钮
+- 中央阅读舞台继续承担主操作，文档和目录都给出明确下一步动作
+- 右侧上下文面板默认只显示知识库边界、当前节点和权限边界
+- 管理角色的知识库审计和节点审计改为按需展开，避免默认噪音
 - 显式展示当前角色能做什么、不能做什么
 - 支持阅读专注模式
 
@@ -206,6 +215,7 @@ memora-web-app/
 - 版本、成员、权限默认按需展示
 - 只有核心工作流动作占用主按钮位
 - 弹窗和抽屉沿用产品语言，不使用后台接口式措辞
+- 浏览器书签脚本不直接跨站打开放接口，而是跳到 Memora 自己的 `/capture/save` 页面再继续执行
 
 ---
 
@@ -247,9 +257,14 @@ Axios 基础配置：
 说明：
 
 - 上述种子账号仅在后端以 `dev` profile 启动时可用；真实进入产品应优先走 Owner 注册和邀请接受。
+- 登录页会根据 `GET /services/config` 的真实运行态提示当前是否允许种子账号登录；默认运行态不会再暗示 `admin / 123456` 可用。
 - Axios 在受保护请求遇到 `401` 时会先尝试一次 `refresh`，失败后再清空本地会话。
 - Axios 默认附带 `X-Memora-Client: memora-web-app`，用于后端审计来源标记。
+- 启动阶段会先读取 `GET /services/config`，同步运行时标题、浏览器会话元数据和基础特性开关。
 - 前端会优先把旧 `localStorage` 会话迁移到 `sessionStorage`，并清除其中遗留 bearer token。
+- 登录、退出登录和工作区切换会通过 `localStorage` 广播同步到其他标签页，而当前会话快照仍只保存在 `sessionStorage`。
+- “工作区管理 / 安全与会话”页会展示当前工作区的活跃会话，并支持移除其他设备会话；管理员还可查看工作区设备概览、逐设备移除成员会话和按成员批量清理会话。
+- “工作区管理 / 开放接入”管理的是机器主体和访问密钥，不是用户个人凭证。
 - 根页面已补 `Referrer-Policy: no-referrer`，减少公开分享 token 因外链资源被带出站外。
 - 邀请链接和文档分享链接都只在创建当下展示一次，历史列表只保留状态与治理动作。
 
@@ -260,6 +275,13 @@ Axios 基础配置：
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/auth/refresh`
 - `GET /api/v1/auth/session`
+- `GET /api/v1/auth/sessions`
+- `POST /api/v1/auth/sessions/revoke-others`
+- `POST /api/v1/auth/sessions/{sessionId}/revoke`
+- `GET /api/v1/auth/tenant-sessions`
+- `POST /api/v1/auth/tenant-sessions/{sessionId}/revoke`
+- `POST /api/v1/auth/tenant-sessions/users/{userId}/revoke`
+- `GET /services/config`
 - `GET /api/v1/workspaces/joined`
 - `POST /api/v1/workspaces/{tenantId}/switch`
 - `POST /api/v1/tenants/current/invites`

@@ -18,10 +18,14 @@ public class OpenApiDocumentCreateDTO {
 
     private String content;
 
-    private String contentText;
-
     @Size(max = 500, message = "摘要长度不能超过500个字符")
     private String summary;
+
+    @Size(max = 160, message = "来源外部ID长度不能超过160个字符")
+    private String sourceExternalId;
+
+    @Size(max = 160, message = "来源版本长度不能超过160个字符")
+    private String sourceRevision;
 
     @NotNull(message = "知识库ID不能为空")
     private Long knowledgeBaseId;

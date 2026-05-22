@@ -23,6 +23,8 @@ public class ApiKey {
 
     private String secretHash;
 
+    private String secretCiphertext;
+
     private Integer status;
 
     private LocalDateTime expiresAt;

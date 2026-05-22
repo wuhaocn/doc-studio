@@ -1,35 +1,23 @@
-const escapeHtml = (value) =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
+import { marked } from 'marked'
 
-const inlineMarkdownToHtml = (value) => {
-  const escaped = escapeHtml(value)
-  return escaped
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    .replace(/\*(.+?)\*/g, '<em>$1</em>')
-    .replace(/`([^`]+)`/g, '<code>$1</code>')
+export const DOCUMENT_FORMATS = {
+  RICH_TEXT: 'RICH_TEXT',
+  MARKDOWN: 'MARKDOWN',
+  HTML: 'HTML',
 }
 
-const closeListIfNeeded = (html, listType) => {
-  if (!listType) {
-    return html
-  }
-  return `${html}</${listType}>`
-}
+export const DEFAULT_DOCUMENT_FORMAT = DOCUMENT_FORMATS.RICH_TEXT
 
-const HTML_LIKE_PATTERN = /<[a-z][\s\S]*>/i
 const TEXT_NODE = 3
 const ELEMENT_NODE = 1
 const BLOCKED_TAGS = new Set(['script', 'style', 'iframe', 'object', 'embed', 'form', 'input', 'button', 'link', 'meta'])
 const ALLOWED_TAGS = new Set([
+  'a',
   'article',
   'blockquote',
   'br',
   'code',
+  'del',
   'div',
   'em',
   'figure',
@@ -37,6 +25,9 @@ const ALLOWED_TAGS = new Set([
   'h1',
   'h2',
   'h3',
+  'h4',
+  'h5',
+  'h6',
   'hr',
   'img',
   'li',
@@ -46,13 +37,35 @@ const ALLOWED_TAGS = new Set([
   'section',
   'span',
   'strong',
+  'sub',
+  'sup',
+  'table',
+  'tbody',
+  'td',
+  'th',
+  'thead',
+  'tr',
   'ul',
 ])
 const GLOBAL_ALLOWED_ATTRS = new Set(['class'])
 const TAG_ALLOWED_ATTRS = {
+  a: new Set(['href', 'title', 'target', 'rel']),
   div: new Set(['data-type', 'data-diagram-type', 'data-content', 'data-width', 'data-height']),
   img: new Set(['src', 'alt', 'title']),
 }
+const FORMAT_SET = new Set(Object.values(DOCUMENT_FORMATS))
+
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+})
+
+const stripUnsafeMarkupFallback = (value) =>
+  value
+    .replace(/<\s*(script|style|iframe|object|embed|form|input|button|link|meta)\b[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*(".*?"|'.*?'|[^\s>]+)/gi, '')
+    .replace(/\s(href|src)\s*=\s*("javascript:[^"]*"|'javascript:[^']*'|javascript:[^\s>]+)/gi, '')
+    .replace(/\s(href|src)\s*=\s*("vbscript:[^"]*"|'vbscript:[^']*'|vbscript:[^\s>]+)/gi, '')
 
 const isSafeUrl = (value, { allowDataImage = false } = {}) => {
   const normalized = value.trim()
@@ -106,7 +119,7 @@ const sanitizeNode = (node, ownerDocument) => {
     }
 
     const attrValue = attribute.value || ''
-    if (attrName === 'src' && !isSafeUrl(attrValue, { allowDataImage: true })) {
+    if ((attrName === 'src' || attrName === 'href') && !isSafeUrl(attrValue, { allowDataImage: attrName === 'src' })) {
       return
     }
 
@@ -119,14 +132,22 @@ const sanitizeNode = (node, ownerDocument) => {
   return sanitizedElement
 }
 
-export const sanitizeRichHtml = (value) => {
+export const normalizeDocumentFormat = (value) => {
+  const normalized = (value || '').trim().toUpperCase()
+  if (!normalized) {
+    return DEFAULT_DOCUMENT_FORMAT
+  }
+  return FORMAT_SET.has(normalized) ? normalized : DEFAULT_DOCUMENT_FORMAT
+}
+
+export const sanitizeDocumentHtml = (value) => {
   const normalized = (value || '').trim()
   if (!normalized) {
     return ''
   }
 
   if (typeof DOMParser === 'undefined' || typeof document === 'undefined') {
-    return escapeHtml(normalized)
+    return stripUnsafeMarkupFallback(normalized)
   }
 
   const parser = new DOMParser()
@@ -141,120 +162,55 @@ export const sanitizeRichHtml = (value) => {
   return container.innerHTML
 }
 
-export const toEditorHtml = (value) => {
+export const normalizeRichTextEditorContent = (value) => sanitizeDocumentHtml(value) || '<p></p>'
+
+export const renderMarkdownToHtml = (value) => {
   if (!value || !value.trim()) {
-    return '<p></p>'
+    return ''
+  }
+  return sanitizeDocumentHtml(marked.parse(value))
+}
+
+export const renderDocumentHtml = (format, content) => {
+  const normalizedFormat = normalizeDocumentFormat(format)
+  if (!content || !content.trim()) {
+    return ''
   }
 
-  const trimmed = value.trim()
-  if (HTML_LIKE_PATTERN.test(trimmed)) {
-    return sanitizeRichHtml(trimmed) || '<p></p>'
+  if (normalizedFormat === DOCUMENT_FORMATS.MARKDOWN) {
+    return renderMarkdownToHtml(content)
+  }
+  return sanitizeDocumentHtml(content)
+}
+
+export const extractPlainTextFromHtml = (value) => {
+  const normalized = (value || '').trim()
+  if (!normalized) {
+    return ''
   }
 
-  const lines = trimmed.split('\n')
-  let html = ''
-  let listType = null
-  let inCodeBlock = false
-  let codeBuffer = []
-
-  const flushCodeBlock = () => {
-    if (!inCodeBlock) {
-      return
-    }
-    html += `<pre><code>${escapeHtml(codeBuffer.join('\n'))}</code></pre>`
-    inCodeBlock = false
-    codeBuffer = []
+  if (typeof DOMParser === 'undefined') {
+    return normalized.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   }
 
-  lines.forEach((line) => {
-    const rawLine = line.replace(/\r/g, '')
-    const trimmedLine = rawLine.trim()
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(`<body>${normalized}</body>`, 'text/html')
+  return doc.body.textContent?.replace(/\s+/g, ' ').trim() || ''
+}
 
-    if (trimmedLine.startsWith('```')) {
-      if (listType) {
-        html = closeListIfNeeded(html, listType)
-        listType = null
-      }
-      if (inCodeBlock) {
-        flushCodeBlock()
-      } else {
-        inCodeBlock = true
-      }
-      return
-    }
+export const getDocumentRenderState = ({ format, content, contentText, renderedHtml }) => {
+  const normalizedFormat = normalizeDocumentFormat(format)
+  const html = renderedHtml
+    ? sanitizeDocumentHtml(renderedHtml)
+    : renderDocumentHtml(normalizedFormat, content || '')
+  const plainText = summarizePlainText(contentText || extractPlainTextFromHtml(html) || '')
 
-    if (inCodeBlock) {
-      codeBuffer.push(rawLine)
-      return
-    }
-
-    if (!trimmedLine) {
-      if (listType) {
-        html = closeListIfNeeded(html, listType)
-        listType = null
-      }
-      return
-    }
-
-    const headingMatch = trimmedLine.match(/^(#{1,3})\s+(.+)$/)
-    if (headingMatch) {
-      if (listType) {
-        html = closeListIfNeeded(html, listType)
-        listType = null
-      }
-      const level = headingMatch[1].length
-      html += `<h${level}>${inlineMarkdownToHtml(headingMatch[2])}</h${level}>`
-      return
-    }
-
-    const blockquoteMatch = trimmedLine.match(/^>\s+(.+)$/)
-    if (blockquoteMatch) {
-      if (listType) {
-        html = closeListIfNeeded(html, listType)
-        listType = null
-      }
-      html += `<blockquote><p>${inlineMarkdownToHtml(blockquoteMatch[1])}</p></blockquote>`
-      return
-    }
-
-    const orderedMatch = trimmedLine.match(/^\d+\.\s+(.+)$/)
-    if (orderedMatch) {
-      if (listType !== 'ol') {
-        if (listType) {
-          html = closeListIfNeeded(html, listType)
-        }
-        html += '<ol>'
-        listType = 'ol'
-      }
-      html += `<li>${inlineMarkdownToHtml(orderedMatch[1])}</li>`
-      return
-    }
-
-    const unorderedMatch = trimmedLine.match(/^[-*]\s+(.+)$/)
-    if (unorderedMatch) {
-      if (listType !== 'ul') {
-        if (listType) {
-          html = closeListIfNeeded(html, listType)
-        }
-        html += '<ul>'
-        listType = 'ul'
-      }
-      html += `<li>${inlineMarkdownToHtml(unorderedMatch[1])}</li>`
-      return
-    }
-
-    if (listType) {
-      html = closeListIfNeeded(html, listType)
-      listType = null
-    }
-    html += `<p>${inlineMarkdownToHtml(trimmedLine)}</p>`
-  })
-
-  if (listType) {
-    html = closeListIfNeeded(html, listType)
+  return {
+    format: normalizedFormat,
+    html,
+    plainText,
+    hasRenderedContent: Boolean(html),
   }
-  flushCodeBlock()
-  return sanitizeRichHtml(html) || '<p></p>'
 }
 
 export const summarizePlainText = (value, maxLength = 180) => {

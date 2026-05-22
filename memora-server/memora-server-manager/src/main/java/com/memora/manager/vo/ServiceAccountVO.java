@@ -23,5 +23,7 @@ public class ServiceAccountVO {
 
     private LocalDateTime createdAt;
 
+    private LocalDateTime updatedAt;
+
     private List<ApiKeyVO> apiKeys;
 }

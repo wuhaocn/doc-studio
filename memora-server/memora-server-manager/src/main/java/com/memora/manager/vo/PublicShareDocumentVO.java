@@ -24,6 +24,8 @@ public class PublicShareDocumentVO {
 
     private String summary;
 
+    private String renderedHtml;
+
     private Integer versionNo;
 
     private LocalDateTime updatedAt;

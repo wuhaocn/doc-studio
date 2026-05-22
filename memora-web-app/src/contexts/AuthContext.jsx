@@ -3,7 +3,14 @@ import { authApi } from '../services/api/authApi'
 import { tenantInviteApi } from '../services/api/tenantInviteApi'
 import { workspaceApi } from '../services/api/workspaceApi'
 import { clearRememberedKnowledgeBase } from '../utils/knowledgeBaseRoute'
-import { AUTH_SESSION_CHANGED_EVENT, clearCurrentUser, getCurrentUser, hydrateCurrentUser } from '../utils/user'
+import {
+  applyAuthSessionBroadcastPayload,
+  AUTH_SESSION_CHANGED_EVENT,
+  clearCurrentUser,
+  getCurrentUser,
+  hydrateCurrentUser,
+  parseAuthSessionBroadcastStorageEvent,
+} from '../utils/user'
 
 const AuthContext = createContext(null)
 
@@ -46,7 +53,9 @@ export const AuthProvider = ({ children }) => {
       setJoinedWorkspaces(nextWorkspaces)
       return nextWorkspaces
     } catch (error) {
-      console.error('加载已加入工作区失败', error)
+      if (error?.code !== 401) {
+        console.error('加载已加入工作区失败', error)
+      }
       setJoinedWorkspaces([])
       return []
     }
@@ -57,9 +66,28 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(getCurrentUser())
     }
 
+    const handleStorage = (event) => {
+      const payload = parseAuthSessionBroadcastStorageEvent(event)
+      if (!payload) {
+        return
+      }
+
+      const previousUser = getCurrentUser()
+      const nextUser = applyAuthSessionBroadcastPayload(payload)
+      if (!nextUser || previousUser?.tenantId !== nextUser.tenantId) {
+        clearRememberedKnowledgeBase()
+      }
+      setCurrentUser(nextUser)
+      if (!nextUser) {
+        setJoinedWorkspaces([])
+      }
+    }
+
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChanged)
+    window.addEventListener('storage', handleStorage)
     return () => {
       window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChanged)
+      window.removeEventListener('storage', handleStorage)
     }
   }, [])
 
@@ -81,13 +109,17 @@ export const AuthProvider = ({ children }) => {
   }, [refreshCurrentSession])
 
   useEffect(() => {
+    if (sessionLoading) {
+      return
+    }
+
     if (!currentUser?.id || !currentUser?.tenantId) {
       setJoinedWorkspaces([])
       return
     }
 
     loadJoinedWorkspaces()
-  }, [currentUser?.id, currentUser?.tenantId, loadJoinedWorkspaces])
+  }, [currentUser?.id, currentUser?.tenantId, loadJoinedWorkspaces, sessionLoading])
 
   const login = useCallback(async ({ username, password, tenantSlug }) => {
     const response = await authApi.login({ username, password, tenantSlug })

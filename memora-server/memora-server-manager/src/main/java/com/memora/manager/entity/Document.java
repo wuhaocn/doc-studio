@@ -24,10 +24,10 @@ public class Document {
     private String docType;
 
     private String format;
-    
-    private String content; // HTML内容
-    
-    private String contentText; // 纯文本内容，用于搜索
+
+    private String content; // 原始正文内容，实际解释方式由 format 决定
+
+    private String contentText; // 服务端归一后的纯文本内容，用于搜索与摘要
 
     private String summary;
     
@@ -48,6 +48,20 @@ public class Document {
     private Integer viewCount;
     
     private Integer sortOrder;
+
+    private String publishStatus;
+
+    private String publicSlug;
+
+    private LocalDateTime publishedAt;
+
+    private String renderedHtml;
+
+    private String renderChecksum;
+
+    private String sourceExternalId;
+
+    private String sourceRevision;
 
     private LocalDateTime createdAt;
     

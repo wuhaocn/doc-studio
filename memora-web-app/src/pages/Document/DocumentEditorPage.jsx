@@ -13,11 +13,12 @@ import { documentApi } from '../../services/api/documentApi'
 import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { useDocumentTitle } from '../../hooks/useDocumentTitle'
 import { buildLineDiff } from '../../utils/documentDiff'
-import { summarizePlainText } from '../../utils/documentContent'
+import { DOCUMENT_FORMATS, normalizeDocumentFormat } from '../../utils/documentContent'
 import { removeDraft, getDraft } from '../../utils/editorDraft'
 import styles from './DocumentEditorPage.module.css'
 
 const DocumentRichEditor = lazy(() => import('../../components/Document/DocumentRichEditor'))
+const DocumentSourceEditor = lazy(() => import('../../components/Document/DocumentSourceEditor'))
 
 const PAGE_STATUS = {
   LOADING: 'loading',
@@ -175,6 +176,10 @@ const DocumentEditorPage = () => {
     return buildLineDiff(document.contentText || '', comparingVersion.contentText || comparingVersion.content || '')
   }, [comparingVersion, document])
 
+  const documentFormat = useMemo(() => normalizeDocumentFormat(document?.format), [document?.format])
+  const publicUrl = document?.publicUrl
+    || (knowledgeBaseAccess?.siteUrl && document?.publicSlug ? `${knowledgeBaseAccess.siteUrl}/${document.publicSlug}` : '')
+
   const backToKnowledgeBase = () => {
     if (!document?.knowledgeBaseId) {
       navigate('/')
@@ -186,7 +191,7 @@ const DocumentEditorPage = () => {
     })
   }
 
-  const handleSave = async ({ content, contentText }) => {
+  const handleSave = async ({ format, content }) => {
     if (!document) {
       return
     }
@@ -194,10 +199,10 @@ const DocumentEditorPage = () => {
     try {
       setSaving(true)
       await documentApi.updateDocument(document.id, {
+        format,
         content,
-        contentText,
-        summary: summarizePlainText(contentText),
       })
+      setDraftContent(null)
       removeDraft(documentId)
       await loadData()
       await loadVersions()
@@ -277,13 +282,30 @@ const DocumentEditorPage = () => {
                 <div className={styles.documentIdentity}>
                   <h1 className={styles.title}>{document.title}</h1>
                   <span className={styles.metaInline}>
+                    {documentFormat}
+                    <span className={styles.metaSep}>·</span>
                     {saving ? '保存中…' : `v${document.versionNo}`}
                     <span className={styles.metaSep}>·</span>
                     {dayjs(document.updatedAt).format('MM-DD HH:mm')}
+                    {document.publishStatus === 'PUBLISHED' ? (
+                      <>
+                        <span className={styles.metaSep}>·</span>
+                        已发布
+                      </>
+                    ) : null}
                   </span>
                 </div>
               </div>
               <div className={styles.topbarActions}>
+                {publicUrl ? (
+                  <button
+                    type="button"
+                    className={styles.secondaryButton}
+                    onClick={() => window.open(publicUrl, '_blank', 'noopener,noreferrer')}
+                  >
+                    公开页
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   className={styles.secondaryButton}
@@ -318,16 +340,29 @@ const DocumentEditorPage = () => {
             </header>
 
             <Suspense fallback={<div className={styles.editorLoading}>正在加载编辑器...</div>}>
-              <DocumentRichEditor
-                focusMode
-                documentId={documentId}
-                initialContent={draftContent || document.content || document.contentText || ''}
-                placeholder="开始编写文档正文..."
-                saving={saving}
-                onCancel={backToKnowledgeBase}
-                onSave={handleSave}
-                onDirtyChange={handleDirtyChange}
-              />
+              {documentFormat === DOCUMENT_FORMATS.RICH_TEXT ? (
+                <DocumentRichEditor
+                  focusMode
+                  documentId={documentId}
+                  initialContent={draftContent || document.content || ''}
+                  placeholder="开始编写文档正文..."
+                  saving={saving}
+                  onCancel={backToKnowledgeBase}
+                  onSave={handleSave}
+                  onDirtyChange={handleDirtyChange}
+                />
+              ) : (
+                <DocumentSourceEditor
+                  focusMode
+                  documentId={documentId}
+                  format={documentFormat}
+                  initialContent={draftContent || document.content || ''}
+                  saving={saving}
+                  onCancel={backToKnowledgeBase}
+                  onSave={handleSave}
+                  onDirtyChange={handleDirtyChange}
+                />
+              )}
             </Suspense>
           </div>
 

@@ -6,7 +6,6 @@ import {
   canManageServiceAccountsForRole,
   canManageKnowledgeBaseTrashForRole,
   canViewWorkspaceAuditForRole,
-  shouldAutoOpenKnowledgeBaseTrash,
 } from './knowledgeBaseAccess.js'
 
 test('canCreateKnowledgeBaseForRole only allows workspace write roles', () => {
@@ -45,11 +44,4 @@ test('canManageServiceAccountsForRole only allows workspace manage roles', () =>
   assert.equal(canManageServiceAccountsForRole('ADMIN'), true)
   assert.equal(canManageServiceAccountsForRole('EDITOR'), false)
   assert.equal(canManageServiceAccountsForRole('VIEWER'), false)
-})
-
-test('shouldAutoOpenKnowledgeBaseTrash requires both route intent and manage permission', () => {
-  assert.equal(shouldAutoOpenKnowledgeBaseTrash({ openKnowledgeBaseTrash: true }, 'OWNER'), true)
-  assert.equal(shouldAutoOpenKnowledgeBaseTrash({ openKnowledgeBaseTrash: true }, 'EDITOR'), false)
-  assert.equal(shouldAutoOpenKnowledgeBaseTrash({ openKnowledgeBaseTrash: false }, 'OWNER'), false)
-  assert.equal(shouldAutoOpenKnowledgeBaseTrash(null, 'OWNER'), false)
 })

@@ -19,6 +19,12 @@ public class UserSession {
 
     private String accessToken;
 
+    private String clientType;
+
+    private String userAgent;
+
+    private String ipAddress;
+
     private Integer status;
 
     private LocalDateTime expiresAt;
@@ -26,4 +32,6 @@ public class UserSession {
     private LocalDateTime lastActiveAt;
 
     private LocalDateTime createdAt;
+
+    private LocalDateTime revokedAt;
 }

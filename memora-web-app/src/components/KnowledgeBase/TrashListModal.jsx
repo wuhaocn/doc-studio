@@ -11,7 +11,7 @@ const TrashListModal = ({
   errorMessage = '',
   restoringItemId = null,
   emptyTitle = '当前回收站为空',
-  emptyDescription = '删除后的内容会显示在这里。',
+  emptyDescription = '暂无内容。',
   restoreLabel = '恢复',
   onClose,
   onRestore,

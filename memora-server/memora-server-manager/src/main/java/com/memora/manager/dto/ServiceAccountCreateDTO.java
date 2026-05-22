@@ -1,5 +1,6 @@
 package com.memora.manager.dto;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -26,9 +27,7 @@ public class ServiceAccountCreateDTO {
     @Max(value = 3650, message = "API key 有效期不能超过 3650 天")
     private Integer expiresInDays;
 
-    @NotBlank(message = "访问模式不能为空")
-    private String accessMode;
-
+    @Valid
     @NotEmpty(message = "至少选择一个知识库作用域")
-    private List<Long> knowledgeBaseIds;
+    private List<ApiKeyScopeAssignDTO> scopes;
 }

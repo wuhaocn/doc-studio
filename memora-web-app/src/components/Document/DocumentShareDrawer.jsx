@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import dayjs from 'dayjs'
 import { useConfirm } from '../Feedback/ConfirmDialog'
 import { useToast } from '../Feedback/Toast'
@@ -45,10 +45,6 @@ const DocumentShareDrawer = ({
   const [revokingShareId, setRevokingShareId] = useState(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [form, setForm] = useState(DEFAULT_FORM)
-
-  const hasActiveShares = useMemo(() => {
-    return shares.some((share) => share.status === 1 && !share.expired)
-  }, [shares])
 
   const loadShares = useCallback(async () => {
     if (!documentId) {
@@ -151,28 +147,12 @@ const DocumentShareDrawer = ({
       <div className={styles.drawer}>
         <div className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>受控分享</p>
             <h2 className={styles.title}>{title}</h2>
-            <p className={styles.description}>为当前文档生成外部只读链接，并按过期时间与访问码进行边界控制。</p>
+            <p className={styles.description}>生成外部只读链接</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose}>
             关闭
           </button>
-        </div>
-
-        <div className={styles.summaryBlock}>
-          <div className={styles.summaryItem}>
-            <span>分享范围</span>
-            <strong>仅当前文档</strong>
-          </div>
-          <div className={styles.summaryItem}>
-            <span>访问权限</span>
-            <strong>外部只读</strong>
-          </div>
-          <div className={styles.summaryItem}>
-            <span>当前状态</span>
-            <strong>{hasActiveShares ? '已有生效分享' : '尚未创建分享'}</strong>
-          </div>
         </div>
 
         <form className={styles.form} onSubmit={handleCreateShare}>
@@ -205,9 +185,8 @@ const DocumentShareDrawer = ({
           ) : null}
 
           <div className={styles.footer}>
-            <div className={styles.note}>受控分享访问会进入审计；访问码不会再次明文展示，请创建后立即保存。</div>
             <button type="submit" className={styles.primaryButton} disabled={submitting}>
-              {submitting ? '创建中...' : '创建受控分享'}
+              {submitting ? '创建中...' : '创建分享'}
             </button>
           </div>
         </form>

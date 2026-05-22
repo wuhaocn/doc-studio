@@ -1,4 +1,5 @@
 import httpClient, { API_BASE_URL } from '../http/axios'
+import { getRuntimeWebClientHeaders } from '../runtime/runtimeConfig'
 
 export const auditApi = {
   listAuditLogs: async (params = {}) => {
@@ -43,7 +44,7 @@ export const auditApi = {
       credentials: 'include',
       headers: {
         Accept: 'text/csv,application/json',
-        'X-Memora-Client': 'memora-web-app',
+        ...getRuntimeWebClientHeaders(),
       },
     })
 

@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import dayjs from 'dayjs'
 import { useParams } from 'react-router-dom'
+import DocumentRenderedContent from '../../components/Document/DocumentRenderedContent'
 import PageState from '../../components/Feedback/PageState'
 import { publicShareApi } from '../../services/api/publicShareApi'
-import { sanitizeRichHtml } from '../../utils/documentContent'
+import { getDocumentRenderState } from '../../utils/documentContent'
 import styles from './PublicSharePage.module.css'
 
 const PAGE_STATUS = {
@@ -22,7 +23,15 @@ const PublicSharePage = () => {
   const [accessCode, setAccessCode] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const shouldRenderRichContent = document?.format === 'RICH_TEXT' && !!document?.content
+  const renderState = useMemo(() => {
+    return getDocumentRenderState({
+      format: document?.format,
+      content: document?.content,
+      contentText: document?.contentText,
+      renderedHtml: document?.renderedHtml,
+    })
+  }, [document?.format, document?.content, document?.contentText, document?.renderedHtml])
+  const shouldRenderRichContent = renderState.hasRenderedContent
 
   const handleTerminalError = useCallback((error) => {
     console.error('加载受控分享失败', error)
@@ -89,8 +98,6 @@ const PublicSharePage = () => {
     }
   }, [handleTerminalError, loadSharedDocument, token])
 
-  const safeDocumentContent = useMemo(() => sanitizeRichHtml(document?.content || ''), [document?.content])
-
   const handleSubmitAccessCode = async (event) => {
     event.preventDefault()
     await loadSharedDocument(accessCode.trim())
@@ -156,9 +163,13 @@ const PublicSharePage = () => {
             {document.summary ? <p>{document.summary}</p> : null}
           </div>
           {shouldRenderRichContent ? (
-            <article className={styles.richContent} dangerouslySetInnerHTML={{ __html: safeDocumentContent }} />
+            <DocumentRenderedContent
+              className={styles.richContent}
+              html={renderState.html}
+              variant="article"
+            />
           ) : (
-            <div className={styles.plainContent}>{document.contentText || '当前文档暂无正文。'}</div>
+            <div className={styles.plainContent}>{renderState.plainText || '当前文档暂无正文。'}</div>
           )}
         </main>
       ) : null}

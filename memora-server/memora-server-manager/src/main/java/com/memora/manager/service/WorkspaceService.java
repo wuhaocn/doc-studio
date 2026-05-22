@@ -11,6 +11,7 @@ import com.memora.manager.mapper.KnowledgeBaseMapper;
 import com.memora.manager.mapper.TenantMapper;
 import com.memora.manager.mapper.TenantMemberMapper;
 import com.memora.manager.support.CurrentAccessContext;
+import com.memora.manager.support.DocumentContentSupport;
 import com.memora.manager.support.TenantAccessService;
 import com.memora.manager.vo.KnowledgeBaseVO;
 import com.memora.manager.vo.DocumentVO;
@@ -181,6 +182,17 @@ public class WorkspaceService {
     private DocumentVO convertDocument(Document document) {
         DocumentVO vo = new DocumentVO();
         BeanUtils.copyProperties(document, vo);
+        DocumentContentSupport.NormalizedStoredDocument normalized = DocumentContentSupport.normalizeStoredDocument(
+            document.getDocType(),
+            document.getFormat(),
+            document.getContent(),
+            document.getContentText(),
+            document.getSummary()
+        );
+        vo.setDocType(normalized.docType());
+        vo.setFormat(normalized.format());
+        vo.setContentText(normalized.contentText());
+        vo.setSummary(normalized.summary());
         return vo;
     }
 }

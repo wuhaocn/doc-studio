@@ -31,6 +31,7 @@ const WorkspaceInviteModal = ({
   invites = [],
   inviteListLoading = false,
   revokingInviteId = null,
+  showInviteHistory = true,
   onClose,
   onSubmit,
   onRevoke,
@@ -91,9 +92,7 @@ const WorkspaceInviteModal = ({
       <div className={styles.modal}>
         <div className={styles.header}>
           <div>
-            <p className={styles.eyebrow}>成员邀请</p>
-            <h2 className={styles.title}>邀请成员加入当前工作区</h2>
-            <p className={styles.description}>当前版本使用邀请链接完成加入，不开放公共注册入口。</p>
+            <h2 className={styles.title}>邀请成员</h2>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose}>
             关闭
@@ -173,58 +172,59 @@ const WorkspaceInviteModal = ({
             </div>
           ) : null}
 
-          <section className={styles.inviteHistory}>
-            <div className={styles.inviteHistoryHeader}>
-              <div>
-                <strong>最近邀请</strong>
-                <span>这里只保留邀请状态；原始链接只在创建当下展示，丢失后需撤销重建。</span>
+          {showInviteHistory ? (
+            <section className={styles.inviteHistory}>
+              <div className={styles.inviteHistoryHeader}>
+                <div>
+                  <strong>最近邀请</strong>
+                </div>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  onClick={onRefreshInvites}
+                  disabled={inviteListLoading}
+                >
+                  {inviteListLoading ? '刷新中...' : '刷新列表'}
+                </button>
               </div>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={onRefreshInvites}
-                disabled={inviteListLoading}
-              >
-                {inviteListLoading ? '刷新中...' : '刷新列表'}
-              </button>
-            </div>
 
-            {inviteListLoading ? (
-              <div className={styles.inviteHistoryEmpty}>正在加载邀请列表...</div>
-            ) : invites.length > 0 ? (
-              <div className={styles.inviteHistoryList}>
-                {invites.map((invite) => (
-                  <article key={invite.id} className={styles.inviteHistoryItem}>
-                    <div className={styles.inviteHistoryMain}>
-                      <div className={styles.inviteHistoryTopline}>
-                        <strong>{invite.inviteeEmail}</strong>
-                        <span className={styles.inviteStatus}>{invite.statusText}</span>
+              {inviteListLoading ? (
+                <div className={styles.inviteHistoryEmpty}>正在加载邀请列表...</div>
+              ) : invites.length > 0 ? (
+                <div className={styles.inviteHistoryList}>
+                  {invites.map((invite) => (
+                    <article key={invite.id} className={styles.inviteHistoryItem}>
+                      <div className={styles.inviteHistoryMain}>
+                        <div className={styles.inviteHistoryTopline}>
+                          <strong>{invite.inviteeEmail}</strong>
+                          <span className={styles.inviteStatus}>{invite.statusText}</span>
+                        </div>
+                        <div className={styles.inviteHistoryMeta}>
+                          <span>{invite.role}</span>
+                          <span>创建于 {invite.createdAtText}</span>
+                          <span>截止 {invite.expiresAtText}</span>
+                        </div>
                       </div>
-                      <div className={styles.inviteHistoryMeta}>
-                        <span>{invite.role}</span>
-                        <span>创建于 {invite.createdAtText}</span>
-                        <span>截止 {invite.expiresAtText}</span>
+                      <div className={styles.inviteHistoryActions}>
+                        {invite.canRevoke ? (
+                          <button
+                            type="button"
+                            className={styles.secondaryButton}
+                            onClick={() => onRevoke(invite.id)}
+                            disabled={revokingInviteId === invite.id}
+                          >
+                            {revokingInviteId === invite.id ? '撤销中...' : '撤销'}
+                          </button>
+                        ) : null}
                       </div>
-                    </div>
-                    <div className={styles.inviteHistoryActions}>
-                      {invite.canRevoke ? (
-                        <button
-                          type="button"
-                          className={styles.secondaryButton}
-                          onClick={() => onRevoke(invite.id)}
-                          disabled={revokingInviteId === invite.id}
-                        >
-                          {revokingInviteId === invite.id ? '撤销中...' : '撤销'}
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : (
-              <div className={styles.inviteHistoryEmpty}>当前还没有可管理的邀请记录。</div>
-            )}
-          </section>
+                    </article>
+                  ))}
+                </div>
+              ) : (
+                <div className={styles.inviteHistoryEmpty}>当前还没有可管理的邀请记录。</div>
+              )}
+            </section>
+          ) : null}
 
           <div className={styles.footer}>
             <button type="button" className={styles.secondaryButton} onClick={onClose}>

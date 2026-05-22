@@ -30,6 +30,7 @@
 - 内部知识生产闭环
 - 受控分发闭环
 - 机器接入闭环
+- 轻发布与公开消费闭环
 
 ### 2.3 默认实施决策
 
@@ -52,6 +53,9 @@
 | P3 | 治理与审计 | audit log、关键操作追踪、最小审计查询，基线已实现 |
 | P4 | 受控外部分发 | 文档分享模型、过期 / 撤销、外部阅读页 |
 | P5 | 平台接入能力 | service account、API key、文档外部 API、并发保护 |
+| P6 | 内容资产格式闭环 | 正式 `format`、统一渲染、历史内容归一化、Open API 格式收口 |
+| P7 | 轻发布与内容站点 | 知识库站点配置、文档发布状态、公开站点首页 / 详情页，基线已实现 |
+| P8 | 上游接入增强 | `upsert`、批量同步、来源追踪、浏览器 / 对话框接入 |
 
 ---
 
@@ -615,7 +619,7 @@ P5 目标：
 - 新增 `service_account`
 - 新增 `api_key`
 - 新增 `api_key_scope`
-- 只存储 key hash
+- 存储 key hash，并为新签发 key 保留加密展示副本
 
 交付结果：
 
@@ -623,14 +627,14 @@ P5 目标：
 
 验收标准：
 
-- 明文 key 只展示一次
+- 新签发 key 可由当前管理员再次展示，历史 key 需轮换后才能恢复展示
 
 ### 9.2 T5-02 Key 生命周期
 
 任务：
 
 - 创建 key
-- 一次展示
+- 支持再次展示并写入审计
 - 禁用
 - 吊销
 - 轮换
@@ -732,26 +736,217 @@ P5 目标：
 
 ---
 
-## 10. 实施顺序
+## 10. P6 内容资产格式闭环
 
-### 10.1 总顺序
+P6 目标：
+
+`把外部 AI 或人工生成的内容正式收口为可管理的文档资产`
+
+### 10.1 T6-01 正式格式模型
+
+任务：
+
+- 固定 `RICH_TEXT / MARKDOWN / HTML` 三种正式格式
+- 创建、更新、分享、Open API 全链路显式携带 `format`
+- 移除调用方主导 `contentText` 的旧兼容语义
+
+验收标准：
+
+- 同一文档在所有读写链路中格式语义一致
+
+### 10.2 T6-02 统一渲染链路
+
+任务：
+
+- 统一阅读页、知识库预览、公开分享页渲染规则
+- Markdown 渲染与 HTML 白名单净化共享一条展示语义
+- 逐步引入服务端 canonical `renderedHtml`
+
+验收标准：
+
+- 同一文档在知识库预览、阅读页、分享页中显示一致
+
+### 10.3 T6-03 历史内容归一化
+
+任务：
+
+- 提供批量归一化维护入口
+- 修正旧数据中的 `docType / format / contentText / summary`
+- 提供 `dryRun` 与范围执行机制
+
+验收标准：
+
+- 历史 Markdown / HTML 文档不会直接破坏阅读、搜索和分享体验
+
+### 10.4 T6-04 P6 阶段验收
+
+验收链路：
+
+- 创建 Markdown 文档
+- 创建 HTML 文档
+- 阅读页查看
+- 公开分享查看
+- Open API 更新
+
+通过标准：
+
+- 内容资产格式闭环成立
+
+---
+
+## 11. P7 轻发布与内容站点
+
+P7 目标：
+
+`让知识库内容从“可分享文档”推进到“可公开消费站点”`
+
+### 11.1 T7-01 知识库站点配置
+
+任务：
+
+- 为知识库新增 `siteEnabled / siteSlug / siteTitle / siteDescription`
+- 提供知识库级发布设置接口
+- 明确一个知识库是否作为轻量站点容器对外发布
+
+验收标准：
+
+- 知识库可独立开启或关闭站点发布
+
+### 11.2 T7-02 文档发布状态模型
+
+任务：
+
+- 为文档新增 `publishStatus / publicSlug / publishedAt`
+- 明确 `DRAFT / REVIEW / PUBLISHED / ARCHIVED` 或等价状态
+- 让 `share` 与 `publish` 彻底分离
+
+验收标准：
+
+- 文档具备正式发布状态，不再借用分享 token 表达公开访问
+
+### 11.3 T7-03 服务端公开渲染产物
+
+任务：
+
+- 为文档新增 `renderedHtml / renderChecksum`
+- 保存时统一派生公开消费产物
+- 公开页优先消费后端 canonical 渲染结果
+
+验收标准：
+
+- 公开站点不再完全依赖前端运行时渲染
+
+### 11.4 T7-04 公开站点读模型
+
+任务：
+
+- 新增公开站点首页
+- 新增文档详情页
+- 提供稳定 `siteSlug / publicSlug` 路由
+- 预留 Feed / Embed 只读消费面
+
+验收标准：
+
+- `/site/{siteSlug}` 和 `/site/{siteSlug}/{publicSlug}` 稳定可访问
+
+### 11.5 T7-05 P7 阶段验收
+
+验收链路：
+
+- 开启知识库站点发布
+- 发布 Markdown 文档
+- 发布 HTML 文档
+- 访问站点首页
+- 访问文档详情
+- 撤销发布后重新访问
+
+通过标准：
+
+- 轻发布与内容站点闭环成立
+- 当前代码基线已实现最小闭环：
+  - 知识库公开站点配置接口与 Web 治理侧栏
+  - 文档正式发布 / 取消发布接口
+  - `/api/public/sites/{siteSlug}` 与 `/api/public/sites/{siteSlug}/{publicSlug}`
+  - Web 公开站点页 `/site/:siteSlug` 与 `/site/:siteSlug/:publicSlug`
+  - 服务端 `renderedHtml / renderChecksum` 统一渲染产物
+
+---
+
+## 12. P8 上游接入增强
+
+P8 目标：
+
+`让对话框、浏览器和脚本更顺畅地接入 Memora`
+
+### 12.1 T8-01 持续同步语义
+
+任务：
+
+- 新增 `upsert`
+- 新增 `batch-upsert`
+- 引入 `sourceExternalId / sourceRevision / 幂等`
+
+验收标准：
+
+- 外部 AI 或脚本重复同步不会无意创建重复文档或覆盖新版本
+
+当前基线：
+
+- 已补 `POST /api/v1/open/documents/upsert`
+- 已补 `POST /api/v1/open/documents/batch-upsert`
+- Open API `create / update / upsert` 已可落 `sourceExternalId / sourceRevision`
+- 持续同步以 `knowledgeBaseId + sourceExternalId` 作为收口键
+- `sourceRevision` 当前按“同 revision 跳过、旧 revision 冲突、新 revision 更新”执行
+- 集成测试已覆盖单条 upsert、批量 upsert、跳过、冲突与审计记录
+
+### 12.2 T8-02 上游工具接入
+
+任务：
+
+- 预留浏览器侧保存入口
+- 预留对话框侧一键保存与只读打开入口
+- 提供更细公开消费视图和格式协商
+
+验收标准：
+
+- 上游工具可以稳定写入或打开内容，而不需要理解复杂治理模型
+
+当前基线：
+
+- 已补 `GET /api/v1/open/knowledge-bases/{knowledgeBaseId}/documents/by-source`
+- 已补 `GET /api/v1/open/documents/{documentId}/consume`
+- 已支持 `metadata / rendered / source / plain / summary` 五种消费视图
+- 工作区“开放接入”页已补可复制的写入、来源读取、浏览器打开、对话框保存和按来源打开阅读页示例
+- `/capture/save` 已支持浏览器捕获参数和对话框 draft 载荷，外部工具可先把预生成草稿带到 Memora 页内，再复用现有 `upsert` 链路
+
+---
+
+## 13. 实施顺序
+
+### 13.1 总顺序
 
 1. 先做 `P0`
 2. 再做 `P1`
 3. 然后做 `P2`
 4. 再做 `P3`
-5. 最后做 `P4` 和 `P5`
+5. 再做 `P4` 和 `P5`
+6. 然后做 `P6`
+7. 当前直接目标转为 `P8`
+8. 最后做 `P8`
 
-### 10.2 阶段门槛
+### 13.2 阶段门槛
 
 - `P4` 不得早于 `P1` 和 `P3`
 - `P5` 不得早于 `P0` 和 `P1`
+- `P7` 不得早于 `P6`
+- `P8` 不得早于 `P7`
 - 搜索上线前必须先完成聚合权限收口
 - 分享和 API key 不得共用同一种 token 语义
+- 分享与正式发布不得共用同一种 URL / token 语义
 
 ---
 
-## 11. 风险清单
+## 14. 风险清单
 
 ### 11.1 方向风险
 
@@ -769,7 +964,7 @@ P5 目标：
 
 ---
 
-## 12. 验收原则
+## 15. 验收原则
 
 每一阶段验收都应围绕闭环，而不是围绕新增模块数量。
 

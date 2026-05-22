@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.memora.common.result.Result;
 import com.memora.manager.dto.KnowledgeBaseCreateDTO;
 import com.memora.manager.dto.KnowledgeBaseMemberBatchUpdateDTO;
+import com.memora.manager.dto.KnowledgeBaseSiteUpdateDTO;
 import com.memora.manager.dto.KnowledgeBaseUpdateDTO;
 import com.memora.manager.service.DocumentService;
 import com.memora.manager.service.KnowledgeBaseMemberService;
@@ -33,6 +34,11 @@ public class KnowledgeBaseController {
     @PutMapping("/{id}")
     public Result<KnowledgeBaseVO> update(@PathVariable Long id, @Valid @RequestBody KnowledgeBaseUpdateDTO dto) {
         return Result.success(knowledgeBaseService.update(id, dto));
+    }
+
+    @PutMapping("/{id}/site")
+    public Result<KnowledgeBaseVO> updateSiteSettings(@PathVariable Long id, @Valid @RequestBody KnowledgeBaseSiteUpdateDTO dto) {
+        return Result.success(knowledgeBaseService.updateSiteSettings(id, dto));
     }
 
     @DeleteMapping("/{id}")

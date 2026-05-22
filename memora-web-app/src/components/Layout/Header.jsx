@@ -1,11 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
-import { IconMenuFold, IconMenuUnfold, IconHome, IconFolder } from '@arco-design/web-react/icon'
+import { IconMenuFold, IconMenuUnfold } from '@arco-design/web-react/icon'
 import { Avatar } from '@arco-design/web-react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useToast } from '../Feedback/Toast'
-import { useKnowledgeBaseNavigation } from '../../hooks/useKnowledgeBaseNavigation'
-import { getRememberedKnowledgeBaseId } from '../../utils/knowledgeBaseRoute'
 import styles from './Header.module.css'
 
 const Header = ({ onToggleSidebar, showMenuButton = true }) => {
@@ -16,9 +14,6 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
   const toast = useToast()
   const [scrolled, setScrolled] = useState(false)
   const [searchKeyword, setSearchKeyword] = useState(searchParams.get('keyword') || '')
-  const { knowledgeBases } = useKnowledgeBaseNavigation(currentUser.tenantId, {
-    errorMessage: '加载头部知识库导航失败',
-  })
 
   useEffect(() => {
     const handleScroll = () => {
@@ -33,62 +28,6 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
   useEffect(() => {
     setSearchKeyword(searchParams.get('keyword') || '')
   }, [location.pathname, searchParams])
-
-  const currentKnowledgeBaseRoute = useMemo(() => {
-    if (location.pathname.startsWith('/kb/')) {
-      return location.pathname
-    }
-
-    const rememberedKnowledgeBaseId = getRememberedKnowledgeBaseId()
-    const rememberedKnowledgeBase = knowledgeBases.find((item) => item.id === rememberedKnowledgeBaseId)
-    if (rememberedKnowledgeBase) {
-      return `/kb/${rememberedKnowledgeBase.id}`
-    }
-
-    if (knowledgeBases[0]?.id) {
-      return `/kb/${knowledgeBases[0].id}`
-    }
-
-    return '/'
-  }, [knowledgeBases, location.pathname])
-
-  const currentKnowledgeBase = useMemo(() => {
-    return knowledgeBases.find((item) => currentKnowledgeBaseRoute === `/kb/${item.id}`) || null
-  }, [currentKnowledgeBaseRoute, knowledgeBases])
-
-  const contextItems = useMemo(() => {
-    const items = [{
-      to: '/',
-      label: currentUser.tenantName,
-      icon: <IconHome />,
-      active: location.pathname === '/',
-    }]
-
-    if (location.pathname.startsWith('/kb/')) {
-      items.push({
-        to: currentKnowledgeBaseRoute,
-        label: currentKnowledgeBase?.name || '知识库工作区',
-        icon: <IconFolder />,
-        active: true,
-      })
-      return items
-    }
-
-    if (location.pathname.startsWith('/docs/')) {
-      items.push({
-        to: currentKnowledgeBaseRoute,
-        label: currentKnowledgeBase?.name || '知识库工作区',
-        icon: <IconFolder />,
-        active: false,
-      })
-      items.push({
-        label: location.pathname.endsWith('/edit') ? '文档编辑' : '文档阅读',
-        active: true,
-      })
-    }
-
-    return items
-  }, [currentKnowledgeBase, currentKnowledgeBaseRoute, currentUser.tenantName, location.pathname])
 
   const handleSearchSubmit = (event) => {
     event.preventDefault()
@@ -132,21 +71,6 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
         </Link>
       </div>
 
-      <nav className={styles.nav}>
-        {contextItems.map((item, index) => (
-          item.to ? (
-            <Link key={`${item.to}-${index}`} to={item.to} className={`${styles.navLink} ${item.active ? styles.active : ''}`}>
-              {item.icon || null}
-              <span>{item.label}</span>
-            </Link>
-          ) : (
-            <span key={`${item.label}-${index}`} className={`${styles.navLabel} ${item.active ? styles.active : ''}`}>
-              <span>{item.label}</span>
-            </span>
-          )
-        ))}
-      </nav>
-
       <form className={styles.searchForm} onSubmit={handleSearchSubmit}>
         <input
           className={styles.searchInput}
@@ -176,14 +100,18 @@ const Header = ({ onToggleSidebar, showMenuButton = true }) => {
             </select>
           </div>
         ) : null}
+        <Link
+          to="/workspace/manage"
+          className={`${styles.manageButton} ${location.pathname.startsWith('/workspace/manage') ? styles.manageButtonActive : ''}`}
+        >
+          <span className={styles.manageLabelFull}>工作区管理</span>
+          <span className={styles.manageLabelShort}>管理</span>
+        </Link>
         <div className={styles.userCard}>
           <Avatar size={30} className={styles.avatar}>
             {currentUser.nickname.charAt(0)}
           </Avatar>
-          <div>
-            <div className={styles.userName}>{currentUser.nickname}</div>
-            <div className={styles.userRole}>{currentUser.role}</div>
-          </div>
+          <div className={styles.userName}>{currentUser.nickname}</div>
         </div>
         <button type="button" className={styles.logoutButton} onClick={logout}>
           退出

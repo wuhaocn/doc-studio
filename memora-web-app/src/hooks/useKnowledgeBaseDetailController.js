@@ -4,7 +4,7 @@ import { useToast } from '../components/Feedback/Toast'
 import { documentApi } from '../services/api/documentApi'
 import { knowledgeBaseApi } from '../services/api/knowledgeBaseApi'
 import { workspaceApi } from '../services/api/workspaceApi'
-import { sanitizeRichHtml } from '../utils/documentContent'
+import { DOCUMENT_FORMATS, getDocumentRenderState } from '../utils/documentContent'
 import { emitKnowledgeBasesChanged } from '../utils/knowledgeBaseEvents'
 import { rememberKnowledgeBase } from '../utils/knowledgeBaseRoute'
 import {
@@ -21,6 +21,24 @@ import {
   resolveDefaultParentId,
   validateBatchDeleteSelection,
 } from '../utils/knowledgeBaseTree'
+
+const escapeHtml = (value) =>
+  value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&#39;')
+
+const buildInitialDocumentContent = (title, format) => {
+  if (format === DOCUMENT_FORMATS.MARKDOWN) {
+    return `# ${title}\n\n`
+  }
+  if (format === DOCUMENT_FORMATS.HTML) {
+    return `<article>\n  <h1>${escapeHtml(title)}</h1>\n  <p></p>\n</article>`
+  }
+  return `<h1>${escapeHtml(title)}</h1><p></p>`
+}
 
 export const PAGE_STATUS = {
   LOADING: 'loading',
@@ -61,8 +79,11 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
   const [expandedFolderIds, setExpandedFolderIds] = useState([])
   const [treePanelCollapsed, setTreePanelCollapsed] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
   const [knowledgeBaseInfoVisible, setKnowledgeBaseInfoVisible] = useState(false)
+  const [siteSubmitting, setSiteSubmitting] = useState(false)
+  const [siteError, setSiteError] = useState('')
+  const [documentPublishingSubmitting, setDocumentPublishingSubmitting] = useState(false)
+  const [documentPublishingError, setDocumentPublishingError] = useState('')
   const [readLinkOpen, setReadLinkOpen] = useState(false)
   const [permissionModalOpen, setPermissionModalOpen] = useState(false)
   const [permissionMembers, setPermissionMembers] = useState([])
@@ -134,16 +155,6 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
   }, [id])
 
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 24)
-    }
-
-    handleScroll()
-    window.addEventListener('scroll', handleScroll, { passive: true })
-    return () => window.removeEventListener('scroll', handleScroll)
-  }, [])
-
-  useEffect(() => {
     if (documents.length === 0) {
       setSelectedDocumentId(null)
       return
@@ -190,10 +201,15 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
   })
 
   const selectedDocument = documents.find((item) => item.id === selectedDocumentId) || visibleDocuments[0] || documents[0]
-  const safeSelectedDocumentContent = useMemo(
-    () => sanitizeRichHtml(selectedDocument?.content || ''),
-    [selectedDocument?.content]
-  )
+  const selectedDocumentRenderState = useMemo(() => {
+    return getDocumentRenderState({
+      format: selectedDocument?.format,
+      content: selectedDocument?.content,
+      contentText: selectedDocument?.contentText,
+      renderedHtml: selectedDocument?.renderedHtml,
+    })
+  }, [selectedDocument?.format, selectedDocument?.content, selectedDocument?.contentText, selectedDocument?.renderedHtml])
+  const safeSelectedDocumentContent = selectedDocumentRenderState.html
   const siblingDocuments = getSiblingDocuments(documents, selectedDocument)
   const selectedSiblingIndex = siblingDocuments.findIndex((item) => item.id === selectedDocument?.id)
   const canMoveUp = selectedSiblingIndex > 0
@@ -206,7 +222,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
   const canWriteKnowledgeBase = !!knowledgeBase?.canWrite
   const canManageKnowledgeBase = !!knowledgeBase?.canManage
   const dragSortEnabled = canWriteKnowledgeBase && !batchMode && !search.trim()
-  const shouldRenderRichPreview = selectedDocument?.docType === 'DOC' && !!selectedDocument?.content
+  const shouldRenderRichPreview = selectedDocument?.docType === 'DOC' && selectedDocumentRenderState.hasRenderedContent
   const compactKnowledgeBaseDescription = knowledgeBase?.description?.trim()
   const hasActiveSearch = !!deferredSearch.trim()
   const treePanelStatusText = hasActiveSearch
@@ -219,7 +235,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     : !canWriteKnowledgeBase
       ? '当前角色只能阅读和搜索，不能新建、移动或删除节点。'
     : dragSortEnabled
-      ? '可直接拖拽排序。'
+      ? '支持右键操作；同级可直接拖拽排序，拖到目录中部可移入该目录。'
       : hasActiveSearch
         ? '按标题过滤，层级关系保持不变。'
         : '继续像文档目录一样浏览即可。'
@@ -235,6 +251,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setFocusMode(false)
       setReadLinkOpen(false)
     }
+    setDocumentPublishingError('')
   }, [selectedDocument?.docType])
 
   useEffect(() => {
@@ -264,6 +281,68 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setModalError(error?.message || '更新知识库失败，请稍后重试')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleSaveSiteSettings = async (siteForm) => {
+    if (!canManageKnowledgeBase) {
+      return
+    }
+
+    try {
+      setSiteSubmitting(true)
+      setSiteError('')
+      await knowledgeBaseApi.updateKnowledgeBaseSite(id, siteForm)
+      await loadData()
+      emitKnowledgeBasesChanged()
+      toast.success(siteForm.siteEnabled ? '公开站点设置已保存' : '公开站点已停用')
+    } catch (error) {
+      console.error('保存公开站点设置失败', error)
+      setSiteError(error?.message || '保存公开站点设置失败，请稍后重试')
+    } finally {
+      setSiteSubmitting(false)
+    }
+  }
+
+  const handlePublishDocument = async ({ publicSlug } = {}) => {
+    if (!canManageKnowledgeBase || selectedDocument?.docType !== 'DOC') {
+      return
+    }
+
+    try {
+      setDocumentPublishingSubmitting(true)
+      setDocumentPublishingError('')
+      await documentApi.publishDocument(selectedDocument.id, {
+        publicSlug: publicSlug || undefined,
+      })
+      await loadData()
+      setSelectedDocumentId(selectedDocument.id)
+      toast.success('文档已进入正式发布')
+    } catch (error) {
+      console.error('发布文档失败', error)
+      setDocumentPublishingError(error?.message || '发布文档失败，请稍后重试')
+    } finally {
+      setDocumentPublishingSubmitting(false)
+    }
+  }
+
+  const handleUnpublishDocument = async () => {
+    if (!canManageKnowledgeBase || selectedDocument?.docType !== 'DOC') {
+      return
+    }
+
+    try {
+      setDocumentPublishingSubmitting(true)
+      setDocumentPublishingError('')
+      await documentApi.unpublishDocument(selectedDocument.id)
+      await loadData()
+      setSelectedDocumentId(selectedDocument.id)
+      toast.success('文档已取消正式发布')
+    } catch (error) {
+      console.error('取消发布文档失败', error)
+      setDocumentPublishingError(error?.message || '取消发布失败，请稍后重试')
+    } finally {
+      setDocumentPublishingSubmitting(false)
     }
   }
 
@@ -423,11 +502,11 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     navigate(`/docs/${documentId}/edit`)
   }
 
-  const handleOpenEditorPage = () => {
-    if (!selectedDocument || selectedDocument.docType !== 'DOC' || !canWriteKnowledgeBase) {
+  const handleOpenEditorPage = (targetDocument = selectedDocument) => {
+    if (!targetDocument || targetDocument.docType !== 'DOC' || !canWriteKnowledgeBase) {
       return
     }
-    navigateToEditor(selectedDocument.id)
+    navigateToEditor(targetDocument.id)
   }
 
   const handleToggleFocusMode = () => {
@@ -438,7 +517,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     setFocusMode((current) => !current)
   }
 
-  const openCreateDocumentModal = (docType) => {
+  const openCreateDocumentModal = (docType, targetDocument = selectedDocument) => {
     if (!canWriteKnowledgeBase) {
       return
     }
@@ -449,23 +528,26 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     setDocumentModalInitialValues({
       title: '',
       summary: '',
-      parentId: resolveDefaultParentId(selectedDocument),
+      parentId: resolveDefaultParentId(targetDocument),
+      format: DOCUMENT_FORMATS.RICH_TEXT,
     })
     setDocumentModalOpen(true)
   }
 
-  const openEditDocumentModal = () => {
-    if (!selectedDocument || !canWriteKnowledgeBase) {
+  const openEditDocumentModal = (targetDocument = selectedDocument) => {
+    if (!targetDocument || !canWriteKnowledgeBase) {
       return
     }
 
+    setSelectedDocumentId(targetDocument.id)
     setDocumentModalMode('edit')
-    setDocumentModalType(selectedDocument.docType)
+    setDocumentModalType(targetDocument.docType)
     setDocumentModalError('')
     setDocumentModalInitialValues({
-      title: selectedDocument.title,
-      summary: selectedDocument.summary || '',
-      parentId: selectedDocument.parentId ?? 0,
+      title: targetDocument.title,
+      summary: targetDocument.summary || '',
+      parentId: targetDocument.parentId ?? 0,
+      format: targetDocument.format || DOCUMENT_FORMATS.RICH_TEXT,
     })
     setDocumentModalOpen(true)
   }
@@ -480,15 +562,15 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       setDocumentModalError('')
 
       if (documentModalMode === 'create') {
+        const documentFormat = formData.format || DOCUMENT_FORMATS.RICH_TEXT
         const response = await documentApi.createDocument({
           knowledgeBaseId: Number(id),
           parentId: formData.parentId,
           title: formData.title,
           docType: documentModalType,
-          format: 'MARKDOWN',
+          format: documentModalType === 'DOC' ? documentFormat : undefined,
           summary: documentModalType === 'DOC' ? formData.summary : undefined,
-          content: documentModalType === 'DOC' ? `# ${formData.title}` : '',
-          contentText: documentModalType === 'DOC' ? (formData.summary || formData.title) : formData.title,
+          content: documentModalType === 'DOC' ? buildInitialDocumentContent(formData.title, documentFormat) : undefined,
         })
         setDocumentModalOpen(false)
         await loadData()
@@ -522,24 +604,24 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     }
   }
 
-  const handleDeleteDocument = async () => {
-    if (!selectedDocument || !canWriteKnowledgeBase) {
+  const handleDeleteDocument = async (targetDocument = selectedDocument) => {
+    if (!targetDocument || !canWriteKnowledgeBase) {
       return
     }
 
     const confirmed = await confirm({
       title: '确认删除',
-      description: `确认删除${TYPE_LABELS[selectedDocument.docType] || '节点'}”${selectedDocument.title}”吗？删除后可在文档回收站恢复。`,
+      description: `确认删除${TYPE_LABELS[targetDocument.docType] || '节点'}”${targetDocument.title}”吗？删除后可在文档回收站恢复。`,
       confirmLabel: '确认删除',
       danger: true,
     })
     if (!confirmed) return
 
     try {
-      await documentApi.deleteDocument(selectedDocument.id)
+      await documentApi.deleteDocument(targetDocument.id)
       setSelectedDocumentId(null)
       await loadData()
-      toast.success(`${TYPE_LABELS[selectedDocument.docType] || selectedDocument.docType}”${selectedDocument.title}”已删除，可在文档回收站恢复`)
+      toast.success(`${TYPE_LABELS[targetDocument.docType] || targetDocument.docType}”${targetDocument.title}”已删除，可在文档回收站恢复`)
     } catch (error) {
       console.error('删除文档节点失败', error)
       toast.error(error?.message || '删除文档节点失败，请稍后重试')
@@ -625,13 +707,28 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     }
 
     const draggingDocument = documents.find((candidate) => candidate.id === draggingDocumentId)
-    if (!draggingDocument || (draggingDocument.parentId ?? 0) !== (item.parentId ?? 0)) {
+    if (!draggingDocument) {
+      return
+    }
+
+    const isDraggingFolderIntoSelf = draggingDocument.docType === 'FOLDER'
+      && ((item.path || '') === (draggingDocument.path || '') || (item.path || '').startsWith(`${draggingDocument.path || ''}/`))
+    if (isDraggingFolderIntoSelf) {
       return
     }
 
     event.preventDefault()
     const bounds = event.currentTarget.getBoundingClientRect()
-    const position = event.clientY - bounds.top > bounds.height / 2 ? 'after' : 'before'
+    const offsetY = event.clientY - bounds.top
+    const sameParent = (draggingDocument.parentId ?? 0) === (item.parentId ?? 0)
+    let position = offsetY > bounds.height / 2 ? 'after' : 'before'
+
+    if (item.docType === 'FOLDER' && offsetY > bounds.height * 0.25 && offsetY < bounds.height * 0.75) {
+      position = 'inside'
+    } else if (!sameParent && item.docType !== 'FOLDER') {
+      return
+    }
+
     event.dataTransfer.dropEffect = 'move'
     setDragOverDocumentId(item.id)
     setDragOverPosition(position)
@@ -645,25 +742,48 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
 
     event.preventDefault()
     const draggingDocument = documents.find((candidate) => candidate.id === draggingDocumentId)
-    if (!draggingDocument || (draggingDocument.parentId ?? 0) !== (item.parentId ?? 0)) {
-      clearDragState()
-      return
-    }
-
-    const reorderedDocuments = reorderSiblingDocuments(
-      getSiblingDocuments(documents, draggingDocument),
-      draggingDocument.id,
-      item.id,
-      dragOverPosition
-    )
-
-    if (!reorderedDocuments) {
+    if (!draggingDocument) {
       clearDragState()
       return
     }
 
     try {
       setDragSorting(true)
+      if (dragOverPosition === 'inside') {
+        if (item.docType !== 'FOLDER') {
+          clearDragState()
+          return
+        }
+        if ((draggingDocument.parentId ?? 0) === item.id) {
+          clearDragState()
+          return
+        }
+
+        await documentApi.batchMoveDocuments([draggingDocument.id], item.id)
+        setExpandedFolderIds((current) => (current.includes(item.id) ? current : [...current, item.id]))
+        await loadData()
+        setSelectedDocumentId(draggingDocument.id)
+        toast.success(`已将${TYPE_LABELS[draggingDocument.docType] || draggingDocument.docType}”${draggingDocument.title}”移入目录“${item.title}”`)
+        return
+      }
+
+      if ((draggingDocument.parentId ?? 0) !== (item.parentId ?? 0)) {
+        clearDragState()
+        return
+      }
+
+      const reorderedDocuments = reorderSiblingDocuments(
+        getSiblingDocuments(documents, draggingDocument),
+        draggingDocument.id,
+        item.id,
+        dragOverPosition
+      )
+
+      if (!reorderedDocuments) {
+        clearDragState()
+        return
+      }
+
       await documentApi.updateSortOrder(
         reorderedDocuments.map((documentItem, indexValue) => ({
           id: documentItem.id,
@@ -732,13 +852,12 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     try {
       await knowledgeBaseApi.deleteKnowledgeBase(id)
       emitKnowledgeBasesChanged()
-      navigate('/', {
+      navigate('/workspace/manage/trash', {
         state: {
           feedback: {
             type: 'success',
             message: `知识库”${knowledgeBase.name}”已删除，可在知识库回收站恢复`,
           },
-          openKnowledgeBaseTrash: true,
         },
       })
     } catch (error) {
@@ -784,9 +903,14 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     treePanelCollapsed,
     setTreePanelCollapsed,
     focusMode,
-    scrolled,
     knowledgeBaseInfoVisible,
     setKnowledgeBaseInfoVisible,
+    siteSubmitting,
+    siteError,
+    setSiteError,
+    documentPublishingSubmitting,
+    documentPublishingError,
+    setDocumentPublishingError,
     readLinkOpen,
     setReadLinkOpen,
     permissionModalOpen,
@@ -826,6 +950,9 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     selectedFolderDirectoryCount,
     loadData,
     handleSaveKnowledgeBase,
+    handleSaveSiteSettings,
+    handlePublishDocument,
+    handleUnpublishDocument,
     openPermissionModal,
     handleSubmitPermissions,
     openDocumentTrash,

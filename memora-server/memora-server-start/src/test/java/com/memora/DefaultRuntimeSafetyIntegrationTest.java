@@ -47,10 +47,17 @@ class DefaultRuntimeSafetyIntegrationTest {
     }
 
     @Test
-    void shouldReturnHttp404ForMissingStaticResourceRequest() throws Exception {
+    void shouldExposeRuntimeServiceConfig() throws Exception {
         mockMvc.perform(get("/services/config"))
-            .andExpect(status().isNotFound())
-            .andExpect(jsonPath("$.code").value(404))
-            .andExpect(jsonPath("$.message").value("资源不存在"));
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.code").value(200))
+            .andExpect(jsonPath("$.data.app.name").value("Memora"))
+            .andExpect(jsonPath("$.data.auth.browserClientHeaderName").value("X-Memora-Client"))
+            .andExpect(jsonPath("$.data.auth.browserClientHeaderValue").value("memora-web-app"))
+            .andExpect(jsonPath("$.data.auth.seedAccountLoginEnabled").value(false))
+            .andExpect(jsonPath("$.data.auth.sessionTransport").value("HTTP_ONLY_COOKIE"))
+            .andExpect(jsonPath("$.data.features.publicShareEnabled").value(true))
+            .andExpect(jsonPath("$.data.features.publicSiteEnabled").value(true))
+            .andExpect(jsonPath("$.data.features.openApiEnabled").value(true));
     }
 }

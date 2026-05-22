@@ -36,6 +36,10 @@ export const knowledgeBaseApi = {
     return httpClient.put(`/api/v1/knowledge-bases/${id}`, data)
   },
 
+  updateKnowledgeBaseSite: async (id, data) => {
+    return httpClient.put(`/api/v1/knowledge-bases/${id}/site`, data)
+  },
+
   deleteKnowledgeBase: async (id) => {
     return httpClient.delete(`/api/v1/knowledge-bases/${id}`)
   },

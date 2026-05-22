@@ -20,4 +20,28 @@ export const authApi = {
   refreshSession: async () => {
     return httpClient.post('/api/v1/auth/refresh', {}, { _skipAuthRefresh: true })
   },
+
+  listSessions: async () => {
+    return httpClient.get('/api/v1/auth/sessions')
+  },
+
+  listTenantSessions: async () => {
+    return httpClient.get('/api/v1/auth/tenant-sessions')
+  },
+
+  revokeSession: async (sessionId) => {
+    return httpClient.post(`/api/v1/auth/sessions/${sessionId}/revoke`)
+  },
+
+  revokeTenantSession: async (sessionId) => {
+    return httpClient.post(`/api/v1/auth/tenant-sessions/${sessionId}/revoke`)
+  },
+
+  revokeTenantUserSessions: async (userId) => {
+    return httpClient.post(`/api/v1/auth/tenant-sessions/users/${userId}/revoke`)
+  },
+
+  revokeOtherSessions: async () => {
+    return httpClient.post('/api/v1/auth/sessions/revoke-others')
+  },
 }
