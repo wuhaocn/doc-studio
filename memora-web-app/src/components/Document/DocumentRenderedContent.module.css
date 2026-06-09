@@ -20,6 +20,122 @@
   max-width: 100%;
 }
 
+.root :global([data-type="mini-app-example"]) {
+  display: none;
+}
+
+.miniAppPreview {
+  margin: 0 0 24px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(31, 111, 255, 0.14);
+  background: linear-gradient(180deg, rgba(239, 246, 255, 0.92), rgba(255, 255, 255, 0.98));
+}
+
+.miniAppHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.miniAppHeader span,
+.miniAppHeader strong,
+.miniAppHeader small {
+  display: block;
+}
+
+.miniAppHeader span,
+.miniAppHeader small {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.miniAppHeader strong {
+  margin-top: 4px;
+  color: #111827;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.miniAppForm {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.miniAppForm label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.miniAppForm label:last-child {
+  grid-column: 1 / -1;
+}
+
+.miniAppForm input,
+.miniAppForm select,
+.miniAppForm textarea {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #111827;
+  font: inherit;
+  font-size: 13px;
+}
+
+.miniAppForm textarea {
+  min-height: 76px;
+  resize: vertical;
+}
+
+.miniAppActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.miniAppActions button {
+  min-height: 36px;
+  padding: 0 14px;
+  border-radius: 10px;
+  background: #1f6fff;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.miniAppActions span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.miniAppResult {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.04);
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.miniAppResult strong {
+  color: #111827;
+}
+
 .root :global(h1) {
   margin: 0 0 20px;
   color: #111827;
@@ -232,5 +348,13 @@
   .root :global(img) {
     margin: 18px auto;
     border-radius: 14px;
+  }
+
+  .miniAppHeader {
+    flex-direction: column;
+  }
+
+  .miniAppForm {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

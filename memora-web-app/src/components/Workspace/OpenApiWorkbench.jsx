@@ -5,7 +5,8 @@ import { knowledgeBaseApi } from '../../services/api/knowledgeBaseApi'
 import { openDocumentApi } from '../../services/api/openDocumentApi'
 import { API_BASE_URL } from '../../services/http/axios'
 import { copyText } from '../../utils/copyText'
-import { getDocumentRenderState } from '../../utils/documentContent'
+import { DOCUMENT_FORMATS, getDocumentRenderState } from '../../utils/documentContent'
+import { buildDocumentQuickExample, getDocumentQuickExamplesByFormats } from '../../utils/documentExamples'
 import { buildFolderOptions } from '../../utils/knowledgeBaseTree'
 import {
   buildCaptureBookmarkletSnippet,
@@ -37,6 +38,10 @@ const CONSUME_VIEWS = [
 ]
 
 const EMPTY_INITIAL_VALUES = Object.freeze({})
+const OPEN_API_QUICK_EXAMPLES = getDocumentQuickExamplesByFormats([
+  DOCUMENT_FORMATS.MARKDOWN,
+  DOCUMENT_FORMATS.HTML,
+])
 
 const buildInitialForm = (knowledgeBases = [], initialValues = {}) => {
   const preferredKnowledgeBaseId = Number(initialValues.knowledgeBaseId || knowledgeBases[0]?.id || 0)
@@ -267,6 +272,20 @@ const OpenApiWorkbench = ({
     }))
   }
 
+  const handleApplyQuickExample = (example) => {
+    setForm((current) => {
+      const starter = buildDocumentQuickExample(example.format, current.title.trim() || example.title)
+      return {
+        ...current,
+        title: current.title.trim() || starter.title,
+        format: starter.format,
+        content: starter.content,
+      }
+    })
+    setErrorMessage('')
+    setFeedback(`${example.label} 示例已填充`)
+  }
+
   const openExternalLink = (path) => {
     const targetUrl = resolveAbsoluteWorkbenchUrl(path, webOrigin)
     if (!targetUrl) {
@@ -294,7 +313,6 @@ const OpenApiWorkbench = ({
       {
         id: 'curl',
         title: 'cURL 写入',
-        description: '用于外部脚本或流水线先做单文档联调。',
         snippet: buildOpenApiCurlSnippet({
           apiBaseUrl: API_BASE_URL,
           payload,
@@ -303,7 +321,6 @@ const OpenApiWorkbench = ({
       {
         id: 'fetch',
         title: 'fetch 写入',
-        description: '用于对话框插件、浏览器侧工具或 Node / Edge 轻脚本。',
         snippet: buildOpenApiFetchSnippet({
           apiBaseUrl: API_BASE_URL,
           payload,
@@ -312,7 +329,6 @@ const OpenApiWorkbench = ({
       {
         id: 'consume',
         title: '按来源读取',
-        description: '用来源标识稳定定位文档，再按视图读取。',
         snippet: buildOpenApiConsumeCurlSnippet({
           apiBaseUrl: API_BASE_URL,
           knowledgeBaseId: payload.knowledgeBaseId,
@@ -323,7 +339,6 @@ const OpenApiWorkbench = ({
       {
         id: 'bookmarklet',
         title: '浏览器书签脚本',
-        description: '从当前网页打开 Memora 捕获页，不直接跨站调用后端 API。',
         snippet: buildCaptureBookmarkletSnippet({
           webOrigin,
           knowledgeBaseId: payload.knowledgeBaseId,
@@ -333,7 +348,6 @@ const OpenApiWorkbench = ({
       {
         id: 'dialog-save',
         title: '对话框保存入口',
-        description: '把预生成的 Markdown / HTML 草稿打包进 capture/save，再由 Memora 页内完成保存或更新。',
         snippet: buildDialogCaptureSnippet({
           webOrigin,
           draft: {
@@ -351,7 +365,6 @@ const OpenApiWorkbench = ({
       {
         id: 'dialog-open',
         title: '按来源打开阅读页',
-        description: '先按来源标识解析文档，再打开当前登录态下的只读阅读页。',
         snippet: buildOpenReaderFetchSnippet({
           apiBaseUrl: API_BASE_URL,
           knowledgeBaseId: payload.knowledgeBaseId,
@@ -366,18 +379,11 @@ const OpenApiWorkbench = ({
     <section className={`${styles.panel} ${workspaceMode ? '' : styles.panelStandalone}`}>
       <div className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>{workspaceMode ? '接入调试' : '保存到 Memora'}</p>
-          <h2 className={styles.title}>{workspaceMode ? '先跑通一次保存和读取' : '把当前内容保存进知识库'}</h2>
-          <p className={styles.description}>
-            {workspaceMode
-              ? '先拿一篇文档验证保存、回读和打开阅读页，确认无误后再接浏览器、脚本或对话框。'
-              : '这个入口会把当前页面或外部草稿带进 Memora。粘贴一把可写密钥后，就能直接保存到指定知识库。'}
-          </p>
+          <h2 className={styles.title}>{workspaceMode ? '保存与回读' : '保存到知识库'}</h2>
         </div>
         <div className={styles.headerPills}>
           <span className={styles.metaPill}>{workspaceMode ? '单篇验证' : '当前草稿'}</span>
-          <span className={styles.metaPill}>{workspaceMode ? '按标识回读' : '指定知识库'}</span>
-          <span className={styles.metaPill}>{workspaceMode ? '打开阅读页' : 'Markdown / HTML'}</span>
+          <span className={styles.metaPill}>Markdown / H5</span>
         </div>
       </div>
 
@@ -385,7 +391,6 @@ const OpenApiWorkbench = ({
         <div className={styles.editorCard}>
           <div className={styles.cardHeader}>
             <strong>保存参数</strong>
-            <span>当前页内临时使用</span>
           </div>
 
           <div className={styles.formGrid}>
@@ -459,7 +464,7 @@ const OpenApiWorkbench = ({
                 onChange={(event) => setForm((current) => ({ ...current, format: event.target.value }))}
               >
                 <option value="MARKDOWN">MARKDOWN</option>
-                <option value="HTML">HTML</option>
+                <option value="HTML">H5 / HTML</option>
               </select>
             </label>
           </div>
@@ -508,6 +513,26 @@ const OpenApiWorkbench = ({
             </span>
           </div>
 
+          <div className={styles.quickExamples}>
+            <div>
+              <strong>快速创建示例</strong>
+              <span>用于外部 AI 或脚本快速写入 Markdown / H5 文档。</span>
+            </div>
+            <div className={styles.quickExampleActions}>
+              {OPEN_API_QUICK_EXAMPLES.map((example) => (
+                <button
+                  key={example.id}
+                  type="button"
+                  className={styles.quickExampleButton}
+                  onClick={() => handleApplyQuickExample(example)}
+                >
+                  <strong>{example.label}</strong>
+                  <span>{example.difference}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           <label className={styles.field}>
             <span>正文</span>
             <textarea
@@ -553,7 +578,7 @@ const OpenApiWorkbench = ({
           </div>
 
           <div className={styles.subtleText}>
-            访问密钥只保存在当前页面内存中。这里先完成保存和读取验证，正式公开仍通过发布或公开站点完成。
+            密钥仅用于本次调试。
           </div>
         </div>
 
@@ -657,7 +682,6 @@ const OpenApiWorkbench = ({
               <div className={styles.cardHeader}>
                 <div>
                   <strong>{item.title}</strong>
-                  <p className={styles.cardDescription}>{item.description}</p>
                 </div>
                 <button
                   type="button"

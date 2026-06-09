@@ -11,6 +11,8 @@
 
 .modal {
   width: min(640px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
   border-radius: var(--workspace-card-radius);
   border: 1px solid rgba(31, 35, 41, 0.08);
   background: #ffffff;
@@ -72,6 +74,103 @@
   color: #646a73;
   font-size: var(--type-body-sm);
   line-height: 1.7;
+}
+
+.quickExamples {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: var(--workspace-card-radius);
+  border: 1px solid rgba(31, 35, 41, 0.08);
+  background: #f8fafc;
+}
+
+.quickExampleHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.quickExampleHeader strong,
+.quickExampleHeader span {
+  display: block;
+}
+
+.quickExampleHeader strong {
+  color: #1f2329;
+  font-size: var(--type-body-sm);
+}
+
+.quickExampleHeader span {
+  margin-top: 4px;
+  color: #646a73;
+  font-size: var(--type-eyebrow-subtle);
+  line-height: 1.6;
+}
+
+.quickExampleList {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.quickExampleButton {
+  min-height: 104px;
+  padding: 10px;
+  border-radius: var(--button-radius-lg);
+  border: 1px solid rgba(31, 35, 41, 0.08);
+  background: #ffffff;
+  text-align: left;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+
+.quickExampleButton:hover {
+  border-color: rgba(36, 91, 219, 0.28);
+  background: #fbfdff;
+}
+
+.quickExampleButton:active {
+  transform: translateY(1px);
+}
+
+.quickExampleButton span,
+.quickExampleButton strong,
+.quickExampleButton em,
+.quickExampleButton small {
+  display: block;
+}
+
+.quickExampleButton span {
+  color: #245bdb;
+  font-size: var(--type-eyebrow-subtle);
+  font-weight: 700;
+}
+
+.quickExampleButton strong {
+  margin-top: 8px;
+  color: #1f2329;
+  font-size: var(--type-body-sm);
+  line-height: 1.35;
+}
+
+.quickExampleButton em {
+  margin-top: 8px;
+  color: #4f5662;
+  font-size: var(--type-body-sm);
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.quickExampleButton small {
+  margin-top: 10px;
+  color: #646a73;
+  font-size: var(--type-eyebrow-subtle);
+}
+
+.quickExampleButtonActive {
+  border-color: rgba(36, 91, 219, 0.42);
+  background: rgba(36, 91, 219, 0.07);
 }
 
 .advancedToggle {
@@ -184,4 +283,19 @@
 .primaryButton:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+@media (max-width: 720px) {
+  .overlay {
+    padding: 14px;
+  }
+
+  .header,
+  .footer {
+    flex-direction: column;
+  }
+
+  .quickExampleList {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

@@ -10,6 +10,7 @@ import com.memora.manager.vo.IssuedApiKeyVO;
 import com.memora.manager.vo.ServiceAccountVO;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -51,6 +52,12 @@ public class ServiceAccountController {
     @PostMapping("/api/v1/service-accounts/{serviceAccountId}/enable")
     public Result<Void> enableServiceAccount(@PathVariable Long serviceAccountId) {
         serviceAccountService.enableServiceAccount(serviceAccountId);
+        return Result.success();
+    }
+
+    @DeleteMapping("/api/v1/service-accounts/{serviceAccountId}")
+    public Result<Void> deleteServiceAccount(@PathVariable Long serviceAccountId) {
+        serviceAccountService.deleteServiceAccount(serviceAccountId);
         return Result.success();
     }
 

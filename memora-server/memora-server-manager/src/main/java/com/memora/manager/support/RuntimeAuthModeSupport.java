@@ -13,11 +13,8 @@ public class RuntimeAuthModeSupport {
     @Value("${spring.datasource.url:}")
     private String datasourceUrl;
 
-    @Value("${memora.auth.allow-demo-token:false}")
-    private Boolean allowDemoToken;
-
     public boolean isSeedAccountLoginEnabled() {
-        return Boolean.TRUE.equals(allowDemoToken) || isLocalAdminBootstrapActive();
+        return isLocalAdminBootstrapActive();
     }
 
     public boolean isLocalAdminBootstrapActive() {

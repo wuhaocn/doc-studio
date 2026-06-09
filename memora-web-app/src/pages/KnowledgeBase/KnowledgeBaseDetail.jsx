@@ -166,8 +166,8 @@ const KnowledgeBaseDetail = () => {
   const currentRoleLabel = ROLE_LABELS[knowledgeBase?.currentRole] || knowledgeBase?.currentRole || '未知角色'
   const folderCount = documents.filter((item) => item.docType === 'FOLDER').length
   const documentCount = documents.filter((item) => item.docType === 'DOC').length
-  const knowledgeBaseSiteUrl = knowledgeBase.siteUrl
-    || (knowledgeBase.siteEnabled && knowledgeBase.siteSlug ? `/site/${knowledgeBase.siteSlug}` : '')
+  const knowledgeBaseSiteUrl = knowledgeBase?.siteUrl
+    || (knowledgeBase?.siteEnabled && knowledgeBase?.siteSlug ? `/site/${knowledgeBase.siteSlug}` : '')
   const selectedContextLabel = selectedDocument
     ? selectedDocument.docType === 'DOC' ? '当前文档' : '当前目录'
     : '知识库视图'

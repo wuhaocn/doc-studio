@@ -12,10 +12,6 @@ public final class DocumentContentSupport {
     private static final Pattern LINE_BREAK_TAG_PATTERN = Pattern.compile("(?i)<br\\s*/?>");
     private static final Pattern BLOCK_TAG_PATTERN = Pattern.compile("(?i)</?(p|div|section|article|header|footer|aside|nav|blockquote|ul|ol|li|h[1-6]|pre|table|thead|tbody|tfoot|tr|td|th|hr)\\b[^>]*>");
     private static final Pattern HTML_TAG_PATTERN = Pattern.compile("(?is)<[^>]+>");
-    private static final Pattern LEGACY_HTML_DOCUMENT_PATTERN = Pattern.compile("(?is)<\\s*(!doctype|html|body|head|article|section|table|thead|tbody|tfoot|tr|td|th|figure|figcaption)\\b");
-    private static final Pattern LEGACY_MARKDOWN_PATTERN = Pattern.compile(
-        "(?m)(^#{1,6}\\s+\\S+|^>+\\s+\\S+|^\\s*([-*+]\\s+|\\d+\\.\\s+)\\S+|^```.*$|!\\[[^\\]]*]\\([^)]*\\)|\\[[^\\]]+]\\([^)]*\\)|\\*\\*[^*]+\\*\\*|__[^_]+__|`[^`]+`)"
-    );
     private static final Pattern MARKDOWN_IMAGE_PATTERN = Pattern.compile("!\\[([^\\]]*)]\\([^)]*\\)");
     private static final Pattern MARKDOWN_LINK_PATTERN = Pattern.compile("\\[([^\\]]+)]\\(([^)]*)\\)");
     private static final Pattern MARKDOWN_HEADING_PATTERN = Pattern.compile("(?m)^#{1,6}\\s+");
@@ -85,15 +81,13 @@ public final class DocumentContentSupport {
     }
 
     public static String resolveStoredFormat(String rawFormat, String rawContent) {
-        if (StringUtils.hasText(rawFormat)) {
-            String normalized = rawFormat.trim().toUpperCase(Locale.ROOT);
-            for (DocumentFormat value : DocumentFormat.values()) {
-                if (value.name().equals(normalized)) {
-                    return normalized;
-                }
+        String normalized = StringUtils.hasText(rawFormat) ? rawFormat.trim().toUpperCase(Locale.ROOT) : DocumentFormat.DEFAULT.name();
+        for (DocumentFormat value : DocumentFormat.values()) {
+            if (value.name().equals(normalized)) {
+                return normalized;
             }
         }
-        return inferLegacyFormat(rawContent).name();
+        return DocumentFormat.DEFAULT.name();
     }
 
     public static NormalizedStoredDocument normalizeStoredDocument(
@@ -142,7 +136,7 @@ public final class DocumentContentSupport {
         if (!StringUtils.hasText(rawContent)) {
             return null;
         }
-        String normalizedRawContent = normalizeEscapedLineBreaks(rawContent);
+        String normalizedRawContent = rawContent.replace("\r\n", "\n").replace('\r', '\n');
         return switch (format) {
             case MARKDOWN -> extractMarkdownPlainText(normalizedRawContent);
             case HTML, RICH_TEXT -> extractHtmlPlainText(normalizedRawContent);
@@ -217,34 +211,6 @@ public final class DocumentContentSupport {
             .replace('\n', ' ')
             .replace('\t', ' ');
         return MULTI_WHITESPACE_PATTERN.matcher(normalized).replaceAll(" ").trim();
-    }
-
-    private static String normalizeEscapedLineBreaks(String rawText) {
-        if (!StringUtils.hasText(rawText)) {
-            return rawText;
-        }
-        String normalized = rawText.replace("\r\n", "\n").replace('\r', '\n');
-        if (!normalized.contains("\n") && (normalized.contains("\\n") || normalized.contains("\\r\\n"))) {
-            normalized = normalized
-                .replace("\\r\\n", "\n")
-                .replace("\\n", "\n")
-                .replace("\\r", "\n")
-                .replace("\\t", "\t");
-        }
-        return normalized;
-    }
-
-    private static DocumentFormat inferLegacyFormat(String rawContent) {
-        if (!StringUtils.hasText(rawContent)) {
-            return DocumentFormat.DEFAULT;
-        }
-        if (LEGACY_HTML_DOCUMENT_PATTERN.matcher(rawContent).find()) {
-            return DocumentFormat.HTML;
-        }
-        if (LEGACY_MARKDOWN_PATTERN.matcher(rawContent).find() && !HTML_TAG_PATTERN.matcher(rawContent).find()) {
-            return DocumentFormat.MARKDOWN;
-        }
-        return DocumentFormat.DEFAULT;
     }
 
     public record NormalizedDocumentContent(

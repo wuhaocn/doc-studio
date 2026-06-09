@@ -43,7 +43,6 @@ public final class AuditLogConstants {
     public static final String ACTION_ROLLBACK_DOCUMENT = "ROLLBACK_DOCUMENT";
     public static final String ACTION_PUBLISH_DOCUMENT = "PUBLISH_DOCUMENT";
     public static final String ACTION_UNPUBLISH_DOCUMENT = "UNPUBLISH_DOCUMENT";
-    public static final String ACTION_NORMALIZE_DOCUMENT_CONTENT = "NORMALIZE_DOCUMENT_CONTENT";
     public static final String ACTION_EXPORT_AUDIT_LOG = "EXPORT_AUDIT_LOG";
     public static final String ACTION_APPLY_AUDIT_RETENTION = "APPLY_AUDIT_RETENTION";
     public static final String ACTION_CREATE_DOCUMENT_SHARE = "CREATE_DOCUMENT_SHARE";
@@ -52,6 +51,7 @@ public final class AuditLogConstants {
     public static final String ACTION_CREATE_SERVICE_ACCOUNT = "CREATE_SERVICE_ACCOUNT";
     public static final String ACTION_ENABLE_SERVICE_ACCOUNT = "ENABLE_SERVICE_ACCOUNT";
     public static final String ACTION_DISABLE_SERVICE_ACCOUNT = "DISABLE_SERVICE_ACCOUNT";
+    public static final String ACTION_DELETE_SERVICE_ACCOUNT = "DELETE_SERVICE_ACCOUNT";
     public static final String ACTION_CREATE_API_KEY = "CREATE_API_KEY";
     public static final String ACTION_REVEAL_API_KEY = "REVEAL_API_KEY";
     public static final String ACTION_UPDATE_API_KEY_SCOPE = "UPDATE_API_KEY_SCOPE";
@@ -72,7 +72,6 @@ public final class AuditLogConstants {
     public static final String ACTION_OPEN_API_DELETE_DOCUMENT = "OPEN_API_DELETE_DOCUMENT";
     public static final String ACTION_OPEN_API_RESTORE_DOCUMENT = "OPEN_API_RESTORE_DOCUMENT";
     public static final String ACTION_OPEN_API_ROLLBACK_DOCUMENT = "OPEN_API_ROLLBACK_DOCUMENT";
-
     public static final String RESULT_SUCCESS = "SUCCESS";
     public static final String RESULT_FAILURE = "FAILURE";
 

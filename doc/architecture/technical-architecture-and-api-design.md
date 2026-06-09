@@ -147,6 +147,12 @@ Spring Boot Monolith
 - [DocumentController.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/controller/DocumentController.java)
 - [DocumentService.java](../../memora-server/memora-server-manager/src/main/java/com/memora/manager/service/DocumentService.java)
 
+路径规则：
+
+- 文档路径唯一性以数据库约束 `knowledgeBaseId + path` 为准，回收站文档仍占用原路径，避免恢复时再次冲突。
+- 人工创建、移动或改标识时，服务端必须先按父级目录和 slug 解析唯一 `path`，冲突时自动追加 `-2 / -3` 后缀。
+- Open API 创建和 `upsert` 采用同一规则，外部 AI 或脚本提交同名 HTML / Markdown / H5 文档时不应直接暴露唯一键异常。
+
 ### 5.5 Version
 
 职责：
@@ -401,8 +407,6 @@ Spring Boot Monolith
 
 这些能力不属于当前 Web 主链路基线，也不再作为后端内部保留骨架继续维护。
 
----
-
 ## 7. 接口分层
 
 ### 7.1 控制器层
@@ -476,7 +480,6 @@ Spring Boot Monolith
 - 不可信 HTML 不能直接按生产能力渲染
 - Markdown 渲染、HTML 白名单净化、富文本输出必须走统一展示链路
 - 阅读页、知识库预览、公开分享页、开放 API 不能各自定义一套格式语义
-- `HTML 文档` 与 `HTML 应用` 必须分开建模；当前基线只支持前者
 
 ### 8.6 发布与公开消费约束
 
@@ -484,7 +487,7 @@ Spring Boot Monolith
 - 正式发布必须使用稳定 slug，不得依赖一次性 token
 - 公开站点不得绕过知识库边界直接发布未授权内容
 - 公开消费应优先依赖服务端统一 `renderedHtml`，而不是每个前端各自渲染
-- 当前基线只支持 `HTML 文档` 发布，不支持脚本执行、iframe 宿主或应用运行时
+- 当前基线支持 `HTML 文档` 安全发布，不支持脚本执行、iframe 宿主或源码级应用运行时
 
 ---
 
@@ -505,22 +508,28 @@ Spring Boot Monolith
 - `content` 表示格式对应的源内容，不再默认解释为“任意 HTML 缓存”
 - `contentText`、`summary` 由服务端统一派生，调用方不再主导正文搜索语义
 - 版本快照会保留 `format / content / contentText`，回滚后重新校正摘要
-- 对历史数据读取已增加 `docType / format / contentText / summary` 兜底归一化，并兼容正文中误存为字面量 `\n / \r\n` 的 Markdown / HTML，避免旧数据直接破坏阅读、分享和搜索体验
+- 新写入与读取链路只认显式 `docType / format / content / contentText / summary` 语义；不再通过正文猜测历史格式或修正字面量换行
 
 ### 9.2 Web 创建与编辑链路
 
 相关文件：
 
 - `memora-web-app/src/components/Document/DocumentRichEditor.jsx`
+- `memora-web-app/src/components/Document/DocumentActionModal.jsx`
 - `memora-web-app/src/pages/Document/DocumentEditorPage.jsx`
 - `memora-web-app/src/hooks/useKnowledgeBaseDetailController.js`
+- `memora-web-app/src/utils/documentExamples.js`
+- `memora-web-app/src/components/Workspace/OpenApiWorkbench.jsx`
 
 当前实现：
 
 - 富文本编辑器显式写入 `RICH_TEXT`
 - `MARKDOWN`、`HTML` 使用独立源码编辑器与实时预览
 - 新建文档入口已显式选择格式，不再默认把所有新文档写成 `MARKDOWN`
-- 保存接口会明确携带 `format`，避免继续累积“名义 Markdown、实际 HTML”的历史数据
+- 新建文档弹窗复用 `documentExamples.js` 提供富文本帖子、Markdown 操作规范、H5 点击小程序三类差异化快速示例；示例只生成首版标题、摘要和源内容，不新增模板或标签模型
+- 开放接入调试台复用同一示例事实源填充 Markdown / H5 写入 payload，便于外部 AI 或脚本快速创建可预览文档
+- H5 示例按 HTML 源码保存声明式事件规范，由 `DocumentRenderedContent` 渲染安全点击演示；正文仍不保存或执行任意 `script / onclick`
+- 保存接口会明确携带 `format`，避免出现“名义格式与实际内容不一致”的新数据
 
 ### 9.3 Web 渲染链路
 
@@ -535,7 +544,7 @@ Spring Boot Monolith
 
 - `documentContent.js` 已按 `format` 提供统一渲染与净化能力
 - 知识库预览、阅读页、公开分享页共用一条格式渲染链路
-- Markdown 已升级为正式渲染能力，不再依赖“正文猜测式兼容”
+- Markdown 已升级为正式渲染能力，不依赖正文猜测
 - HTML 文档继续走安全白名单，不引入脚本执行
 
 ### 9.4 开放 API 与机器接入
@@ -550,7 +559,9 @@ Spring Boot Monolith
 当前实现：
 
 - Open API 已对输入 `format` 做显式校验
-- 机器主体支持整体启停、同主体多 key 和逐知识库 `READ / WRITE` 作用域
+- 机器主体支持整体启停、删除、同主体多 key 和逐知识库 `READ / WRITE` 作用域
+- 停用主体期间不签发新 key，恢复后才允许继续新增密钥
+- 删除机器主体会级联移除其密钥与作用域，旧 key 立即无效，审计记录继续保留
 - 当前 `API key` 只绑定到机器主体，不和用户登录态或个人凭证混用
 - 外部 AI 或脚本可直接创建 / 更新 / 搜索 / 删除 / 恢复 / 回滚 Markdown 与 HTML 文档
 - Open API 已提供单条 `upsert` 与 `batch-upsert`，并以 `knowledgeBaseId + sourceExternalId` 作为持续同步锚点
@@ -558,7 +569,7 @@ Spring Boot Monolith
 - Open API 已补按 `sourceExternalId` 定位文档和按 `metadata / rendered / source / plain / summary` 协商消费视图，外部工具不必自行推断应读取哪个字段
 - `contentText` 不再作为外部权威输入，而是服务端从源内容统一派生
 - 主链路与 Open API 的创建 / 更新 DTO 已移除 `contentText` 这类无效兼容字段
-- 当前仍只暴露文档源内容与元数据，不提供可执行 HTML 应用运行时
+- 当前 Open API 仍只暴露文档源内容与元数据，不提供可执行 HTML 应用运行时
 
 ### 9.5 搜索、版本与测试护栏
 
@@ -574,13 +585,13 @@ Spring Boot Monolith
 - 版本 diff 和搜索继续依赖统一派生的 `contentText`
 - 自动化测试已把 Markdown / HTML 的创建、读取、分享与 Open API 一致性纳入正式基线
 - schema 默认值与 seed 数据已同步到新的格式语义
-- 已补 `POST /api/v1/documents/maintenance/normalize-content` 维护接口，支持管理员先 `dryRun` 再批量修正历史数据
+- 新项目不保留文档内容维护归一化接口；如需一次性导入或修正，应通过独立迁移脚本和专项验收处理
 - 搜索页已支持知识库范围过滤、命中高亮和结果相关度排序
 - 后端统一搜索与 Open API 搜索已补多关键词相关度排序，不再单纯按更新时间截断结果
 
 后续治理：
 
-- 如需做历史数据修正，应同时补 schema 迁移说明和回填策略
+- 如需做数据修正，应同时补 schema 迁移说明、回填脚本和专项验收
 - 可以继续增强版本 diff 的格式感知与历史渲染稳定性
 - 后续仍应引入索引化或专门搜索引擎，以支撑更大规模知识库
 

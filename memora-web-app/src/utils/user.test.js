@@ -1,12 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  AUTH_SESSION_BROADCAST_STORAGE_KEY,
   applyAuthSessionBroadcastPayload,
   clearCurrentUser,
   getCurrentUser,
   hydrateCurrentUser,
-  parseAuthSessionBroadcastStorageEvent,
+  parseAuthSessionBroadcastMessage,
 } from './user.js'
 
 const createStorage = () => {
@@ -26,8 +25,8 @@ const createStorage = () => {
 
 const installWindowMock = () => {
   const sessionStorage = createStorage()
-  const localStorage = createStorage()
   const dispatchedEvents = []
+  const broadcastMessages = []
 
   globalThis.CustomEvent = class CustomEvent {
     constructor(type, init = {}) {
@@ -38,18 +37,30 @@ const installWindowMock = () => {
 
   globalThis.window = {
     sessionStorage,
-    localStorage,
     dispatchEvent(event) {
       dispatchedEvents.push(event)
       return true
     },
   }
+  globalThis.BroadcastChannel = class BroadcastChannel {
+    constructor(name) {
+      this.name = name
+    }
+
+    postMessage(message) {
+      broadcastMessages.push({ channel: this.name, message })
+    }
+
+    close() {}
+  }
 
   return {
+    broadcastMessages,
     dispatchedEvents,
     restore() {
       delete globalThis.window
       delete globalThis.CustomEvent
+      delete globalThis.BroadcastChannel
     },
   }
 }
@@ -75,6 +86,7 @@ test('hydrateCurrentUser persists normalized session snapshot', () => {
     assert.equal(currentUser.tenantId, 9)
     assert.equal(getCurrentUser().tenantSlug, 'north-delivery')
     assert.equal(mock.dispatchedEvents.at(-1)?.type, 'memora:auth-session-changed')
+    assert.equal(mock.broadcastMessages.at(-1)?.message.action, 'SYNC')
   } finally {
     mock.restore()
   }
@@ -84,20 +96,17 @@ test('applyAuthSessionBroadcastPayload syncs another tab session locally', () =>
   const mock = installWindowMock()
 
   try {
-    const payload = parseAuthSessionBroadcastStorageEvent({
-      key: AUTH_SESSION_BROADCAST_STORAGE_KEY,
-      newValue: JSON.stringify({
-        action: 'SYNC',
-        user: {
-          id: 3,
-          tenantId: 5,
-          username: 'editor',
-          nickname: '区域编辑',
-          email: 'editor@memora.local',
-          role: 'EDITOR',
-          tenantName: '区域知识中心',
-        },
-      }),
+    const payload = parseAuthSessionBroadcastMessage({
+      action: 'SYNC',
+      user: {
+        id: 3,
+        tenantId: 5,
+        username: 'editor',
+        nickname: '区域编辑',
+        email: 'editor@memora.local',
+        role: 'EDITOR',
+        tenantName: '区域知识中心',
+      },
     })
 
     const currentUser = applyAuthSessionBroadcastPayload(payload)
@@ -129,10 +138,7 @@ test('applyAuthSessionBroadcastPayload clears local session on remote logout', (
       role: 'VIEWER',
     })
 
-    const payload = parseAuthSessionBroadcastStorageEvent({
-      key: AUTH_SESSION_BROADCAST_STORAGE_KEY,
-      newValue: JSON.stringify({ action: 'CLEAR' }),
-    })
+    const payload = parseAuthSessionBroadcastMessage({ action: 'CLEAR' })
 
     const currentUser = applyAuthSessionBroadcastPayload(payload)
     assert.equal(currentUser, null)

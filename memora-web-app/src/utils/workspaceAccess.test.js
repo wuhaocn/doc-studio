@@ -34,12 +34,12 @@ test('resolveManagedApiKeyDisplay falls back to unavailable hint when secret cop
   })
 })
 
-test('resolveManagedApiKeyDisplay marks legacy keys as regenerate only', () => {
+test('resolveManagedApiKeyDisplay marks undisplayable keys as rotate required', () => {
   assert.deepEqual(resolveManagedApiKeyDisplay({
     secretRevealAvailable: false,
   }), {
     plainTextKey: '',
-    state: 'legacy',
-    hint: '这把密钥创建较早，暂不支持再次显示，可直接重新生成。',
+    state: 'rotate_required',
+    hint: '当前密钥不可再次显示，可直接重新生成。',
   })
 })

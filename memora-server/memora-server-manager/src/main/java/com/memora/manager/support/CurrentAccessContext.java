@@ -6,7 +6,6 @@ import com.memora.manager.entity.UserSession;
 import com.memora.manager.mapper.UserSessionMapper;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestAttributes;
@@ -21,15 +20,11 @@ public class CurrentAccessContext {
     private static final String AUTHORIZATION_HEADER = "Authorization";
     private static final String BEARER_PREFIX = "Bearer ";
     private static final String ACCESS_TOKEN_PAYLOAD_ATTR = CurrentAccessContext.class.getName() + ".payload";
-    private static final String DEMO_TOKEN_PREFIX = "demo:";
     private static final String SESSION_TOKEN_PREFIX = "session:";
 
     private final UserSessionMapper userSessionMapper;
     private final OpaqueTokenCodec opaqueTokenCodec;
     private final BrowserSessionSupport browserSessionSupport;
-
-    @Value("${memora.auth.allow-demo-token:false}")
-    private boolean allowDemoToken;
 
     public Long getCurrentTenantId() {
         return requireAccessTokenPayload().tenantId();
@@ -93,8 +88,6 @@ public class CurrentAccessContext {
         AccessTokenPayload resolvedPayload;
         if (token.startsWith(SESSION_TOKEN_PREFIX)) {
             resolvedPayload = resolveSessionAccessToken(token);
-        } else if (allowDemoToken && token.startsWith(DEMO_TOKEN_PREFIX)) {
-            resolvedPayload = resolveDemoAccessToken(token);
         } else {
             resolvedPayload = null;
         }
@@ -117,13 +110,6 @@ public class CurrentAccessContext {
         String hashedToken = opaqueTokenCodec.hash(token);
         UserSession session = findActiveSessionByStoredToken(hashedToken);
         if (session == null) {
-            session = findActiveSessionByStoredToken(token);
-            if (session != null) {
-                session.setAccessToken(hashedToken);
-                userSessionMapper.updateById(session);
-            }
-        }
-        if (session == null) {
             return null;
         }
         return new AccessTokenPayload(session.getTenantId(), session.getUserId(), session.getId(), token, true);
@@ -136,19 +122,6 @@ public class CurrentAccessContext {
             .gt(UserSession::getExpiresAt, LocalDateTime.now())
             .last("LIMIT 1");
         return userSessionMapper.selectOne(queryWrapper);
-    }
-
-    private AccessTokenPayload resolveDemoAccessToken(String token) {
-        String[] parts = token.substring(DEMO_TOKEN_PREFIX.length()).split(":");
-        if (parts.length != 2) {
-            return null;
-        }
-
-        try {
-            return new AccessTokenPayload(Long.parseLong(parts[0]), Long.parseLong(parts[1]), null, token, false);
-        } catch (NumberFormatException ex) {
-            return null;
-        }
     }
 
     private record AccessTokenPayload(Long tenantId, Long userId, Long sessionId, String accessToken, boolean sessionToken) {

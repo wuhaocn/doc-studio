@@ -82,7 +82,12 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
         document.setContent(normalizedContent.content());
         document.setContentText(normalizedContent.contentText());
         applyRenderedArtifact(document, normalizedContent);
-        document.setSlug(resolveDocumentSlug(normalizedTitle, dto.getSlug()));
+        document.setSlug(resolveUniqueDocumentSlug(
+            knowledgeBase.getId(),
+            null,
+            parent,
+            resolveDocumentSlug(normalizedTitle, dto.getSlug())
+        ));
         document.setParentId(parent == null ? 0L : parent.getId());
         document.setPath(buildPath(parent, document.getSlug()));
         document.setDepth(parent == null ? 0 : parent.getDepth() + 1);
@@ -187,6 +192,7 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
             document.setSortOrder(resolveNextSortOrder(document.getKnowledgeBaseId(), nextParentId, document.getId()));
         }
 
+        document.setSlug(resolveUniqueDocumentSlug(document.getKnowledgeBaseId(), document.getId(), parent, document.getSlug()));
         document.setPath(buildPath(parent, document.getSlug()));
         document.setDepth(parent == null ? 0 : parent.getDepth() + 1);
 
@@ -921,6 +927,27 @@ public class DocumentService extends ServiceImpl<DocumentMapper, Document> {
 
     private String resolveDocumentSlug(String title, String slug) {
         return StringUtils.hasText(slug) ? SlugUtils.toSlug(slug) : SlugUtils.toSlug(title);
+    }
+
+    private String resolveUniqueDocumentSlug(Long knowledgeBaseId, Long documentId, Document parent, String baseSlug) {
+        String normalizedBaseSlug = StringUtils.hasText(baseSlug) ? baseSlug : SlugUtils.toSlug(null);
+        String candidateSlug = normalizedBaseSlug;
+        int suffix = 2;
+        while (documentPathExists(knowledgeBaseId, documentId, buildPath(parent, candidateSlug))) {
+            candidateSlug = normalizedBaseSlug + "-" + suffix++;
+        }
+        return candidateSlug;
+    }
+
+    private boolean documentPathExists(Long knowledgeBaseId, Long documentId, String path) {
+        LambdaQueryWrapper<Document> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Document::getKnowledgeBaseId, knowledgeBaseId)
+            .eq(Document::getPath, path);
+        if (documentId != null) {
+            queryWrapper.ne(Document::getId, documentId);
+        }
+        queryWrapper.last("LIMIT 1");
+        return documentMapper.selectOne(queryWrapper) != null;
     }
 
     private String resolvePublicSlug(Long knowledgeBaseId, Long documentId, String requestedSlug, String title) {

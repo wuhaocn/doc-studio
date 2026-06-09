@@ -146,8 +146,14 @@ Web 端请求默认开启 `withCredentials`；当会话过期且本地仍有当�
 
 - `GET /api/v1/service-accounts`
 - `POST /api/v1/service-accounts`
+- `POST /api/v1/service-accounts/{serviceAccountId}/api-keys`
+- `POST /api/v1/service-accounts/{serviceAccountId}/disable`
+- `POST /api/v1/service-accounts/{serviceAccountId}/enable`
+- `DELETE /api/v1/service-accounts/{serviceAccountId}`
 - `POST /api/v1/api-keys/{apiKeyId}/disable`
+- `POST /api/v1/api-keys/{apiKeyId}/reveal`
 - `POST /api/v1/api-keys/{apiKeyId}/revoke`
+- `PUT /api/v1/api-keys/{apiKeyId}/scope`
 - `POST /api/v1/api-keys/{apiKeyId}/rotate`
 
 ---
@@ -168,7 +174,7 @@ Web 端请求默认开启 `withCredentials`；当会话过期且本地仍有当�
 
 ## 当前说明
 
-1. Web 主链路已不再依赖 `demo:{tenantId}:{userId}` 占位 token。
+1. Web 主链路只使用真实登录会话，后端不再提供占位 bearer token。
 2. Web 端真实会话默认通过 `HttpOnly Cookie` 维持，前端不再持有可读 bearer token。
 3. 邀请链路已支持生成、查看、列出和撤销，但原始邀请链接只在创建时展示一次。
 4. 工作台首页已展示最近审计记录、汇总、活跃/归档导出和手动归档入口，知识库上下文面板继续展示最近记录。

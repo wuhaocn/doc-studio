@@ -54,7 +54,7 @@ public final class DocumentRenderSupport {
         if (DocumentContentSupport.isFolder(docType)) {
             return new RenderedDocument(null, null);
         }
-        String normalizedContent = normalizeEscapedLineBreaks(content);
+        String normalizedContent = normalizeLineBreaks(content);
         if (normalizedContent == null || normalizedContent.isBlank()) {
             return new RenderedDocument(null, null);
         }
@@ -276,7 +276,7 @@ public final class DocumentRenderSupport {
     }
 
     private static String sanitizeHtml(String rawHtml) {
-        String normalizedHtml = normalizeEscapedLineBreaks(rawHtml);
+        String normalizedHtml = normalizeLineBreaks(rawHtml);
         if (normalizedHtml == null || normalizedHtml.isBlank()) {
             return "";
         }
@@ -429,19 +429,11 @@ public final class DocumentRenderSupport {
         return pattern.matcher(value).replaceAll(replacement);
     }
 
-    private static String normalizeEscapedLineBreaks(String rawText) {
+    private static String normalizeLineBreaks(String rawText) {
         if (rawText == null || rawText.isBlank()) {
             return rawText;
         }
-        String normalized = rawText.replace("\r\n", "\n").replace('\r', '\n');
-        if (!normalized.contains("\n") && (normalized.contains("\\n") || normalized.contains("\\r\\n"))) {
-            normalized = normalized
-                .replace("\\r\\n", "\n")
-                .replace("\\n", "\n")
-                .replace("\\r", "\n")
-                .replace("\\t", "\t");
-        }
-        return normalized;
+        return rawText.replace("\r\n", "\n").replace('\r', '\n');
     }
 
     private static boolean isSafeUrl(String url, boolean allowDataImage) {

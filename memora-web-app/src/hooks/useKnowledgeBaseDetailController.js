@@ -5,6 +5,8 @@ import { documentApi } from '../services/api/documentApi'
 import { knowledgeBaseApi } from '../services/api/knowledgeBaseApi'
 import { workspaceApi } from '../services/api/workspaceApi'
 import { DOCUMENT_FORMATS, getDocumentRenderState } from '../utils/documentContent'
+import { buildDocumentStarterContent } from '../utils/documentExamples'
+import { normalizeDocumentId } from '../utils/documentId'
 import { emitKnowledgeBasesChanged } from '../utils/knowledgeBaseEvents'
 import { rememberKnowledgeBase } from '../utils/knowledgeBaseRoute'
 import {
@@ -21,24 +23,6 @@ import {
   resolveDefaultParentId,
   validateBatchDeleteSelection,
 } from '../utils/knowledgeBaseTree'
-
-const escapeHtml = (value) =>
-  value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#39;')
-
-const buildInitialDocumentContent = (title, format) => {
-  if (format === DOCUMENT_FORMATS.MARKDOWN) {
-    return `# ${title}\n\n`
-  }
-  if (format === DOCUMENT_FORMATS.HTML) {
-    return `<article>\n  <h1>${escapeHtml(title)}</h1>\n  <p></p>\n</article>`
-  }
-  return `<h1>${escapeHtml(title)}</h1><p></p>`
-}
 
 export const PAGE_STATUS = {
   LOADING: 'loading',
@@ -109,10 +93,11 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       }
 
       const knowledgeBaseResponse = await knowledgeBaseApi.getKnowledgeBaseById(id)
-
-      if (knowledgeBaseResponse.code === 200) {
-        setKnowledgeBase(knowledgeBaseResponse.data)
+      const nextKnowledgeBase = knowledgeBaseResponse?.data
+      if (!nextKnowledgeBase?.id) {
+        throw { code: 404, message: '当前知识库不存在或已删除' }
       }
+      setKnowledgeBase(nextKnowledgeBase)
 
       const [documentTreeResult] = await Promise.allSettled([
         documentApi.getDocumentTreeByKnowledgeBaseId(id),
@@ -570,7 +555,9 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
           docType: documentModalType,
           format: documentModalType === 'DOC' ? documentFormat : undefined,
           summary: documentModalType === 'DOC' ? formData.summary : undefined,
-          content: documentModalType === 'DOC' ? buildInitialDocumentContent(formData.title, documentFormat) : undefined,
+          content: documentModalType === 'DOC'
+            ? formData.content || buildDocumentStarterContent(formData.title, documentFormat)
+            : undefined,
         })
         setDocumentModalOpen(false)
         await loadData()
@@ -609,6 +596,14 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
       return
     }
 
+    let targetDocumentId
+    try {
+      targetDocumentId = normalizeDocumentId(targetDocument.id)
+    } catch (error) {
+      toast.error(error?.message || '当前节点缺少有效文档ID，不能删除')
+      return
+    }
+
     const confirmed = await confirm({
       title: '确认删除',
       description: `确认删除${TYPE_LABELS[targetDocument.docType] || '节点'}”${targetDocument.title}”吗？删除后可在文档回收站恢复。`,
@@ -618,7 +613,7 @@ export const useKnowledgeBaseDetailController = ({ id, currentUser, navigate, lo
     if (!confirmed) return
 
     try {
-      await documentApi.deleteDocument(targetDocument.id)
+      await documentApi.deleteDocument(targetDocumentId)
       setSelectedDocumentId(null)
       await loadData()
       toast.success(`${TYPE_LABELS[targetDocument.docType] || targetDocument.docType}”${targetDocument.title}”已删除，可在文档回收站恢复`)

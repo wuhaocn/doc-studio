@@ -9,7 +9,7 @@ import {
   clearCurrentUser,
   getCurrentUser,
   hydrateCurrentUser,
-  parseAuthSessionBroadcastStorageEvent,
+  subscribeAuthSessionBroadcast,
 } from '../utils/user'
 
 const AuthContext = createContext(null)
@@ -66,12 +66,7 @@ export const AuthProvider = ({ children }) => {
       setCurrentUser(getCurrentUser())
     }
 
-    const handleStorage = (event) => {
-      const payload = parseAuthSessionBroadcastStorageEvent(event)
-      if (!payload) {
-        return
-      }
-
+    const handleBroadcast = (payload) => {
       const previousUser = getCurrentUser()
       const nextUser = applyAuthSessionBroadcastPayload(payload)
       if (!nextUser || previousUser?.tenantId !== nextUser.tenantId) {
@@ -84,10 +79,10 @@ export const AuthProvider = ({ children }) => {
     }
 
     window.addEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChanged)
-    window.addEventListener('storage', handleStorage)
+    const unsubscribeBroadcast = subscribeAuthSessionBroadcast(handleBroadcast)
     return () => {
       window.removeEventListener(AUTH_SESSION_CHANGED_EVENT, handleSessionChanged)
-      window.removeEventListener('storage', handleStorage)
+      unsubscribeBroadcast()
     }
   }, [])
 

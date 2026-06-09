@@ -129,7 +129,6 @@ public class AuthService {
             throw ex;
         }
         Tenant tenant = requireActiveTenant(member.getTenantId());
-        upgradePasswordHashIfNeeded(user, dto.getPassword());
         AuthSessionVO session = openSessionForTenantMember(user, tenant, member);
         auditLogService.recordSuccess(AuditLogCommand.builder()
             .tenantId(tenant.getId())
@@ -633,27 +632,9 @@ public class AuthService {
         return normalized;
     }
 
-    private void upgradePasswordHashIfNeeded(UserAccount user, String rawPassword) {
-        if (user == null || !passwordCodec.needsRehash(user.getPasswordHash())) {
-            return;
-        }
-        user.setPasswordHash(passwordCodec.hash(rawPassword));
-        user.setUpdatedAt(LocalDateTime.now());
-        userAccountMapper.updateById(user);
-    }
-
     private UserSession findActiveSessionByRawToken(String rawToken) {
         String hashedToken = opaqueTokenCodec.hash(rawToken);
-        UserSession session = findActiveSessionByStoredToken(hashedToken);
-        if (session != null) {
-            return session;
-        }
-        session = findActiveSessionByStoredToken(rawToken);
-        if (session != null && Objects.equals(session.getAccessToken(), rawToken)) {
-            session.setAccessToken(hashedToken);
-            userSessionMapper.updateById(session);
-        }
-        return session;
+        return findActiveSessionByStoredToken(hashedToken);
     }
 
     private UserSession findActiveSessionByStoredToken(String storedToken) {

@@ -21,19 +21,6 @@ class DocumentContentSupportTest {
     }
 
     @Test
-    void shouldNormalizeEscapedMarkdownLineBreaksIntoPlainText() {
-        DocumentContentSupport.NormalizedStoredDocument normalized = DocumentContentSupport.normalizeStoredDocument(
-            "DOC",
-            "MARKDOWN",
-            "# 项目启动清单\\n- 确认客户信息\\n- 确认硬件版本",
-            "项目启动清单 确认客户信息 确认硬件版本",
-            "适用于制造项目实施启动阶段的标准清单。"
-        );
-
-        assertThat(normalized.contentText()).isEqualTo("项目启动清单 确认客户信息 确认硬件版本");
-    }
-
-    @Test
     void shouldRenderMarkdownIntoCanonicalHtml() {
         DocumentContentSupport.NormalizedDocumentContent normalized = DocumentContentSupport.normalizeDocument(
             "DOC",

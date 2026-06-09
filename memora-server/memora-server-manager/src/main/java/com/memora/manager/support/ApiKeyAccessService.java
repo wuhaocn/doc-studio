@@ -63,9 +63,6 @@ public class ApiKeyAccessService {
             recordInvalidKeyFailure(apiKey, actionType, "当前 API key 无效");
             throw new BusinessException(401, "当前 API key 无效");
         }
-        if (passwordCodec.needsRehash(apiKey.getSecretHash())) {
-            apiKey.setSecretHash(passwordCodec.hash(rawKey));
-        }
 
         ServiceAccount serviceAccount = requireActiveServiceAccount(apiKey, actionType);
         if (apiKey.getStatus() == null || apiKey.getStatus() == API_KEY_STATUS_DISABLED) {

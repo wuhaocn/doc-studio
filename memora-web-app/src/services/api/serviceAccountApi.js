@@ -21,6 +21,10 @@ export const serviceAccountApi = {
     return httpClient.post(`/api/v1/service-accounts/${serviceAccountId}/enable`)
   },
 
+  deleteServiceAccount: async (serviceAccountId) => {
+    return httpClient.delete(`/api/v1/service-accounts/${serviceAccountId}`)
+  },
+
   disableApiKey: async (apiKeyId) => {
     return httpClient.post(`/api/v1/api-keys/${apiKeyId}/disable`)
   },

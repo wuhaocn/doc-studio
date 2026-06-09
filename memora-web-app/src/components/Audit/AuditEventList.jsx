@@ -40,6 +40,7 @@ const ACTION_LABELS = {
   CREATE_SERVICE_ACCOUNT: '创建机器主体',
   ENABLE_SERVICE_ACCOUNT: '启用机器主体',
   DISABLE_SERVICE_ACCOUNT: '停用机器主体',
+  DELETE_SERVICE_ACCOUNT: '删除机器主体',
   CREATE_API_KEY: '创建访问密钥',
   REVEAL_API_KEY: '查看访问密钥',
   UPDATE_API_KEY_SCOPE: '更新密钥访问范围',

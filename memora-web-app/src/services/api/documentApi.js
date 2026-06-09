@@ -1,4 +1,5 @@
 import httpClient from '../http/axios'
+import { normalizeDocumentId } from '../../utils/documentId'
 
 // 文档API服务
 export const documentApi = {
@@ -50,7 +51,7 @@ export const documentApi = {
   },
 
   deleteDocument: async (id) => {
-    return httpClient.delete(`/api/v1/documents/${id}`)
+    return httpClient.delete(`/api/v1/documents/${normalizeDocumentId(id)}`)
   },
 
   getDeletedDocuments: async (params = {}) => {

@@ -1,12 +1,11 @@
 const STORAGE_KEY = 'memora-auth-session'
 export const AUTH_SESSION_CHANGED_EVENT = 'memora:auth-session-changed'
-export const AUTH_SESSION_BROADCAST_STORAGE_KEY = 'memora-auth-session-broadcast'
+export const AUTH_SESSION_BROADCAST_CHANNEL = 'memora-auth-session-broadcast'
 const AUTH_SESSION_BROADCAST_ACTIONS = {
   SYNC: 'SYNC',
   CLEAR: 'CLEAR',
 }
 const primaryStorage = () => window.sessionStorage
-const legacyStorage = () => window.localStorage
 
 const normalizeSessionUser = (session) => {
   if (!session?.userId || !session?.tenantId) {
@@ -52,7 +51,7 @@ const normalizeStoredUser = (storedUser) => {
 
 const readStoredUser = () => {
   try {
-    const rawValue = primaryStorage().getItem(STORAGE_KEY) || legacyStorage().getItem(STORAGE_KEY)
+    const rawValue = primaryStorage().getItem(STORAGE_KEY)
     if (!rawValue) {
       return null
     }
@@ -61,12 +60,6 @@ const readStoredUser = () => {
     const normalized = normalizeStoredUser(parsed)
     if (!normalized) {
       return null
-    }
-
-    const normalizedValue = JSON.stringify(normalized)
-    if (!primaryStorage().getItem(STORAGE_KEY) || primaryStorage().getItem(STORAGE_KEY) !== normalizedValue) {
-      primaryStorage().setItem(STORAGE_KEY, normalizedValue)
-      legacyStorage().removeItem(STORAGE_KEY)
     }
 
     return normalized
@@ -97,17 +90,21 @@ const writeStoredUser = (user) => {
   }
 
   primaryStorage().setItem(STORAGE_KEY, nextValue)
-  legacyStorage().removeItem(STORAGE_KEY)
   return normalizedUser
 }
 
 const broadcastSessionChange = (action, user = null) => {
-  legacyStorage().setItem(AUTH_SESSION_BROADCAST_STORAGE_KEY, JSON.stringify({
+  if (typeof BroadcastChannel === 'undefined') {
+    return
+  }
+
+  const channel = new BroadcastChannel(AUTH_SESSION_BROADCAST_CHANNEL)
+  channel.postMessage({
     action,
     user,
     emittedAt: Date.now(),
-  }))
-  legacyStorage().removeItem(AUTH_SESSION_BROADCAST_STORAGE_KEY)
+  })
+  channel.close()
 }
 
 const persistUser = (user, options = {}) => {
@@ -136,7 +133,6 @@ export const hydrateCurrentUser = (session) => {
 
 export const clearCurrentUser = (options = {}) => {
   primaryStorage().removeItem(STORAGE_KEY)
-  legacyStorage().removeItem(STORAGE_KEY)
   if (options.broadcast !== false) {
     broadcastSessionChange(AUTH_SESSION_BROADCAST_ACTIONS.CLEAR)
   }
@@ -145,13 +141,9 @@ export const clearCurrentUser = (options = {}) => {
   }
 }
 
-export const parseAuthSessionBroadcastStorageEvent = (event) => {
-  if (event?.key !== AUTH_SESSION_BROADCAST_STORAGE_KEY || !event?.newValue) {
-    return null
-  }
-
+export const parseAuthSessionBroadcastMessage = (message) => {
   try {
-    const payload = JSON.parse(event.newValue)
+    const payload = typeof message === 'string' ? JSON.parse(message) : message
     if (!payload?.action || !Object.values(AUTH_SESSION_BROADCAST_ACTIONS).includes(payload.action)) {
       return null
     }
@@ -160,6 +152,21 @@ export const parseAuthSessionBroadcastStorageEvent = (event) => {
     console.error('解析跨标签页会话广播失败', error)
     return null
   }
+}
+
+export const subscribeAuthSessionBroadcast = (handler) => {
+  if (typeof BroadcastChannel === 'undefined') {
+    return () => {}
+  }
+
+  const channel = new BroadcastChannel(AUTH_SESSION_BROADCAST_CHANNEL)
+  channel.onmessage = (event) => {
+    const payload = parseAuthSessionBroadcastMessage(event.data)
+    if (payload) {
+      handler(payload)
+    }
+  }
+  return () => channel.close()
 }
 
 export const applyAuthSessionBroadcastPayload = (payload) => {

@@ -292,12 +292,43 @@ const ServiceAccessPanel = ({
       return
     }
 
+    if (!enabling && createKeyAccountId === account.id) {
+      setCreateKeyAccountId(null)
+      setCreateKeyForm(buildCreateKeyForm(knowledgeBases))
+    }
     await runManagedAction(
       `service-account:${account.id}:${enabling ? 'enable' : 'disable'}`,
       () => (enabling
         ? serviceAccountApi.enableServiceAccount(account.id)
         : serviceAccountApi.disableServiceAccount(account.id)),
       enabling ? '主体已恢复使用' : '主体已停用',
+    )
+  }
+
+  const handleDeleteServiceAccount = async (account) => {
+    const apiKeyCount = account.apiKeys?.length || 0
+    const confirmed = await confirm({
+      title: '删除机器主体',
+      description: apiKeyCount > 0
+        ? '删除后，主体下的密钥会立即失效并从列表移除。'
+        : '删除后将从列表移除。',
+      confirmLabel: '确认删除',
+      danger: true,
+    })
+    if (!confirmed) {
+      return
+    }
+
+    if (createKeyAccountId === account.id) {
+      setCreateKeyAccountId(null)
+      setCreateKeyForm(buildCreateKeyForm(knowledgeBases))
+    }
+    setEditingScopeKeyId(null)
+    setScopeEditDrafts({})
+    await runManagedAction(
+      `service-account:${account.id}:delete`,
+      () => serviceAccountApi.deleteServiceAccount(account.id),
+      '机器主体已删除',
     )
   }
 
@@ -418,9 +449,7 @@ const ServiceAccessPanel = ({
     <section className={styles.panel}>
       <div className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>开放接入</p>
-          <h2 className={styles.title}>机器接入凭证</h2>
-          <p className={styles.description}>统一管理机器主体和访问密钥；仍可再次展示的当前密钥会直接显示在卡片里。</p>
+          <h2 className={styles.title}>机器主体与密钥</h2>
         </div>
         <div className={styles.headerTools}>
           <div className={styles.headerStats}>
@@ -461,7 +490,10 @@ const ServiceAccessPanel = ({
           <div className={styles.accountList}>
             {serviceAccounts.map((account) => {
               const accountStatusLabel = SERVICE_ACCOUNT_STATUS_LABELS[account.status] || '未知状态'
-              const accountActionLoading = actionKey === `service-account:${account.id}:${account.status === 1 ? 'disable' : 'enable'}`
+              const accountActive = account.status === 1
+              const accountActionLoading = actionKey === `service-account:${account.id}:${accountActive ? 'disable' : 'enable'}`
+              const accountDeleteLoading = actionKey === `service-account:${account.id}:delete`
+              const accountBusy = accountActionLoading || accountDeleteLoading
               const accountSeedScopes = account.apiKeys?.[0]?.scopes || []
 
               return (
@@ -470,7 +502,7 @@ const ServiceAccessPanel = ({
                     <div>
                       <div className={styles.accountTitleRow}>
                         <strong>{account.name}</strong>
-                        <span className={`${styles.statusBadge} ${account.status === 1 ? '' : styles.statusBadgeMuted}`}>
+                        <span className={`${styles.statusBadge} ${accountActive ? '' : styles.statusBadgeMuted}`}>
                           {accountStatusLabel}
                         </span>
                       </div>
@@ -479,7 +511,7 @@ const ServiceAccessPanel = ({
                         <span>{account.apiKeys?.length || 0} 把密钥</span>
                       </div>
                       {account.description ? <p className={styles.accountDescription}>{account.description}</p> : null}
-                      {account.status !== 1 ? (
+                      {!accountActive ? (
                         <div className={styles.accountStateNote}>
                           主体已停用，相关密钥暂不可使用。
                         </div>
@@ -487,22 +519,33 @@ const ServiceAccessPanel = ({
                     </div>
 
                     <div className={styles.accountActions}>
+                      {accountActive ? (
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          disabled={accountBusy}
+                          onClick={() => handleOpenCreateKeyForm(account)}
+                        >
+                          {createKeyAccountId === account.id ? '收起新增密钥' : '新增密钥'}
+                        </button>
+                      ) : null}
                       <button
                         type="button"
-                        className={styles.secondaryButton}
-                        onClick={() => handleOpenCreateKeyForm(account)}
-                      >
-                        {createKeyAccountId === account.id ? '收起新增密钥' : '新增密钥'}
-                      </button>
-                      <button
-                        type="button"
-                        className={account.status === 1 ? styles.dangerButton : styles.secondaryButton}
-                        disabled={accountActionLoading}
+                        className={accountActive ? styles.dangerButton : styles.secondaryButton}
+                        disabled={accountBusy}
                         onClick={() => handleToggleServiceAccount(account)}
                       >
                         {accountActionLoading
-                          ? (account.status === 1 ? '停用中...' : '启用中...')
-                          : (account.status === 1 ? '停用主体' : '恢复主体')}
+                          ? (accountActive ? '停用中...' : '启用中...')
+                          : (accountActive ? '停用主体' : '恢复主体')}
+                      </button>
+                      <button
+                        type="button"
+                        className={styles.dangerButton}
+                        disabled={accountBusy}
+                        onClick={() => handleDeleteServiceAccount(account)}
+                      >
+                        {accountDeleteLoading ? '删除中...' : '删除主体'}
                       </button>
                     </div>
                   </div>
@@ -652,7 +695,7 @@ const ServiceAccessPanel = ({
                             <div className={styles.secretCard}>
                               <div className={styles.secretCardHeader}>
                                 <strong>当前密钥</strong>
-                                <span>{secretState === 'visible' ? '进入页面直接可见' : '可复制保存'}</span>
+                                <span>{secretState === 'visible' ? '可复制' : '需保存'}</span>
                               </div>
                               <textarea value={plainTextKey} readOnly rows={2} />
                               <div className={styles.secretActions}>
@@ -730,7 +773,11 @@ const ServiceAccessPanel = ({
                         </section>
                       )
                     }) : (
-                      <div className={styles.emptyState}>当前主体还没有可用密钥，可直接新增一把。</div>
+                      <div className={styles.emptyState}>
+                        {accountActive
+                          ? '当前主体还没有可用密钥，可直接新增一把。'
+                          : '主体已停用，可恢复后新增可用密钥，或直接删除主体。'}
+                      </div>
                     )}
                   </div>
                 </article>
@@ -756,7 +803,7 @@ const ServiceAccessPanel = ({
           <div className={styles.formSectionHeader}>
             <div>
               <strong>新建机器主体</strong>
-              <span>创建后会直接拿到首把可用密钥。</span>
+              <span>同时创建首把密钥。</span>
             </div>
           </div>
 
@@ -788,7 +835,7 @@ const ServiceAccessPanel = ({
                 rows={3}
                 value={accountForm.description}
                 onChange={(event) => setAccountForm((current) => ({ ...current, description: event.target.value }))}
-                placeholder="描述这个主体对应的系统或链路"
+                placeholder="可选"
               />
             </label>
 
@@ -821,7 +868,7 @@ const ServiceAccessPanel = ({
             </div>
 
             <div className={styles.footer}>
-              <div className={styles.subtleText}>至少选择 1 个知识库。</div>
+              <div className={styles.subtleText}>至少 1 个知识库</div>
               <div className={styles.keyActions}>
                 {serviceAccounts.length > 0 ? (
                   <button type="button" className={styles.secondaryButton} onClick={handleToggleCreateForm}>

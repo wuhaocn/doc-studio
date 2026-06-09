@@ -7,6 +7,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.validation.BindException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -51,6 +52,12 @@ public class GlobalExceptionHandler {
             .reduce((a, b) -> a + "; " + b)
             .orElse("参数校验失败");
         return Result.error(400, message);
+    }
+
+    @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+    public Result<Void> handleMethodArgumentTypeMismatchException(MethodArgumentTypeMismatchException e) {
+        log.warn("路径参数类型异常: {}={}", e.getName(), e.getValue());
+        return Result.error(400, "请求路径参数不合法");
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

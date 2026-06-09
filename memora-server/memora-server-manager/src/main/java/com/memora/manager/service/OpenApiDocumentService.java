@@ -290,7 +290,12 @@ public class OpenApiDocumentService {
         document.setTenantId(principal.tenantId());
         document.setKnowledgeBaseId(knowledgeBase.getId());
         document.setTitle(normalizedTitle);
-        document.setSlug(resolveDocumentSlug(normalizedTitle, dto.getSlug()));
+        document.setSlug(resolveUniqueDocumentSlug(
+            knowledgeBase.getId(),
+            null,
+            parent,
+            resolveDocumentSlug(normalizedTitle, dto.getSlug())
+        ));
         document.setDocType("DOC");
         document.setFormat(normalizedContent.format());
         document.setContent(normalizedContent.content());
@@ -668,7 +673,12 @@ public class OpenApiDocumentService {
         document.setTenantId(principal.tenantId());
         document.setKnowledgeBaseId(knowledgeBase.getId());
         document.setTitle(normalizedTitle);
-        document.setSlug(resolveDocumentSlug(normalizedTitle, dto.getSlug()));
+        document.setSlug(resolveUniqueDocumentSlug(
+            knowledgeBase.getId(),
+            null,
+            parent,
+            resolveDocumentSlug(normalizedTitle, dto.getSlug())
+        ));
         document.setDocType("DOC");
         document.setFormat(normalizedContent.format());
         document.setContent(normalizedContent.content());
@@ -762,6 +772,7 @@ public class OpenApiDocumentService {
             contentSourceChanged
         );
         Long nextParentId = parent == null ? 0L : parent.getId();
+        nextSlug = resolveUniqueDocumentSlug(knowledgeBase.getId(), document.getId(), parent, nextSlug);
         String nextPath = buildPath(parent, nextSlug);
         boolean versionContentChanged = !Objects.equals(document.getTitle(), nextTitle)
             || !Objects.equals(document.getFormat(), normalizedContent.format())
@@ -1003,6 +1014,27 @@ public class OpenApiDocumentService {
 
     private String resolveDocumentSlug(String title, String slug) {
         return StringUtils.hasText(slug) ? SlugUtils.toSlug(slug) : SlugUtils.toSlug(title);
+    }
+
+    private String resolveUniqueDocumentSlug(Long knowledgeBaseId, Long documentId, Document parent, String baseSlug) {
+        String normalizedBaseSlug = StringUtils.hasText(baseSlug) ? baseSlug : SlugUtils.toSlug(null);
+        String candidateSlug = normalizedBaseSlug;
+        int suffix = 2;
+        while (documentPathExists(knowledgeBaseId, documentId, buildPath(parent, candidateSlug))) {
+            candidateSlug = normalizedBaseSlug + "-" + suffix++;
+        }
+        return candidateSlug;
+    }
+
+    private boolean documentPathExists(Long knowledgeBaseId, Long documentId, String path) {
+        LambdaQueryWrapper<Document> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Document::getKnowledgeBaseId, knowledgeBaseId)
+            .eq(Document::getPath, path);
+        if (documentId != null) {
+            queryWrapper.ne(Document::getId, documentId);
+        }
+        queryWrapper.last("LIMIT 1");
+        return documentMapper.selectOne(queryWrapper) != null;
     }
 
     private String buildPath(Document parent, String slug) {

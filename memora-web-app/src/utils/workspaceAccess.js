@@ -26,7 +26,7 @@ export const resolveManagedApiKeyDisplay = (apiKey = {}) => {
 
   return {
     plainTextKey: '',
-    state: 'legacy',
-    hint: '这把密钥创建较早，暂不支持再次显示，可直接重新生成。',
+    state: 'rotate_required',
+    hint: '当前密钥不可再次显示，可直接重新生成。',
   }
 }

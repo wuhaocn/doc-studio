@@ -19,7 +19,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
     properties = {
         "spring.datasource.url=jdbc:h2:file:./var/test-runtime/local-admin-${random.uuid};MODE=MySQL;DATABASE_TO_LOWER=TRUE;DEFAULT_NULL_ORDERING=HIGH",
         "logging.level.com.memora=warn",
-        "memora.auth.allow-demo-token=false"
     }
 )
 @AutoConfigureMockMvc

@@ -100,6 +100,9 @@ public class ServiceAccountService {
     @Transactional(rollbackFor = Exception.class)
     public IssuedApiKeyVO createApiKey(Long serviceAccountId, ApiKeyCreateDTO dto) {
         ServiceAccountContext context = requireManageableServiceAccount(serviceAccountId);
+        if (!Objects.equals(context.serviceAccount().getStatus(), ApiKeyAccessService.SERVICE_ACCOUNT_STATUS_ACTIVE)) {
+            throw new BusinessException(400, "当前机器主体已停用，请先恢复后再新增密钥");
+        }
         return issueApiKey(
             context.serviceAccount(),
             dto.getName(),
@@ -185,6 +188,27 @@ public class ServiceAccountService {
             .actionType(AuditLogConstants.ACTION_DISABLE_SERVICE_ACCOUNT)
             .detail("停用机器主体，主体下密钥会立即停止外部调用")
             .build());
+    }
+
+    @Transactional(rollbackFor = Exception.class)
+    public void deleteServiceAccount(Long serviceAccountId) {
+        ServiceAccountContext context = requireManageableServiceAccount(serviceAccountId);
+        long apiKeyCount = apiKeyMapper.selectCount(new LambdaQueryWrapper<ApiKey>()
+            .eq(ApiKey::getServiceAccountId, serviceAccountId));
+
+        auditLogService.recordSuccess(AuditLogCommand.builder()
+            .tenantId(context.serviceAccount().getTenantId())
+            .actorUserId(currentAccessContext.getCurrentUserId())
+            .actorRole(context.actorRole())
+            .objectType(AuditLogConstants.OBJECT_SERVICE_ACCOUNT)
+            .objectId(context.serviceAccount().getId())
+            .objectTitle(context.serviceAccount().getName())
+            .actionType(AuditLogConstants.ACTION_DELETE_SERVICE_ACCOUNT)
+            .detail(apiKeyCount > 0
+                ? "删除机器主体并移除 " + apiKeyCount + " 把访问密钥"
+                : "删除空机器主体")
+            .build());
+        serviceAccountMapper.deleteById(serviceAccountId);
     }
 
     @Transactional(rollbackFor = Exception.class)

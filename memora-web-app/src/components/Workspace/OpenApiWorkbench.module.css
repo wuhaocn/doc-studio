@@ -21,34 +21,18 @@
   gap: 16px;
 }
 
-.eyebrow {
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: #245bdb;
-}
-
 .title {
-  margin-top: 6px;
   color: #111827;
   font-size: clamp(24px, 2.7vw, 34px);
   line-height: 1.08;
 }
 
-.description,
-.cardDescription,
 .subtleText,
 .inlineHint,
 .resultMeta span {
   color: #66707c;
   font-size: 12px;
   line-height: 1.7;
-}
-
-.description {
-  margin-top: 10px;
-  max-width: 760px;
 }
 
 .headerPills {
@@ -173,6 +157,71 @@
   margin-top: 14px;
 }
 
+.quickExamples {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(31, 111, 255, 0.12);
+  background: rgba(31, 111, 255, 0.05);
+}
+
+.quickExamples strong,
+.quickExamples span {
+  display: block;
+}
+
+.quickExamples strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.quickExamples span {
+  margin-top: 4px;
+  color: #66707c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.quickExampleActions {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  width: min(320px, 100%);
+}
+
+.quickExampleButton {
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: #ffffff;
+  text-align: left;
+}
+
+.quickExampleButton:hover {
+  border-color: rgba(31, 111, 255, 0.22);
+}
+
+.quickExampleButton strong,
+.quickExampleButton span {
+  display: block;
+}
+
+.quickExampleButton strong {
+  color: #111827;
+  font-size: 13px;
+}
+
+.quickExampleButton span {
+  margin-top: 4px;
+  color: #66707c;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 .actionRow {
   margin-top: 18px;
   align-items: center;
@@ -279,11 +328,17 @@
   .cardHeader,
   .resultTopline,
   .actionRow,
-  .inlineActions {
+  .inlineActions,
+  .quickExamples {
     flex-direction: column;
   }
 
   .formGrid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .quickExampleActions {
+    justify-content: flex-start;
+    width: 100%;
   }
 }

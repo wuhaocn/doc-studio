@@ -234,12 +234,6 @@ public class TenantInviteService {
             throw new BusinessException(401, "密码错误，请使用该账号原有密码接受邀请");
         }
 
-        if (passwordCodec.needsRehash(userByUsername.getPasswordHash())) {
-            userByUsername.setPasswordHash(passwordCodec.hash(dto.getPassword()));
-            userByUsername.setUpdatedAt(LocalDateTime.now());
-            userAccountMapper.updateById(userByUsername);
-        }
-
         return userByUsername;
     }
 

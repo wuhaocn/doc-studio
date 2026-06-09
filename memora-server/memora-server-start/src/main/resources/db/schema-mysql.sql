@@ -61,10 +61,6 @@ CREATE TABLE IF NOT EXISTS `user_session` (
 
 CREATE UNIQUE INDEX `uk_user_session_access_token` ON `user_session` (`access_token`);
 CREATE INDEX `idx_user_session_user_tenant` ON `user_session` (`user_id`, `tenant_id`);
-ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `client_type` VARCHAR(60) DEFAULT NULL;
-ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `user_agent` VARCHAR(255) DEFAULT NULL;
-ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `ip_address` VARCHAR(64) DEFAULT NULL;
-ALTER TABLE `user_session` ADD COLUMN IF NOT EXISTS `revoked_at` DATETIME DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `tenant_invite` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,
@@ -116,10 +112,6 @@ CREATE INDEX `idx_kb_tenant_id` ON `knowledge_base` (`tenant_id`);
 CREATE INDEX `idx_kb_user_id` ON `knowledge_base` (`user_id`);
 CREATE INDEX `idx_kb_status` ON `knowledge_base` (`status`);
 CREATE INDEX `idx_kb_created_at` ON `knowledge_base` (`created_at`);
-ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_enabled` TINYINT DEFAULT 0;
-ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_slug` VARCHAR(120) DEFAULT NULL;
-ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_title` VARCHAR(120) DEFAULT NULL;
-ALTER TABLE `knowledge_base` ADD COLUMN IF NOT EXISTS `site_description` VARCHAR(500) DEFAULT NULL;
 CREATE UNIQUE INDEX `uk_kb_site_slug` ON `knowledge_base` (`site_slug`);
 
 CREATE TABLE IF NOT EXISTS `knowledge_base_member` (
@@ -179,13 +171,6 @@ CREATE INDEX `idx_doc_tenant_id` ON `document` (`tenant_id`);
 CREATE INDEX `idx_doc_user_id` ON `document` (`user_id`);
 CREATE INDEX `idx_doc_parent_id` ON `document` (`parent_id`);
 CREATE INDEX `idx_doc_created_at` ON `document` (`created_at`);
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `publish_status` VARCHAR(30) DEFAULT 'DRAFT';
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `public_slug` VARCHAR(160) DEFAULT NULL;
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `published_at` DATETIME DEFAULT NULL;
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `rendered_html` LONGTEXT;
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `render_checksum` VARCHAR(128) DEFAULT NULL;
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `source_external_id` VARCHAR(160) DEFAULT NULL;
-ALTER TABLE `document` ADD COLUMN IF NOT EXISTS `source_revision` VARCHAR(160) DEFAULT NULL;
 CREATE UNIQUE INDEX `uk_doc_kb_public_slug` ON `document` (`knowledge_base_id`, `public_slug`);
 CREATE UNIQUE INDEX `uk_doc_kb_source_external_id` ON `document` (`knowledge_base_id`, `source_external_id`);
 CREATE INDEX `idx_doc_publish_status` ON `document` (`publish_status`, `published_at`);
@@ -324,7 +309,6 @@ CREATE TABLE IF NOT EXISTS `api_key` (
 
 CREATE INDEX `idx_api_key_service_account` ON `api_key` (`service_account_id`, `created_at`);
 CREATE UNIQUE INDEX `uk_api_key_prefix` ON `api_key` (`key_prefix`);
-ALTER TABLE `api_key` ADD COLUMN IF NOT EXISTS `secret_ciphertext` VARCHAR(1024) DEFAULT NULL;
 
 CREATE TABLE IF NOT EXISTS `api_key_scope` (
   `id` BIGINT PRIMARY KEY AUTO_INCREMENT,

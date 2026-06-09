@@ -54,7 +54,6 @@ memora:
       industry: ${MEMORA_BOOTSTRAP_LOCAL_ADMIN_INDUSTRY:本地联调}
       plan-name: ${MEMORA_BOOTSTRAP_LOCAL_ADMIN_PLAN_NAME:TEAM}
   auth:
-    allow-demo-token: false
     session-cookie:
       name: ${MEMORA_AUTH_SESSION_COOKIE_NAME:MEMORA_SESSION}
       path: /

@@ -4,7 +4,7 @@
 
 `多租户工作区 + 知识库 + 文档树 + 版本`
 
-它不再是旧的单用户知识库 demo，也不再围绕资源库、AI 或技能系统展开。
+它不再是旧的单用户知识库原型，也不再围绕资源库、AI 或技能系统展开。
 
 ---
 
@@ -184,6 +184,7 @@ memora-server/
 - `POST /api/v1/service-accounts/{serviceAccountId}/api-keys`
 - `POST /api/v1/service-accounts/{serviceAccountId}/disable`
 - `POST /api/v1/service-accounts/{serviceAccountId}/enable`
+- `DELETE /api/v1/service-accounts/{serviceAccountId}`
 - `POST /api/v1/api-keys/{apiKeyId}/disable`
 - `POST /api/v1/api-keys/{apiKeyId}/reveal`
 - `POST /api/v1/api-keys/{apiKeyId}/revoke`
@@ -192,11 +193,13 @@ memora-server/
 
 说明：
 
-- `service account` 代表机器主体，可整体启停
+- `service account` 代表机器主体，可整体启停和删除
+- 停用主体期间不再签发新 key，需恢复主体后再新增密钥
+- 删除机器主体会级联移除其密钥与作用域，旧 key 立即无效，审计记录继续保留
 - 同一主体下支持签发多把 key
 - 每把 key 可按知识库分别配置 `READ / WRITE`
 - 新签发或轮换的 key 会保留一份加密展示副本；管理页列表会直接返回仍可展示的当前密钥，单独再次展示动作仍会写入审计
-- 历史旧 key 如果创建时没有展示副本，无法直接恢复明文，需要先重新生成
+- 不可展示的 key 无法恢复明文，需要直接重新生成
 - 当前访问密钥只绑定 `service account`，不按用户逐个签发个人 key；如果后续需要个人程序接入，应单独设计 `Personal Access Token`
 
 ### 开放文档接口
@@ -226,19 +229,6 @@ memora-server/
 - Open API 已补“保存后消费”基线：可按 `sourceExternalId` 直接定位文档，也可按 `metadata / rendered / source / plain / summary` 视图消费文档
 - `/services/config` 会暴露 Web 运行时标题、浏览器会话元数据和基础特性开关，供前端启动时读取
 
-### 文档内容维护接口
-
-- `POST /api/v1/documents/maintenance/normalize-content`
-
-说明：
-
-- 用于管理员按工作区或知识库范围执行历史文档内容归一化
-- 会修正文档与历史版本中的 `docType / format / contentText / summary`
-- 读取链路也会兜底识别历史正文里的字面量 `\n / \r\n`，避免 Markdown / HTML 被当成单行脏文本直接透出到阅读、分享和 Open API
-- 默认 `dryRun=true`，先返回命中与待修正数量；显式传 `dryRun=false` 才会真正落库
-
----
-
 ## 本地运行
 
 ### 启动
@@ -247,7 +237,7 @@ memora-server/
 ./start-backend.sh
 ```
 
-本地开发如需种子账号、H2 控制台和 `demo` token 测试入口：
+本地开发如需种子账号、H2 控制台和样例数据：
 
 ```bash
 ./start-backend-dev.sh
@@ -285,15 +275,15 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 - 密码：空
 - 默认不会加载完整演示种子数据
 - 默认会在本地 H2 文件库首次可用时自动引导一个最小管理员工作区：`admin / 123456`
-- 默认不接受 `Bearer demo:{tenantId}:{userId}`
+- 默认只接受真实登录产生的 `session:` 会话
 - 默认不输出 MyBatis SQL stdout
 - 默认只接受显式允许的 Web Origin；可通过 `MEMORA_WEB_ALLOWED_ORIGINS` 覆盖
 
-`dev` profile 使用 H2 内存库并加载种子数据：
+`dev` profile 使用 H2 内存库并加载种子账号与样例数据：
 
 - 启动命令：`./start-backend-dev.sh`
 - H2 控制台：`http://localhost:8080/h2-console`
-- 仅 `dev/test` profile 会开启 `demo` token，并加载完整演示账号与样例文档数据
+- `dev/test` profile 也必须通过真实登录获取 `session:` 会话
 
 ---
 
@@ -367,7 +357,7 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 - `UserSession.access_token` 仅保存哈希值，后端不再明文落库存储真实 session token
 - 浏览器登录、注册、刷新、邀请接受和工作区切换默认下发 `HttpOnly Cookie`，响应体不再回传前端可读 token
 - `user_session` 已补 `clientType / userAgent / ipAddress / revokedAt` 元数据，用于当前用户自助治理活跃设备会话；返回前只暴露脱敏后的 IP
-- 用户密码、API key 和分享访问码新写入时统一使用强哈希；历史 `SHA-256` 数据在首次成功校验后自动升级
+- 用户密码、API key 和分享访问码统一使用强哈希；不保留旧密码哈希自动升级路径
 - 邀请 token 与公开分享 token 仅在创建当下明文返回一次，数据库与后续列表接口只保留哈希或脱敏结果
 - 公开分享与邀请访问路径进入审计前会先做 token 脱敏
 - 500 响应不再直接回显内部异常文本，只返回通用文案和 `requestId`
@@ -378,9 +368,7 @@ MEMORA_GRADLE_CMD=gradle ./scripts/backend-test.sh
 - 默认启用定时自动归档，按 `memora.audit.retention-scheduler.*` 配置每日执行
 - 当前仍保留 `POST /api/v1/audit-logs/retention/run` 供管理员手动触发
 
-除公开分享与邀请读取入口外，主流程接口都要求有效会话；Web 端默认通过 Cookie 续期，非浏览器客户端继续使用 bearer token。
-
-`Authorization: Bearer demo:{tenantId}:{userId}` 仅保留给 `dev/test` profile 和自动化验证，不属于默认运行态能力。
+除公开分享与邀请读取入口外，主流程接口都要求有效会话；Web 端默认通过 Cookie 续期，非浏览器客户端继续使用真实登录返回的 bearer token。
 
 ### 当前测试覆盖
 

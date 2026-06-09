@@ -143,10 +143,6 @@ public class DocumentShareService {
             auditShareFailure(context, "访问码错误");
             throw new BusinessException(403, "当前分享访问码错误");
         }
-        if (StringUtils.hasText(context.shareLink().getAccessCodeHash())
-            && passwordCodec.needsRehash(context.shareLink().getAccessCodeHash())) {
-            context.shareLink().setAccessCodeHash(passwordCodec.hash(normalizedAccessCode));
-        }
 
         context.shareLink().setLastAccessedAt(LocalDateTime.now());
         context.shareLink().setUpdatedAt(LocalDateTime.now());

@@ -29,9 +29,9 @@ class DefaultRuntimeSafetyIntegrationTest {
     private JdbcTemplate jdbcTemplate;
 
     @Test
-    void shouldRejectDemoTokenInDefaultRuntimeMode() throws Exception {
+    void shouldRejectNonSessionBearerTokenInDefaultRuntimeMode() throws Exception {
         mockMvc.perform(get("/api/v1/workspaces/current/dashboard")
-                .header("Authorization", "Bearer demo:1:1"))
+                .header("Authorization", "Bearer invalid-token"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.code").value(401))
             .andExpect(jsonPath("$.message").value("当前请求未携带有效会话"));

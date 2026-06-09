@@ -11,8 +11,6 @@ spring:
       data-locations: classpath:db/seed-data.sql
 
 memora:
-  auth:
-    allow-demo-token: true
   api-key:
     secret-encryption-key: memora-test-api-key-secret
   audit:
